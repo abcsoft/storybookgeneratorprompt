@@ -78,7 +78,7 @@ npm run dev
 Upload 3–5 clear, face-visible photos, enter a name/age/gender, pick a book,
 and click **Create my storybook**. The PDF downloads automatically when done.
 
-## Three ways to make a book
+## Two ways to make a book
 
 ### 1. In the app: "I'll make the images" — free (uses your Gemini app quota)
 
@@ -119,42 +119,17 @@ npm run regenerate -- --name Mia --book the-great-detective \
 `prompts.md`, and the PDF to `<STORYBOOK_OUT_DIR>/<child-slug>/`. `regenerate`
 versions its output (`images-v2/`, `images-v3/`, …) and rebuilds the PDF.
 
-### 3. Web automation — free, drives gemini.google.com with Playwright
-
-`npm run web-generate` automates the **Gemini web app** in a real Chrome
-session (via Playwright), so images come out of your logged-in Google plan
-instead of the paid API:
-
-```bash
-npm run web-generate -- --dir "<run-folder>" --photos "/path/to/photos" \
-  [--pages 1,2,5] [--out images-v8] [--anchor-only] [--headful]
-```
-
-- Prompts come from the run folder's `manifest.json` (written by
-  `npm run prompts`) or a `prompts.md` via `--prompts`.
-- Uses a **persistent Chrome profile** (`GEMINI_WEB_PROFILE_DIR`, default
-  `~/.storybook-gemini-profile`) — log in to Google once with `--headful`, then
-  reuse it.
-- Attaches the character anchor + a real photo to every page, paces requests,
-  retries failures, and is **resumable** (pages that already have an image are
-  skipped).
-- Trade-offs: slower than the API, and images carry Gemini's watermark.
-
-> ⚠️ Automating the web app to avoid API billing likely violates Google's
-> Terms of Service — use at your own risk.
-
 ## Configuration (`.env.local`)
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | — | Required for API generation (not for web automation). |
+| `GEMINI_API_KEY` | — | Required for API generation. |
 | `GEMINI_MODEL` | `gemini-3.1-flash-image` | Image model (Nano Banana 2). |
 | `IMAGE_SIZE` | `2K` | Image tier: `1K` \| `2K` \| `4K`. |
 | `GEMINI_SERVICE_TIER` | `flex` | `flex` (cheaper, slower) \| `standard` \| `priority`. |
 | `GEMINI_TIMEOUT_MS` | `900000` | Per-request timeout (flex can queue for minutes). |
 | `GEN_CONCURRENCY` | `1` | Pages generated in parallel. |
 | `STORYBOOK_OUT_DIR` | `./storybook-out` | Where CLI runs save output. |
-| `GEMINI_WEB_PROFILE_DIR` | `~/.storybook-gemini-profile` | Chrome profile for web automation. |
 
 ## Project layout
 
@@ -165,8 +140,6 @@ npm run web-generate -- --dir "<run-folder>" --photos "/path/to/photos" \
 | `lib/story/greatAdventureTemplate.ts` | "Great Adventure": connected journey, spreads + per-scene lighting. |
 | `lib/story/theGreatDetectiveTemplate.ts` | "The Great Detective": connected mystery, spreads + lighting. |
 | `lib/gemini/imageClient.ts` | Gemini image wrapper (aspect ratios, retries, service tier). |
-| `lib/web/geminiWeb.ts` | Playwright session driving gemini.google.com (free path). |
-| `lib/web/selectors.ts` | Resilient selectors for the Gemini web UI. |
 | `lib/images/preprocess.ts` | Downscales/normalizes photos with `sharp`. |
 | `lib/generate/orchestrator.ts` | Runs pages through Gemini, builds the PDF. |
 | `lib/generate/jobStore.ts` | In-memory job + progress state (POC). |
@@ -176,7 +149,7 @@ npm run web-generate -- --dir "<run-folder>" --photos "/path/to/photos" \
 | `lib/config.ts` | Model id, print size, concurrency, art style. |
 | `app/page.tsx` + `app/Studio.tsx` | Book shelf picker + the two flows. |
 | `app/api/**` | `generate`, `prompts`, `assemble`, `jobs/:id`, `jobs/:id/pdf`. |
-| `scripts/*.ts` | CLI: `prompts`, `assemble`, `generate`, `regenerate`, `web-generate`. |
+| `scripts/*.ts` | CLI: `prompts`, `assemble`, `generate`, `regenerate`. |
 
 ## Adding more storybooks
 
@@ -215,6 +188,4 @@ two facing pages. Tune in `lib/config.ts`.
 
 This MVP is **local-first**. For Vercel: move the job store to a durable store
 (e.g. Upstash KV), run generation on a background-capable function, and swap
-Puppeteer for `@sparticuz/chromium` + `puppeteer-core`. Web automation
-(`web-generate`) is local-only by nature — it needs a real logged-in Chrome
-profile.
+Puppeteer for `@sparticuz/chromium` + `puppeteer-core`.
