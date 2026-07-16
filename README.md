@@ -2,7 +2,7 @@
 
 Upload a few photos of a child and generate a **print-ready PDF picture book**
 with the child illustrated as the hero on every page — in a landscape
-picture-book format).
+picture-book format.
 
 Illustrations are generated with Google **Gemini Nano Banana 2**
 (`gemini-3.1-flash-image`), which keeps the child's likeness consistent across
@@ -10,6 +10,17 @@ every page using the uploaded photos (plus a one-time "character anchor"
 portrait) as reference images.
 
 ![Storybook Studio — pick a book, enter the child's name, age and gender, and generate a print-ready picture book](docs/screenshots/studio.png)
+
+## What you get
+
+Finished, print-ready pages — the child illustrated as the hero on every page,
+with the story woven into the art. Below is a sample book starring **Mia**, a
+*fictional, illustrated character* (these are sample pages, not a real child):
+
+|  |  |
+| :---: | :---: |
+| ![Cover — Mia's Dream Big Adventure](docs/screenshots/samples/page-01-cover.png) | ![Mia the pilot flying a plane](docs/screenshots/samples/page-02-pilot.png) |
+| ![Mia the astronaut in space](docs/screenshots/samples/page-03-astronaut.png) | ![Mia the artist painting](docs/screenshots/samples/page-04-artist.png) |
 
 ## The books
 
@@ -37,6 +48,20 @@ fast if a spread would land across a page-turn instead of on facing pages.
 
 Because a book is 21–26 image calls (~1–3 minutes), generation is a polled job
 rather than one blocking request.
+
+## Privacy
+
+Storybook Generator is **local-first**: you run it yourself, and there is no
+hosted backend of ours that receives or stores anything. Uploaded photos are
+held in memory only for the duration of a generation and are **never written to
+disk** — only the generated artwork and the finished PDF are saved, on your own
+machine.
+
+Generating the illustrations does send the photos to **Google's Gemini API**
+(or, on the free path, the Gemini web app), so they leave your machine for that
+step and are subject to Google's data policies. Nothing else transmits them
+anywhere. Use only photos you have the right to use, and the minimum needed for
+a good likeness.
 
 ## Setup
 
