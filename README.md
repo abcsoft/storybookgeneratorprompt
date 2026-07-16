@@ -2,7 +2,7 @@
 
 Upload a few photos of a child and generate a **print-ready PDF picture book**
 with the child illustrated as the hero on every page — in a landscape
-picture-book format inspired by [diffrun](https://diffrun.com).
+picture-book format).
 
 Illustrations are generated with Google **Gemini Nano Banana 2**
 (`gemini-3.1-flash-image`), which keeps the child's likeness consistent across
