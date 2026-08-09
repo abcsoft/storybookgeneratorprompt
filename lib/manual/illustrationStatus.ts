@@ -47,16 +47,24 @@ export function derivePrimaryBadge(entry: {
   status: IllustrationStatus;
   needsRegeneration?: boolean;
   hasCustomTransform?: boolean;
-}): { label: string; kind: "missing" | "added" | "needs-regeneration" | "adjusted" | "approved" } {
+}): {
+  label: string;
+  kind: "missing" | "added" | "needs-regeneration" | "adjusted" | "approved";
+  secondaryTag?: string;
+} {
   if (entry.status === "missing") return { label: "Missing", kind: "missing" };
   if (entry.status === "needs-regeneration" || entry.needsRegeneration) {
     return { label: "Needs regeneration", kind: "needs-regeneration" };
   }
+  if (entry.status === "approved") {
+    return {
+      label: "Approved",
+      kind: "approved",
+      secondaryTag: entry.hasCustomTransform ? "Framing Adjusted" : undefined,
+    };
+  }
   if (entry.hasCustomTransform) {
     return { label: "Framing Adjusted", kind: "adjusted" };
-  }
-  if (entry.status === "approved") {
-    return { label: "Approved", kind: "approved" };
   }
   return { label: "Added", kind: "added" };
 }

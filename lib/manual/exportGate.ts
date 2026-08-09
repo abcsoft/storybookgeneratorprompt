@@ -25,12 +25,20 @@ export interface ExportGateResult {
 }
 
 export function evaluateExportGate(
-  statuses: IllustrationStatus[],
+  inputs: (IllustrationStatus | { status: IllustrationStatus; needsRegeneration?: boolean })[],
   opts: ExportGateOptions,
 ): ExportGateResult {
-  const missing = statuses.filter((s) => s === "missing").length;
-  const needsRegeneration = statuses.filter((s) => s === "needs-regeneration").length;
-  const notApproved = statuses.filter((s) => s !== "approved").length;
+  const entries = inputs.map((item) =>
+    typeof item === "string" ? { status: item, needsRegeneration: item === "needs-regeneration" } : item,
+  );
+
+  const missing = entries.filter((e) => e.status === "missing").length;
+  const needsRegeneration = entries.filter(
+    (e) => e.status === "needs-regeneration" || e.needsRegeneration === true,
+  ).length;
+  const notApproved = entries.filter(
+    (e) => e.status !== "approved" || e.needsRegeneration === true,
+  ).length;
 
   const reasons: string[] = [];
   if (missing > 0) {

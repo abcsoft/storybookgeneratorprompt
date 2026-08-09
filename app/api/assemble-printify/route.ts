@@ -102,8 +102,17 @@ export async function POST(request: Request): Promise<Response> {
   const result = await exportPrintifyBook({ child, bookId, profileId, images, rawFiles });
 
   if (!result.ok) {
+    const issues = result.preflight.errors.map((err) => ({
+      type: "PREFLIGHT_ERROR",
+      message: err,
+    }));
     return NextResponse.json(
-      { error: "Preflight failed — nothing was exported.", preflight: result.preflight },
+      {
+        code: "PREFLIGHT_FAILED",
+        error: "Preflight failed — nothing was exported.",
+        issues,
+        preflight: result.preflight,
+      },
       { status: 400 },
     );
   }

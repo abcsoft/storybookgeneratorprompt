@@ -13,6 +13,8 @@ import {
   indexFromFilename,
   type ProvidedImage,
 } from "@/lib/manual/assemble";
+import { runPreflight } from "@/lib/print/preflight";
+import { sanitizeTransform, type ArtworkTransform } from "@/lib/print/artworkTransform";
 import { saveRun } from "@/lib/generate/saveRun";
 import { bookFilename } from "@/lib/story/registry";
 import type { ChildProfile } from "@/lib/story/types";
@@ -61,13 +63,28 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // Pair each image with its page by the leading number in the filename.
+  let transformsMap: Record<string, ArtworkTransform> = {};
+  const rawTransforms = form.get("transforms");
+  if (typeof rawTransforms === "string") {
+    try {
+      transformsMap = JSON.parse(rawTransforms);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
+  const rawFiles: { filename: string; buffer: Buffer }[] = [];
   const images = new Map<number, ProvidedImage>();
   for (const file of files) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    rawFiles.push({ filename: file.name, buffer });
     const index = indexFromFilename(file.name);
     if (index === null) continue;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    images.set(index, { buffer, mimeType: file.type || "image/png" });
+    images.set(index, {
+      buffer,
+      mimeType: file.type || "image/png",
+      transform: transformsMap[index] ? sanitizeTransform(transformsMap[index]) : undefined,
+    });
   }
 
   if (images.size === 0) {
@@ -79,6 +96,27 @@ export async function POST(request: Request): Promise<Response> {
 
   const bookId = (form.get("bookId") as string) || undefined;
   const profileId = (form.get("profileId") as string) || undefined;
+  const isDraft = form.get("draft") === "true";
+
+  if (!isDraft) {
+    const preflight = await runPreflight({ child, bookId, profileId, files: rawFiles });
+    if (!preflight.ok) {
+      const issues = preflight.errors.map((err) => ({
+        type: "PREFLIGHT_ERROR",
+        message: err,
+      }));
+      return NextResponse.json(
+        {
+          code: "PREFLIGHT_FAILED",
+          error: "Preflight validation failed — production export blocked.",
+          issues,
+          preflight,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   const { pdf } = await assembleFromImages(child, images, bookId, profileId);
 
   // Keep a per-child folder with the images, prompts, and finished PDF.

@@ -75,9 +75,9 @@ export function reviewResetIllustrations(
   const next: Record<number, IllustrationEntry> = {};
   for (const [key, entry] of Object.entries(illustrations)) {
     next[Number(key)] =
-      entry.status === "approved" || entry.status === "needs-regeneration"
-        ? { ...entry, status: "added" }
-        : entry;
+      entry.status === "approved" || entry.status === "needs-regeneration" || entry.needsRegeneration
+        ? { ...entry, status: "added", needsRegeneration: false }
+        : { ...entry, needsRegeneration: false };
   }
   return next;
 }
