@@ -927,6 +927,7 @@ export default function BookReview({
   exportLabel,
   onExport,
   onUpdateTransform,
+  onApprovePage,
   onMarkNeedsRegeneration,
   onClearNeedsRegeneration,
   onReplaceImage,
@@ -944,6 +945,7 @@ export default function BookReview({
   exportLabel: string;
   onExport: () => void;
   onUpdateTransform?: (manifestIndex: number, transform: ArtworkTransform) => void;
+  onApprovePage?: (manifestIndex: number) => void;
   onMarkNeedsRegeneration?: (manifestIndex: number) => void;
   onClearNeedsRegeneration?: (manifestIndex: number) => void;
   onReplaceImage?: (manifestIndex: number, file: File) => void;
@@ -981,6 +983,22 @@ export default function BookReview({
     : undefined;
 
   const textGeom = useMemo(() => computePageTextGeometry(profile), [profile]);
+
+  const totalIllustrations = manifest.length;
+  const approvedCount = manifest.filter(
+    (m) => illustrations[m.index]?.status === "approved" && !illustrations[m.index]?.needsRegeneration,
+  ).length;
+  const regenCount = manifest.filter(
+    (m) => illustrations[m.index]?.status === "needs-regeneration" || illustrations[m.index]?.needsRegeneration,
+  ).length;
+  const needReviewCount = Math.max(0, totalIllustrations - approvedCount - regenCount);
+
+  const unresolvedIndices = manifest
+    .filter((m) => {
+      const entry = illustrations[m.index];
+      return !entry || entry.status !== "approved" || entry.needsRegeneration;
+    })
+    .map((m) => m.index);
 
   function toggleOverlay(o: OverlayToggle) {
     setOverlays((cur) => {
@@ -1122,6 +1140,43 @@ export default function BookReview({
             </div>
           );
         })}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "12px",
+          background: "var(--surface-2)",
+          padding: "16px 20px",
+          borderRadius: "12px",
+          border: "1px solid var(--border)",
+          margin: "16px 0",
+        }}
+      >
+        <div>
+          <h4 style={{ margin: "0 0 6px", fontSize: "15px", fontWeight: 700, color: "var(--ink)" }}>
+            Production Review Summary ({totalIllustrations} illustrations total)
+          </h4>
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "13px" }}>
+            <span style={{ color: "#22c55e", fontWeight: 700 }}>✓ {approvedCount} approved</span>
+            <span style={{ color: "#3b82f6", fontWeight: 700 }}>👁️ {needReviewCount} need review</span>
+            <span style={{ color: "#ef4444", fontWeight: 700 }}>⚠️ {regenCount} need regeneration</span>
+          </div>
+        </div>
+
+        {unresolvedIndices.length > 0 && (
+          <button
+            type="button"
+            className={styles.button}
+            style={{ padding: "8px 14px", fontSize: "13px", background: "var(--star)", color: "#1c1440" }}
+            onClick={() => setOpenIndex(unresolvedIndices[0])}
+          >
+            Review unresolved pages ({unresolvedIndices.length}) 🔍
+          </button>
+        )}
       </div>
 
       {gate.blocked ? (
@@ -1329,6 +1384,57 @@ export default function BookReview({
             <p className={styles.hint}>
               Overlay is for review only — it never appears in the exported files.
             </p>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {openIndex !== null && illustrations[openIndex]?.status === "approved" ? (
+                  <span className={`${styles.statusBadge} ${styles.statusApproved}`} style={{ padding: "8px 14px", fontSize: "13px" }}>
+                    ✓ Approved
+                  </span>
+                ) : (
+                  openIndex !== null && (
+                    <button
+                      type="button"
+                      className={styles.button}
+                      style={{ padding: "8px 16px", background: "var(--star)", color: "#1c1440", fontWeight: 700 }}
+                      onClick={() => {
+                        onApprovePage?.(openIndex);
+                      }}
+                    >
+                      ✓ Approve Illustration
+                    </button>
+                  )
+                )}
+                {unresolvedIndices.length > 0 && openIndex !== null && (
+                  <button
+                    type="button"
+                    className={styles.button}
+                    style={{ padding: "8px 16px" }}
+                    onClick={() => {
+                      if (illustrations[openIndex]?.status !== "approved") {
+                        onApprovePage?.(openIndex);
+                      }
+                      const nextUnresolved = unresolvedIndices.find((idx) => idx !== openIndex);
+                      if (nextUnresolved !== undefined) {
+                        setOpenIndex(nextUnresolved);
+                      } else {
+                        setOpenIndex(null);
+                      }
+                    }}
+                  >
+                    ✓ Approve & Next Unresolved →
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setOpenIndex(null)}
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

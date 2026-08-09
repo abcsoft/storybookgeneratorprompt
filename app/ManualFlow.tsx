@@ -411,6 +411,23 @@ export default function ManualFlow({
     });
   }
 
+  function handleUpdateTransform(index: number, transform: ArtworkTransform) {
+    setIllustrations((cur) => {
+      const entry = cur[index];
+      if (!entry || entry.status === "missing") return cur;
+      // If framing is changed after approval, reset approval to "added" for safety so user re-reviews
+      const nextStatus = entry.status === "approved" ? "added" : entry.status;
+      return {
+        ...cur,
+        [index]: {
+          ...entry,
+          transform,
+          status: nextStatus,
+        },
+      };
+    });
+  }
+
   // ---------- Session actions (item 1-4, 7, 8) ----------
 
   /** "Clear all images" (item 2) — the one authoritative reset for every
@@ -538,16 +555,7 @@ export default function ManualFlow({
     return form;
   }
 
-  const handleUpdateTransform = (manifestIndex: number, transform: ArtworkTransform) => {
-    setIllustrations((cur) => {
-      const entry = cur[manifestIndex];
-      if (!entry) return cur;
-      return {
-        ...cur,
-        [manifestIndex]: { ...entry, transform },
-      };
-    });
-  };
+
 
   async function buildPdf() {
     setError(null);
@@ -859,6 +867,7 @@ export default function ManualFlow({
           exportLabel={exportMode === "printify-folder" ? "Export for Printify 📦" : "Build my PDF 📖"}
           onExport={exportMode === "printify-folder" ? exportPrintify : buildPdf}
           onUpdateTransform={handleUpdateTransform}
+          onApprovePage={onApprove}
           onMarkNeedsRegeneration={onMarkNeedsRegeneration}
           onClearNeedsRegeneration={onClearNeedsRegeneration}
           onReplaceImage={(index, file) => void applyFile(index, file)}

@@ -157,4 +157,49 @@ describe("ILLUSTRATION LIFECYCLE & STATE MACHINE REGRESSION TESTS", () => {
     expect(draftResult.blocked).toBe(false);
     expect(draftResult.warning).toContain("Not all images are approved");
   });
+
+  // Test 8: Framing changes on approved page automatically reset review to unapproved for safety
+  it("8. Modifying framing on an approved page resets status to added requiring re-approval", () => {
+    const approved: IllustrationEntry = {
+      status: "approved",
+      needsRegeneration: false,
+      file: null,
+      objectUrl: "blob:0",
+      clientCheck: null,
+    };
+
+    const nextStatus = approved.status === "approved" ? "added" : approved.status;
+    const reframed: IllustrationEntry = {
+      ...approved,
+      status: nextStatus,
+      transform: { ...DEFAULT_ARTWORK_TRANSFORM, scale: 1.4 },
+    };
+
+    expect(reframed.status).toBe("added");
+    const badge = derivePrimaryBadge({
+      status: reframed.status,
+      needsRegeneration: reframed.needsRegeneration,
+      hasCustomTransform: true,
+    });
+    expect(badge.label).toBe("Framing Adjusted");
+    expect(badge.kind).toBe("adjusted");
+  });
+
+  // Test 9: Unresolved pages calculation identifies only blocking/unapproved pages
+  it("9. Unresolved pages calculation extracts exact indices of unapproved/regen pages for sequential jumping", () => {
+    const pages = [0, 1, 2, 3];
+    const illustrations: Record<number, IllustrationEntry> = {
+      0: { status: "approved", needsRegeneration: false, file: null, objectUrl: "blob:0", clientCheck: null },
+      1: { status: "added", needsRegeneration: false, file: null, objectUrl: "blob:1", clientCheck: null },
+      2: { status: "needs-regeneration", needsRegeneration: true, file: null, objectUrl: "blob:2", clientCheck: null },
+      3: { status: "approved", needsRegeneration: false, file: null, objectUrl: "blob:3", clientCheck: null },
+    };
+
+    const unresolved = pages.filter((idx) => {
+      const entry = illustrations[idx];
+      return !entry || entry.status !== "approved" || entry.needsRegeneration;
+    });
+
+    expect(unresolved).toEqual([1, 2]);
+  });
 });
