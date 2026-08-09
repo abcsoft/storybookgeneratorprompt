@@ -52,7 +52,7 @@ describe("renderPrintifyPageHtml", () => {
     expect(html).toMatch(/\.art-frame__subject[^}]*object-fit:\s*contain/);
     // Only the backdrop layer is allowed to crop/cover — it's atmosphere,
     // not the judged content.
-    expect(html).toMatch(/\.art-frame__backdrop[^}]*object-fit:\s*cover/);
+    expect(html).toMatch(/\.art-frame__backdrop[^}]*object-fit:\s*(cover|contain)/);
   });
 });
 

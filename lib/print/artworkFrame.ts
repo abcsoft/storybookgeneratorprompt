@@ -59,9 +59,9 @@ export const ARTWORK_FRAME_CSS = `
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  filter: blur(${ARTWORK_FRAME_BACKDROP_BLUR_PX}px) brightness(${ARTWORK_FRAME_BACKDROP_BRIGHTNESS});
-  transform: scale(${ARTWORK_FRAME_BACKDROP_SCALE});
+  object-fit: contain;
+  filter: blur(${ARTWORK_FRAME_BACKDROP_BLUR_PX}px) brightness(0.75);
+  transform: scale(1.15);
 }
 .art-frame__subject {
   position: absolute;

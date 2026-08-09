@@ -1,4 +1,4 @@
-import type { PxSize } from "./types";
+import type { PrintProfile, PxSize } from "./types";
 
 export interface ArtworkTransform {
   mode: "fit" | "fill" | "manual";
@@ -15,6 +15,59 @@ export const DEFAULT_ARTWORK_TRANSFORM: ArtworkTransform = {
   offsetY: 0,
   backgroundMode: "extended",
 };
+
+export interface LayoutDimensions {
+  width: number;
+  height: number;
+  aspectRatio: number;
+  aspectCss: string;
+}
+
+/**
+ * Calculates exact physical target canvas dimensions and aspect ratio
+ * for single pages vs two-page spreads based on the active PrintProfile.
+ */
+export function getLayoutDimensions(
+  profile: PrintProfile,
+  pageLayout: "single" | "spread",
+): LayoutDimensions {
+  const isSpread = pageLayout === "spread";
+  const width = isSpread ? profile.canvasPx.width * 2 : profile.canvasPx.width;
+  const height = profile.canvasPx.height;
+  const aspectRatio = width / height;
+  const aspectCss = `${width} / ${height}`;
+
+  return { width, height, aspectRatio, aspectCss };
+}
+
+export interface ArtworkRenderInput {
+  sourceWidth: number;
+  sourceHeight: number;
+  targetWidth: number;
+  targetHeight: number;
+  layout: "single" | "spread";
+  transform?: ArtworkTransform;
+}
+
+export interface NormalizedRenderGeometry {
+  renderedWidth: number;
+  renderedHeight: number;
+  translateX: number;
+  translateY: number;
+  scale: number;
+  leftPx: number;
+  topPx: number;
+  widthPx: number;
+  heightPx: number;
+  leftPct: number;
+  topPct: number;
+  widthPct: number;
+  heightPct: number;
+  cropBounds: { left: number; top: number; width: number; height: number };
+  showBackdrop: boolean;
+  backgroundMode: "extended" | "none";
+  extensionStrategy: "fill" | "fit" | "extended";
+}
 
 export interface TransformGeometry {
   /** Effective scale factor relative to natural size. */
@@ -33,6 +86,57 @@ export interface TransformGeometry {
   destHeight: number;
   /** Whether backdrop extension should be shown. */
   showBackdrop: boolean;
+  /** Explicit strategy determined for artwork extension. */
+  extensionStrategy: "fill" | "fit" | "extended";
+}
+
+/**
+ * Single authoritative mathematical renderer for resolving normalized artwork positioning,
+ * scaling, offsets, percentage geometry, crop bounds, and backdrop rules.
+ */
+export function resolveArtworkRender(input: ArtworkRenderInput): NormalizedRenderGeometry {
+  const t = sanitizeTransform(input.transform);
+  const sourcePx: PxSize = {
+    width: Math.max(1, input.sourceWidth || (input.layout === "spread" ? 2000 : 1000)),
+    height: Math.max(1, input.sourceHeight || 1000),
+  };
+  const destPx: PxSize = {
+    width: Math.max(1, input.targetWidth),
+    height: Math.max(1, input.targetHeight),
+  };
+
+  const geo = computeTransformGeometry(sourcePx, destPx, t);
+  const pct = computePercentGeometry(geo);
+
+  const srcCropLeft = Math.max(0, -geo.left);
+  const srcCropTop = Math.max(0, -geo.top);
+  const srcCropWidth = Math.min(geo.width - srcCropLeft, destPx.width - Math.max(0, geo.left));
+  const srcCropHeight = Math.min(geo.height - srcCropTop, destPx.height - Math.max(0, geo.top));
+
+  return {
+    renderedWidth: geo.width,
+    renderedHeight: geo.height,
+    translateX: geo.left,
+    translateY: geo.top,
+    scale: geo.effectiveScale,
+    leftPx: geo.left,
+    topPx: geo.top,
+    widthPx: geo.width,
+    heightPx: geo.height,
+    leftPct: pct.leftPct,
+    topPct: pct.topPct,
+    widthPct: pct.widthPct,
+    heightPct: pct.heightPct,
+    cropBounds: {
+      left: srcCropLeft,
+      top: srcCropTop,
+      width: Math.max(1, srcCropWidth),
+      height: Math.max(1, srcCropHeight),
+    },
+    showBackdrop: geo.showBackdrop,
+    backgroundMode: t.backgroundMode,
+    extensionStrategy: geo.extensionStrategy,
+  };
 }
 
 /**
@@ -52,9 +156,21 @@ export function computeTransformGeometry(
   const fitScale = Math.min(safeDestW / safeSourceW, safeDestH / safeSourceH);
   const fillScale = Math.max(safeDestW / safeSourceW, safeDestH / safeSourceH);
 
+  let isAutoFillPromoted = false;
   let baseScale = fitScale;
   if (transform.mode === "fill") {
     baseScale = fillScale;
+  } else if (
+    transform.mode === "fit" &&
+    transform.backgroundMode === "extended" &&
+    transform.scale === 1.0 &&
+    transform.offsetX === 0 &&
+    transform.offsetY === 0 &&
+    fillScale / fitScale <= 1.18
+  ) {
+    // Near-aspect match (e.g. 16:9 source on 2:1 spread target): safely fill target to avoid unnecessary side bands
+    baseScale = fillScale;
+    isAutoFillPromoted = true;
   }
 
   const effectiveScale = baseScale * (transform.scale || 1.0);
@@ -68,6 +184,13 @@ export function computeTransformGeometry(
   const showBackdrop =
     transform.backgroundMode === "extended" && (width < safeDestW || height < safeDestH);
 
+  let extensionStrategy: "fill" | "fit" | "extended" = "fit";
+  if (transform.mode === "fill" || isAutoFillPromoted || (width >= safeDestW && height >= safeDestH)) {
+    extensionStrategy = "fill";
+  } else if (showBackdrop) {
+    extensionStrategy = "extended";
+  }
+
   return {
     effectiveScale,
     width,
@@ -77,6 +200,7 @@ export function computeTransformGeometry(
     destWidth: safeDestW,
     destHeight: safeDestH,
     showBackdrop,
+    extensionStrategy,
   };
 }
 

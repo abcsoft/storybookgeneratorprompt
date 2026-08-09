@@ -5,6 +5,8 @@ import type { PrintProfile } from "@/lib/print/types";
 import {
   computeTransformGeometry,
   computePercentGeometry,
+  getLayoutDimensions,
+  resolveArtworkRender,
   sanitizeTransform,
   DEFAULT_ARTWORK_TRANSFORM,
   type ArtworkTransform,
@@ -44,13 +46,15 @@ function VersePanelOverlay({
   text,
   ink = "light",
   profile,
+  isSpread = false,
 }: {
   text: string | null;
   ink?: "light" | "dark";
   profile: PrintProfile;
+  isSpread?: boolean;
 }) {
   if (!text || !text.trim()) return null;
-  const geom = computePageTextGeometry(profile);
+  const geom = computePageTextGeometry(profile, isSpread);
 
   const style: CSSProperties = {
     position: "absolute",
@@ -226,42 +230,47 @@ function CoverWrapPreview({
 function ArtworkFrame({
   src,
   transform,
+  profile,
+  layout = "single",
   sourcePx,
-  destPx,
 }: {
   src: string;
   transform?: ArtworkTransform;
+  profile?: PrintProfile;
+  layout?: "single" | "spread";
   sourcePx?: { width: number; height: number };
-  destPx?: { width: number; height: number };
 }) {
-  const t = sanitizeTransform(transform);
-  if (!sourcePx || !destPx) {
-    return (
-      <div className="art-frame">
-        {t.backgroundMode === "extended" && (
-          <img className="art-frame__backdrop" src={src} alt="" />
-        )}
-        <img className="art-frame__subject" src={src} alt="" />
-      </div>
-    );
-  }
+  const targetW = profile
+    ? layout === "spread"
+      ? profile.canvasPx.width * 2
+      : profile.canvasPx.width
+    : layout === "spread"
+      ? 2000
+      : 1000;
+  const targetH = profile ? profile.canvasPx.height : 1000;
 
-  const geo = computeTransformGeometry(sourcePx, destPx, t);
-  const pct = computePercentGeometry(geo);
+  const renderGeo = resolveArtworkRender({
+    sourceWidth: sourcePx?.width ?? (layout === "spread" ? 2000 : 1000),
+    sourceHeight: sourcePx?.height ?? 1000,
+    targetWidth: targetW,
+    targetHeight: targetH,
+    layout,
+    transform,
+  });
 
   return (
     <div className="art-frame">
-      {geo.showBackdrop && <img className="art-frame__backdrop" src={src} alt="" />}
+      {renderGeo.showBackdrop && <img className="art-frame__backdrop" src={src} alt="" />}
       <img
         className="art-frame__subject"
         src={src}
         alt=""
         style={{
           position: "absolute",
-          left: `${pct.leftPct}%`,
-          top: `${pct.topPct}%`,
-          width: `${pct.widthPct}%`,
-          height: `${pct.heightPct}%`,
+          left: `${renderGeo.leftPct}%`,
+          top: `${renderGeo.topPct}%`,
+          width: `${renderGeo.widthPct}%`,
+          height: `${renderGeo.heightPct}%`,
           objectFit: "fill",
         }}
       />
@@ -278,10 +287,14 @@ function LeafArt({
   src,
   side,
   transform,
+  profile,
+  layout = "single",
 }: {
   src: string | null;
   side: "left" | "right" | "full";
   transform?: ArtworkTransform;
+  profile?: PrintProfile;
+  layout?: "single" | "spread";
 }) {
   if (!src) {
     return (
@@ -293,7 +306,7 @@ function LeafArt({
   if (side === "full") {
     return (
       <div className={styles.reviewLeafArt}>
-        <ArtworkFrame src={src} transform={transform} />
+        <ArtworkFrame src={src} transform={transform} profile={profile} layout={layout} />
       </div>
     );
   }
@@ -301,7 +314,7 @@ function LeafArt({
   return (
     <div className={styles.reviewLeafFrame}>
       <div className={styles.reviewLeafArt} style={shiftStyle}>
-        <ArtworkFrame src={src} transform={transform} />
+        <ArtworkFrame src={src} transform={transform} profile={profile} layout="spread" />
       </div>
     </div>
   );
@@ -367,23 +380,29 @@ function FramingEditorModal({
     initialH: number;
   } | null>(null);
 
-  const destPx = useMemo(
+  const layoutDims = useMemo(
+    () => getLayoutDimensions(profile, isSpread ? "spread" : "single"),
+    [profile, isSpread],
+  );
+
+  const renderGeo = useMemo(
     () =>
-      isSpread
-        ? { width: profile.canvasPx.width * 2, height: profile.canvasPx.height }
-        : { width: profile.canvasPx.width, height: profile.canvasPx.height },
-    [isSpread, profile],
+      resolveArtworkRender({
+        sourceWidth: naturalSize.width,
+        sourceHeight: naturalSize.height,
+        targetWidth: layoutDims.width,
+        targetHeight: layoutDims.height,
+        layout: isSpread ? "spread" : "single",
+        transform,
+      }),
+    [naturalSize, layoutDims, isSpread, transform],
   );
 
-  const geo = useMemo(
-    () => computeTransformGeometry(naturalSize, destPx, transform),
-    [naturalSize, destPx, transform],
-  );
-
-  const pct = useMemo(() => computePercentGeometry(geo), [geo]);
-
-  const canvasAspect = isSpread ? "2 / 1" : "1 / 1";
-  const canvasWidthPx = isSpread ? 600 : 360;
+  const pct = renderGeo;
+  const canvasAspect = layoutDims.aspectCss;
+  const canvasWidthPx = isSpread
+    ? 600
+    : Math.round(360 * (layoutDims.width / profile.canvasPx.height));
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     // Only drag canvas if not clicking directly on a corner handle
@@ -401,8 +420,8 @@ function FramingEditorModal({
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (cornerDrag && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const deltaXPx = (e.clientX - cornerDrag.startX) * (destPx.width / rect.width);
-      const deltaYPx = (e.clientY - cornerDrag.startY) * (destPx.height / rect.height);
+      const deltaXPx = (e.clientX - cornerDrag.startX) * (layoutDims.width / rect.width);
+      const deltaYPx = (e.clientY - cornerDrag.startY) * (layoutDims.height / rect.height);
       const nextScale = calculateCornerResize(
         cornerDrag.initialScale,
         cornerDrag.initialW,
@@ -453,8 +472,8 @@ function FramingEditorModal({
       startX: e.clientX,
       startY: e.clientY,
       initialScale: transform.scale,
-      initialW: geo.width,
-      initialH: geo.height,
+      initialW: renderGeo.renderedWidth,
+      initialH: renderGeo.renderedHeight,
     });
   }
 
@@ -1062,13 +1081,13 @@ export default function BookReview({
                 <div className={styles.reviewArt} style={{ aspectRatio: tileAspect, position: "relative" }}>
                   {isSpread ? (
                     <>
-                      <LeafArt src={entry?.objectUrl ?? null} side="left" transform={entry?.transform} />
-                      <LeafArt src={entry?.objectUrl ?? null} side="right" transform={entry?.transform} />
+                      <LeafArt src={entry?.objectUrl ?? null} side="left" transform={entry?.transform} profile={profile} layout="spread" />
+                      <LeafArt src={entry?.objectUrl ?? null} side="right" transform={entry?.transform} profile={profile} layout="spread" />
                     </>
                   ) : (
-                    <LeafArt src={entry?.objectUrl ?? null} side="full" transform={entry?.transform} />
+                    <LeafArt src={entry?.objectUrl ?? null} side="full" transform={entry?.transform} profile={profile} layout="single" />
                   )}
-                  <VersePanelOverlay text={manifestPage?.text ?? null} profile={profile} />
+                  <VersePanelOverlay text={manifestPage?.text ?? null} profile={profile} isSpread={isSpread} />
                 </div>
                 <span className={styles.reviewTileLabel}>{label}</span>
                 <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "2px" }}>
@@ -1259,20 +1278,20 @@ export default function BookReview({
                 {openIsSpread ? (
                   <>
                     <div className={styles.reviewPreviewLeaf}>
-                      <LeafArt src={openImage} side="left" transform={openTransform} />
+                      <LeafArt src={openImage} side="left" transform={openTransform} profile={profile} layout="spread" />
                     </div>
                     <div className={styles.reviewPreviewLeaf}>
-                      <LeafArt src={openImage} side="right" transform={openTransform} />
+                      <LeafArt src={openImage} side="right" transform={openTransform} profile={profile} layout="spread" />
                     </div>
                   </>
                 ) : (
                   <div className={styles.reviewPreviewLeaf}>
-                    <LeafArt src={openImage} side="full" transform={openTransform} />
+                    <LeafArt src={openImage} side="full" transform={openTransform} profile={profile} layout="single" />
                   </div>
                 )}
               </div>
 
-              <VersePanelOverlay text={openManifestPage?.text ?? null} profile={profile} />
+              <VersePanelOverlay text={openManifestPage?.text ?? null} profile={profile} isSpread={openIsSpread} />
 
               {openGeo && (
                 <div className={styles.overlayLayer} aria-hidden="true">

@@ -79,9 +79,12 @@ async function splitSpread(
   const backdrop = geo.showBackdrop
     ? await sharp(image.buffer)
         .rotate()
-        .resize(wideWidth, wideHeight, { fit: "cover" })
-        .blur(ARTWORK_FRAME_BACKDROP_BLUR_SIGMA)
-        .modulate({ brightness: ARTWORK_FRAME_BACKDROP_BRIGHTNESS })
+        .resize(wideWidth, wideHeight, {
+          fit: "contain",
+          background: { r: 28, g: 20, b: 64, alpha: 1 },
+        })
+        .blur(48)
+        .modulate({ brightness: 0.75, saturation: 0.9 })
         .png()
         .toBuffer()
     : await sharp({

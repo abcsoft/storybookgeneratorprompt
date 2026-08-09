@@ -761,20 +761,14 @@
   font-weight: 600;
   margin-bottom: 10px;
 }
-.reviewLeafArt {
+.reviewLeafFrame {
   flex: 1 1 0;
-  position: relative;
-  overflow: hidden;
-}
-/* A spread leaf "windows" into half of the same wide backdrop+subject frame
-   the other leaf shows — see app/BookReview.tsx's LeafArt. */
-.reviewLeafWindow {
   position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
-.reviewLeafWide {
+.reviewLeafArt {
   position: absolute;
   top: 0;
   width: 200%;

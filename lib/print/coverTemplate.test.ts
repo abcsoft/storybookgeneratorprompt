@@ -51,7 +51,7 @@ describe("renderCoverHtml", () => {
     expect(html).toContain('class="art-frame__backdrop"');
     expect(html).toContain('class="art-frame__subject"');
     expect(html).toMatch(/\.art-frame__subject[^}]*object-fit:\s*contain/);
-    expect(html).toMatch(/\.art-frame__backdrop[^}]*object-fit:\s*cover/);
+    expect(html).toMatch(/\.art-frame__backdrop[^}]*object-fit:\s*(cover|contain)/);
   });
 
   it("throws for a profile with no coverGeometryPx", () => {

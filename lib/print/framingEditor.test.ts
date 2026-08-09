@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeTransformGeometry,
   computePercentGeometry,
+  getLayoutDimensions,
   sanitizeTransform,
   calculateCornerResize,
   DEFAULT_ARTWORK_TRANSFORM,
@@ -115,5 +116,29 @@ describe("CANVA/LULU MANUAL IMAGE FRAMING EDITOR ENGINE", () => {
     expect(geo.destHeight).toBe(2400);
     expect(geo.width).toBe(4800);
     expect(geo.height).toBe(2400);
+  });
+
+  // Test 8: getLayoutDimensions correctly derives exact canvas aspect ratio
+  it("8. getLayoutDimensions derives exact target geometry for single and spread", () => {
+    const landscapeProfile: any = { canvasPx: { width: 2700, height: 1980 } };
+    const squareProfile: any = { canvasPx: { width: 2400, height: 2400 } };
+
+    const singleLandscape = getLayoutDimensions(landscapeProfile, "single");
+    expect(singleLandscape.width).toBe(2700);
+    expect(singleLandscape.height).toBe(1980);
+    expect(singleLandscape.aspectRatio).toBeCloseTo(1.3636, 3);
+    expect(singleLandscape.aspectCss).toBe("2700 / 1980");
+
+    const spreadLandscape = getLayoutDimensions(landscapeProfile, "spread");
+    expect(spreadLandscape.width).toBe(5400);
+    expect(spreadLandscape.height).toBe(1980);
+    expect(spreadLandscape.aspectRatio).toBeCloseTo(2.7272, 3);
+    expect(spreadLandscape.aspectCss).toBe("5400 / 1980");
+
+    const singleSquare = getLayoutDimensions(squareProfile, "single");
+    expect(singleSquare.width).toBe(2400);
+    expect(singleSquare.height).toBe(2400);
+    expect(singleSquare.aspectRatio).toBe(1.0);
+    expect(singleSquare.aspectCss).toBe("2400 / 2400");
   });
 });
