@@ -7,12 +7,19 @@
  */
 
 import { buildBook } from "../pdf/buildBook";
+import { buildLuluInteriorBook } from "../pdf/luluExport";
+import { getPrintProfile } from "../print/registry";
 import { buildPages, DEFAULT_BOOK_ID } from "../story/registry";
 import type { ChildProfile, GeneratedPage } from "../story/types";
+
+import type { ArtworkTransform } from "../print/artworkTransform";
+
+export { indexFromFilename } from "./filenameMatch";
 
 export interface ProvidedImage {
   buffer: Buffer;
   mimeType: string;
+  transform?: ArtworkTransform;
 }
 
 /**
@@ -22,7 +29,9 @@ export async function assembleFromImages(
   child: ChildProfile,
   images: Map<number, ProvidedImage>,
   bookId: string = DEFAULT_BOOK_ID,
+  profileId?: string,
 ): Promise<{ pdf: Buffer; usedPages: number; totalPages: number }> {
+  const profile = getPrintProfile(profileId);
   const pages = buildPages(child, bookId);
 
   const generated: GeneratedPage[] = pages.map((p) => {
@@ -37,25 +46,32 @@ export async function assembleFromImages(
       failed: !img,
       spread: p.spread,
       verseInk: p.ink,
+      transform: img?.transform,
     };
   });
 
-  const pdf = await buildBook(generated, child);
+  let pdf: Buffer;
+  if (profile.exportMode === "lulu-interior-pdf") {
+    pdf = await buildLuluInteriorBook(generated, child, profile);
+    // Export complete Lulu package under storybook-out/
+    const { exportLuluPackage } = await import("../print/luluPackageExport");
+    try {
+      await exportLuluPackage({
+        child,
+        bookId,
+        profileId: profile.id,
+        pages: generated,
+      });
+    } catch (err) {
+      console.warn("[storybook] Lulu package export failed:", err);
+    }
+  } else {
+    pdf = await buildBook(generated, child);
+  }
+
   return {
     pdf,
     usedPages: images.size,
     totalPages: pages.length,
   };
-}
-
-/**
- * Extract the leading 1-based page number from a filename like "01.png" or
- * "page-3.jpg" and return the matching 0-based index, or null if none.
- */
-export function indexFromFilename(filename: string): number | null {
-  const match = filename.match(/\d+/);
-  if (!match) return null;
-  const n = parseInt(match[0], 10);
-  if (!Number.isFinite(n) || n < 1) return null;
-  return n - 1;
 }

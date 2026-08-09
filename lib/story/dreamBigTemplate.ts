@@ -10,51 +10,33 @@
  * and a back cover.
  */
 
-import { ART_STYLE, CHARACTER_ANCHOR_STYLE } from "../config";
-import type { ChildProfile, Gender, PageSpec, StoryTemplate } from "./types";
-
-interface Pronouns {
-  subj: string; // he / she / they
-  obj: string; // him / her / them
-  poss: string; // his / her / their
-}
-
-function pronouns(gender: Gender): Pronouns {
-  switch (gender) {
-    case "boy":
-      return { subj: "he", obj: "him", poss: "his" };
-    case "girl":
-      return { subj: "she", obj: "her", poss: "her" };
-    default:
-      return { subj: "they", obj: "them", poss: "their" };
-  }
-}
-
-function childNoun(gender: Gender): string {
-  if (gender === "boy") return "boy";
-  if (gender === "girl") return "girl";
-  return "child";
-}
+import { buildIllustrationPrompt } from "./prompt/buildIllustrationPrompt";
+import { childNoun, pronouns, type Pronouns } from "./textHelpers";
+import type { ChildProfile, PageKind, PageSpec, StoryTemplate, LayoutType } from "./types";
 
 /** "a" or "an" depending on the following word. */
 function article(word: string): string {
   return /^[aeiou]/i.test(word.trim()) ? "an" : "a";
 }
 
-/** Build a full illustration prompt: shared art style + the personalized scene. */
-function illustration(role: string, scene: string) {
-  return (c: ChildProfile): string =>
-    `${ART_STYLE} This is ${c.name}, a ${c.age}-year-old ${childNoun(c.gender)}, ` +
-    `as ${article(role)} ${role}: ${scene} Keep ${c.name} looking exactly like ` +
-    `the attached character reference and photos — same real face and hair.`;
-}
-
-/** The one-time master character-reference portrait prompt for a child. */
-export function characterAnchorPrompt(c: ChildProfile): string {
-  return (
-    `${CHARACTER_ANCHOR_STYLE} This is ${c.name}, a ${c.age}-year-old ` +
-    `${childNoun(c.gender)}.`
-  );
+/** Build a full illustration prompt using the central prompt engine. */
+function illustration(
+  role: string,
+  scene: string,
+  layout: LayoutType = "single-page",
+  kind: PageKind = "scene",
+  compositionNotes?: string,
+) {
+  return (c: ChildProfile, profileId?: string): string =>
+    buildIllustrationPrompt({
+      child: c,
+      story: {},
+      scene: `as ${article(role)} ${role}: ${scene}`,
+      layout,
+      kind,
+      profileId,
+      compositionNotes,
+    });
 }
 
 /** One career scene: the badge label, the illustration scene, and the copy. */
@@ -105,7 +87,8 @@ const ROLES: Role[] = [
     badge: "DOCTOR",
     scene:
       "Wearing a white doctor's coat with a stethoscope in a friendly, sunny " +
-      "clinic, holding a clipboard and giving a warm, reassuring smile.",
+      "clinic with plain clinic walls, simple unlabeled medical props, and no posters, " +
+      "charts, labels, or readable documents, holding a clipboard and giving a warm, reassuring smile.",
     copy: (c) =>
       `With a gentle heart and a caring touch, Doctor ${c.name} helps everyone ` +
       `feel better, one kind smile at a time.`,
@@ -125,7 +108,8 @@ const ROLES: Role[] = [
     badge: "SCIENTIST",
     scene:
       "Wearing a lab coat and safety goggles in a bright laboratory, mixing " +
-      "bubbling, colorful potions in glass beakers with wide-eyed wonder.",
+      "bubbling, colorful liquids in simple unlabeled glass beakers with wide-eyed wonder. " +
+      "Clean background with no text labels, charts, or formulas.",
     copy: (c) =>
       `Mixing, testing, full of wonder — ${c.name} the scientist discovers how ` +
       `the world works, one big idea at a time.`,
@@ -214,8 +198,9 @@ const ROLES: Role[] = [
     role: "school teacher",
     badge: "TEACHER",
     scene:
-      "Standing at a chalkboard in a sunny classroom, pointing to friendly " +
-      "drawings of letters and numbers with a warm smile.",
+      "Standing at a chalkboard in a sunny classroom, pointing to simple non-text " +
+      "geometric shapes on a blank chalkboard with a warm smile. Absolutely no letters, " +
+      "words, numbers, or handwriting on the board.",
     copy: (c) =>
       `Patient and kind, ${c.name} the teacher helps everyone learn something ` +
       `new and believe in themselves.`,
@@ -281,14 +266,17 @@ const dreamBigPages: PageSpec[] = [
   // Front cover
   {
     kind: "cover",
+    layout: "single-page",
     illustrationPrompt: illustration(
       "dreamer",
-      "A wide cover scene at golden hour: place the child in the RIGHT portion of " +
+      "A cover scene at golden hour: place the child in the RIGHT portion of " +
         "the frame, looking up in wonder at a vast sky full of dreamy clouds shaped " +
         "like a rocket, an airplane, and stars. Keep the entire LEFT side and the " +
         "lower-left calm and open — soft sky, clouds, and gentle hills with no part " +
         "of the child there — so a large title can sit in the lower-left without " +
         "covering the child.",
+      "single-page",
+      "cover",
     ),
     text: (c) => `${c.name}'s Dream Big Adventure`,
   },
@@ -296,10 +284,13 @@ const dreamBigPages: PageSpec[] = [
   {
     kind: "intro",
     spread: true,
+    layout: "text-left-subject-right",
     illustrationPrompt: illustration(
       "cozy reader",
       "Snuggled up reading a glowing storybook in a cozy bedroom at night, with " +
         "soft warm lamplight and dreamy stars drifting from the open book.",
+      "text-left-subject-right",
+      "intro",
     ),
     text: (c) =>
       `Once upon a time there was a ${childNoun(c.gender)} named ${c.name}, ` +
@@ -308,22 +299,29 @@ const dreamBigPages: PageSpec[] = [
   },
   // 20 career scenes
   ...ROLES.map(
-    (r): PageSpec => ({
-      kind: "scene",
-      role: r.badge,
-      spread: r.spread,
-      illustrationPrompt: illustration(r.role, r.scene),
-      text: (c) => r.copy(c, pronouns(c.gender)),
-    }),
+    (r): PageSpec => {
+      const layout: LayoutType = r.spread ? "text-left-subject-right" : "single-page";
+      return {
+        kind: "scene",
+        role: r.badge,
+        spread: r.spread,
+        layout,
+        illustrationPrompt: illustration(r.role, r.scene, layout, "scene"),
+        text: (c) => r.copy(c, pronouns(c.gender)),
+      };
+    },
   ),
   // Closing
   {
     kind: "closing",
     spread: true,
+    layout: "text-left-subject-right",
     illustrationPrompt: illustration(
       "dreamer",
       "Standing on a hilltop at sunset with arms open wide, looking up at a sky " +
         "full of glowing silhouettes of a rocket, a plane, musical notes, and stars.",
+      "text-left-subject-right",
+      "closing",
     ),
     text: (c) =>
       `No matter how big you dream, ${c.name}, you can be anything.\n\n` +
@@ -332,10 +330,13 @@ const dreamBigPages: PageSpec[] = [
   // Back cover
   {
     kind: "backcover",
+    layout: "single-page",
     illustrationPrompt: illustration(
       "happy dreamer",
       "Waving cheerfully with a big joyful smile against a soft, simple pastel " +
         "background with a few gentle stars.",
+      "single-page",
+      "backcover",
     ),
     text: () => `Dream big.`,
   },

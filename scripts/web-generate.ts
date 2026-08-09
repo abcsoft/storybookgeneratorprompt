@@ -28,7 +28,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { GeminiWebSession } from "../lib/web/geminiWeb";
 import type { ManualPage } from "../lib/manual/manifest";
-import { characterAnchorPrompt } from "../lib/story/dreamBigTemplate";
+import { characterAnchorPrompt } from "../lib/story/prompt/characterAnchor";
 import type { ChildProfile } from "../lib/story/types";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp"];

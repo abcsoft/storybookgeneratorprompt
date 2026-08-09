@@ -78,7 +78,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const bookId = (form.get("bookId") as string) || undefined;
-  const { pdf } = await assembleFromImages(child, images, bookId);
+  const profileId = (form.get("profileId") as string) || undefined;
+  const { pdf } = await assembleFromImages(child, images, bookId, profileId);
 
   // Keep a per-child folder with the images, prompts, and finished PDF.
   try {

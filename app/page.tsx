@@ -1,3 +1,4 @@
+import { DEFAULT_PRINT_PROFILE_ID, listPrintProfiles } from "@/lib/print/registry";
 import { listBooks } from "@/lib/story/registry";
 import Studio from "./Studio";
 import styles from "./page.module.css";
@@ -12,6 +13,11 @@ export default function Home() {
     /** Physical pages once printed — spreads occupy two leaves. */
     printPages: b.pages.reduce((n, p) => n + (p.spread ? 2 : 1), 0),
   }));
+
+  // Pass the full profile objects (plain JSON-safe data) so the client can
+  // read canvas/finished/safe-area geometry for the review-screen overlay
+  // (item 6) without another round trip or re-hardcoding any dimensions.
+  const printProfiles = listPrintProfiles();
 
   return (
     <main className={styles.shell}>
@@ -32,7 +38,11 @@ export default function Home() {
         </p>
       </header>
 
-      <Studio books={books} />
+      <Studio
+        books={books}
+        printProfiles={printProfiles}
+        defaultProfileId={DEFAULT_PRINT_PROFILE_ID}
+      />
     </main>
   );
 }

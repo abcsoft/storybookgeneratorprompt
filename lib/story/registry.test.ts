@@ -33,4 +33,22 @@ describe("registry", () => {
   it("defaults the book id when omitted", () => {
     expect(buildPages(child).length).toBe(24);
   });
+
+  it("provides structured spread composition rules for all registered storybook spreads", () => {
+    const pages = buildPages(child, "dream-big");
+    const spreads = pages.filter((p) => p.spread);
+    expect(spreads.length).toBeGreaterThan(0);
+    for (const page of spreads) {
+      expect(page.prompt).toContain("COMPOSITION (two-page spread)");
+    }
+  });
+
+  it("does not double up the legacy spread note for pages that declare a layout", () => {
+    const pages = buildPages(child, "great-adventure");
+    const spreads = pages.filter((p) => p.spread);
+    expect(spreads.length).toBeGreaterThan(0);
+    for (const page of spreads) {
+      expect(page.prompt).not.toContain("IMPORTANT COMPOSITION");
+    }
+  });
 });

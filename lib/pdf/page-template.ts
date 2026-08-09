@@ -10,8 +10,6 @@
  * brand fonts are base64-embedded so the book renders identically anywhere.
  */
 
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { BLEED_INCHES, PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from "../config";
 import type { ChildProfile, GeneratedPage } from "../story/types";
 
@@ -30,48 +28,80 @@ const FONT_FILES: Array<[string, number, string]> = [
 ];
 
 let fontCssCache: string | null = null;
-function fontFaceCss(): string {
+/** Exported for reuse by lib/print's cover/page templates, which embed the
+ *  same brand fonts at different canvas sizes. */
+export function fontFaceCss(): string {
   if (fontCssCache !== null) return fontCssCache;
+  if (typeof window !== "undefined") return "";
   const faces: string[] = [];
-  for (const [family, weight, file] of FONT_FILES) {
-    try {
-      const b64 = readFileSync(
-        path.join(process.cwd(), "assets/fonts", file),
-      ).toString("base64");
-      faces.push(
-        `@font-face{font-family:'${family}';font-weight:${weight};font-style:normal;` +
-          `src:url(data:font/woff2;base64,${b64}) format('woff2');}`,
-      );
-    } catch {
-      /* font missing — fall back to system fonts */
+  try {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    for (const [family, weight, file] of FONT_FILES) {
+      try {
+        const b64 = fs.readFileSync(path.join(process.cwd(), "public/fonts", file)).toString("base64");
+        faces.push(
+          `@font-face { font-family: "${family}"; font-style: normal; font-weight: ${weight}; src: url("data:font/woff2;base64,${b64}") format("woff2"); }`,
+        );
+      } catch {
+        // Fall back to Google Fonts @import when physical woff2 files missing
+      }
     }
+  } catch {
+    return "";
   }
   fontCssCache = faces.join("\n");
   return fontCssCache;
 }
 
-function escapeHtml(s: string): string {
+/** Exported for reuse by lib/print's cover/page templates. */
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Turn copy with blank lines into paragraphs and single newlines into breaks. */
-function formatText(text: string): string {
+/** Turn copy with blank lines into paragraphs and single newlines into breaks.
+ *  Exported for reuse by lib/print's page template. */
+export function formatText(text: string): string {
   return text
     .split(/\n{2,}/)
     .map((para) => `<p>${escapeHtml(para).replace(/\n/g, "<br/>")}</p>`)
     .join("");
 }
 
+import { ARTWORK_FRAME_CSS } from "../print/artworkFrame";
+import { sanitizeTransform } from "../print/artworkTransform";
+
 function dataUri(page: GeneratedPage): string | null {
   if (!page.image) return null;
   return `data:${page.imageMimeType};base64,${page.image.toString("base64")}`;
 }
 
-/** The illustration, or a soft fallback when generation failed. */
-function background(page: GeneratedPage): string {
+/** Non-destructive artwork framing for classic PDF (contain + backdrop). */
+function background(page: GeneratedPage, side?: "left" | "right" | "full"): string {
   const uri = dataUri(page);
-  if (uri) return `<img class="bg" src="${uri}" alt="" />`;
-  return `<div class="bg fallback"></div>`;
+  if (!uri) return `<div class="bg fallback"></div>`;
+
+  const transform = sanitizeTransform(page.transform);
+  const showBackdrop = transform.backgroundMode === "extended";
+
+  if (side === "left" || side === "right") {
+    const shiftStyle = side === "left" ? "left: 0%;" : "left: -100%;";
+    return `
+      <div class="art-frame">
+        ${showBackdrop ? `<img class="art-frame__backdrop" src="${uri}" style="${shiftStyle} width: 200%; max-width: none;" alt="" />` : ""}
+        <div style="position: absolute; inset: 0; overflow: hidden;">
+          <div style="position: absolute; top: 0; ${shiftStyle} width: 200%; height: 100%;">
+            <img class="art-frame__subject" src="${uri}" style="width: 100%; height: 100%; object-fit: contain;" alt="" />
+          </div>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="art-frame">
+      ${showBackdrop ? `<img class="art-frame__backdrop" src="${uri}" alt="" />` : ""}
+      <img class="art-frame__subject" src="${uri}" alt="" />
+    </div>`;
 }
 
 /**
@@ -111,7 +141,7 @@ function verseStyle(): string {
 function pageHtml(page: GeneratedPage, child: ChildProfile): string {
   if (page.kind === "cover") {
     return `<section class="page cover">
-      ${background(page)}
+      ${background(page, "full")}
       <div class="scrim cover-scrim"></div>
       ${coverLockup(page, child)}
     </section>`;
@@ -124,7 +154,7 @@ function pageHtml(page: GeneratedPage, child: ChildProfile): string {
       ? `<div class="backcover-text"><span class="backcover-panel">${escapeHtml(page.text)}</span></div>`
       : "";
     return `<section class="page backcover">
-      ${background(page)}
+      ${background(page, "full")}
       <div class="scrim scrim-strong"></div>
       ${backText}
     </section>`;
@@ -132,20 +162,19 @@ function pageHtml(page: GeneratedPage, child: ChildProfile): string {
 
   // Two-page spread: one wide image split across the gutter, verse on the left.
   if (page.spread) {
-    const bg = background(page);
     return `<section class="page spread spread-left">
-      ${bg}
+      ${background(page, "left")}
       <div class="scrim"></div>
       <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
     </section>
     <section class="page spread spread-right">
-      ${bg}
+      ${background(page, "right")}
     </section>`;
   }
 
   // Single full-bleed page with verse woven into the art.
   return `<section class="page single">
-    ${background(page)}
+    ${background(page, "full")}
     <div class="scrim"></div>
     <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
   </section>`;

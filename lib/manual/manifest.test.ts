@@ -29,6 +29,29 @@ describe("buildManifest", () => {
     }
     expect(manifest.filter((m) => m.prompt.includes("4-year-old boy")).length).toBe(24);
   });
+
+  it("defaults to the classic landscape aspect ratios (no profileId passed)", () => {
+    expect(manifest.filter((m) => !m.spread).every((m) => m.aspect === "3:2")).toBe(true);
+    expect(manifest.filter((m) => m.spread).every((m) => m.aspect === "21:9")).toBe(true);
+  });
+
+  it("switches aspect ratios when a different print profile is given", () => {
+    const printifyManifest = buildManifest(
+      child,
+      undefined,
+      "printify-hardcover-square-8x8",
+    );
+    expect(printifyManifest.filter((m) => !m.spread).every((m) => m.aspect === "1:1")).toBe(
+      true,
+    );
+    expect(printifyManifest.filter((m) => m.spread).every((m) => m.aspect === "2:1")).toBe(
+      true,
+    );
+    // Profile geometry updates prompt text — Square profile gets square 1:1 guidance.
+    expect(printifyManifest.map((m) => m.prompt)).not.toEqual(manifest.map((m) => m.prompt));
+    expect(printifyManifest[0].prompt).toContain("Square 1:1 composition");
+    expect(manifest[0].prompt).toContain("Landscape composition");
+  });
 });
 
 describe("renderPromptsMarkdown", () => {
@@ -40,6 +63,16 @@ describe("renderPromptsMarkdown", () => {
     expect(md).toContain("00-character.png"); // character-anchor step
     expect(md).toContain("save as `01.png`");
     expect(md).toContain("save as `24.png`");
+  });
+
+  it("reflects the chosen print profile's aspect ratios", () => {
+    const printifyMd = renderPromptsMarkdown(
+      child,
+      undefined,
+      "printify-hardcover-square-8x8",
+    );
+    expect(printifyMd).toContain("**1:1**");
+    expect(printifyMd).toContain("**2:1**");
   });
 });
 

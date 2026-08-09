@@ -553,6 +553,302 @@
   margin-bottom: 18px;
   font-size: 14px;
 }
+.error ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* ---------- Phase 3: status badges ---------- */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--font-display-stack);
+  font-weight: 700;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.statusMissing {
+  background: #fdeaea;
+  color: #a4262c;
+}
+.statusAdded {
+  background: #fff4dd;
+  color: #8a5a00;
+}
+.statusNeedsRegen {
+  background: #ffe4d6;
+  color: #b3400c;
+}
+.statusApproved {
+  background: #e3f7ea;
+  color: #1c7a41;
+}
+
+/* ---------- Phase 3: illustration cards ---------- */
+.illoList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.illoCard {
+  display: flex;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  background: #fff;
+}
+.illoThumbWrap {
+  flex: 0 0 auto;
+}
+.illoThumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1.5px solid var(--border);
+}
+.illoThumbEmpty {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: var(--surface-2);
+}
+.illoBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.illoHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.illoNumber {
+  font-family: var(--font-display-stack);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+}
+.illoMeta {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.illoWarning {
+  font-size: 12px;
+  color: #a4630c;
+  background: #fff4dd;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+}
+.illoActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.illoSecondaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.linkAction {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-decoration: underline;
+}
+.linkAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* ---------- Phase 3: correction issue picker ---------- */
+.issueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 14px;
+  margin-bottom: 14px;
+}
+.issueOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+/* ---------- Phase 3: modal (correction panel + review preview) ---------- */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 14, 46, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 40;
+}
+.modalCard {
+  background: #fff;
+  border-radius: 18px;
+  padding: 22px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 30px 70px -28px rgba(10, 6, 40, 0.75);
+}
+.modalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* ---------- Phase 3: pre-build review ---------- */
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.reviewTile {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+.reviewArt {
+  display: flex;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.overlayText {
+  position: absolute;
+  border: 2px dashed #9c27b0;
+  background: rgba(156, 39, 176, 0.15);
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 10;
+}
+.spineWarningNotice {
+  background: rgba(255, 179, 0, 0.15);
+  border: 1px solid #ffb300;
+  color: #795548;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.reviewLeafArt {
+  flex: 1 1 0;
+  position: relative;
+  overflow: hidden;
+}
+/* A spread leaf "windows" into half of the same wide backdrop+subject frame
+   the other leaf shows — see app/BookReview.tsx's LeafArt. */
+.reviewLeafWindow {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.reviewLeafWide {
+  position: absolute;
+  top: 0;
+  width: 200%;
+  height: 100%;
+}
+.reviewLeafEmpty {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--ink-soft);
+}
+.reviewTileLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 6px 0 2px;
+}
+
+.reviewPreviewWrap {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.reviewPreviewArt {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-2);
+}
+.reviewPreviewLeaf {
+  flex: 1 1 0;
+  position: relative;
+  overflow: hidden;
+}
+.reviewPreviewLeaf .reviewLeafArt,
+.reviewPreviewLeaf .reviewLeafEmpty {
+  width: 100%;
+  height: 100%;
+}
+
+.overlayToggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.overlayLayer {
+  position: absolute;
+  inset: 0;
+}
+.overlayCanvas {
+  position: absolute;
+  border: 2px dashed rgba(255, 255, 255, 0.85);
+  box-sizing: border-box;
+}
+.overlayFinished {
+  position: absolute;
+  border: 2px solid #58e0c6;
+  box-sizing: border-box;
+}
+.overlaySafe {
+  position: absolute;
+  border: 2px dashed var(--star);
+  box-sizing: border-box;
+}
+.overlayGutter {
+  position: absolute;
+  background: rgba(164, 38, 44, 0.28);
+}
 
 /* ---------- accessibility ---------- */
 @media (prefers-reduced-motion: reduce) {
@@ -590,3 +886,249 @@
     flex-direction: column;
   }
 }
+
+/* ---------- session actions (Clear images / Reset review / New book) ---------- */
+.sessionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 18px;
+}
+.sessionNewBook {
+  border: 1.5px solid var(--star-deep);
+  background: linear-gradient(135deg, var(--star), var(--star-deep));
+  color: var(--ink);
+  font-family: var(--font-display-stack);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.sessionNewBook:hover {
+  box-shadow: 0 6px 16px -6px rgba(245, 183, 60, 0.9);
+}
+.sessionSecondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.buttonDanger {
+  width: 100%;
+  padding: 15px 20px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #e85d5d, #a4262c);
+  color: #fff;
+  font-family: var(--font-display-stack);
+  font-weight: 700;
+  font-size: 17px;
+  box-shadow: 0 14px 30px -12px rgba(164, 38, 44, 0.7);
+}
+.buttonDanger:hover {
+  transform: translateY(-2px);
+}
+
+/* ---------- framing editor modal ---------- */
+.editorOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 9, 32, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.editorModal {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  max-height: 92vh;
+  background: #1c1440;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.editorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
+}
+.editorTitle {
+  font-family: var(--font-display-stack);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--star);
+  margin: 0;
+}
+.editorClose {
+  background: transparent;
+  border: none;
+  color: var(--lilac);
+  font-size: 24px;
+  cursor: pointer;
+}
+.editorViewportContainer {
+  position: relative;
+  width: 100%;
+  background: #0e0920;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  user-select: none;
+  touch-action: none;
+}
+.editorCanvas {
+  position: relative;
+  background: #150f33;
+  overflow: hidden;
+  cursor: grab;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.editorCanvas:active {
+  cursor: grabbing;
+}
+.editorToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px 18px;
+  border-radius: 16px;
+}
+.editorSliderGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 14px;
+}
+.editorSliderGroup input[type="range"] {
+  width: 140px;
+}
+.editorButtonGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.editorModeBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.editorModeBtnActive {
+  background: var(--star);
+  color: #000;
+  border-color: var(--star);
+}
+.editorFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 14px;
+}
+
+/* ---------- Canva/Lulu Framing Bounding Box & Corner Handles ---------- */
+.framingBoundingBox {
+  position: absolute;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: move;
+  z-index: 10;
+}
+
+.cornerHandle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  z-index: 12;
+  touch-action: none;
+}
+.cornerHandleTopLeft {
+  top: -7px;
+  left: -7px;
+  cursor: nwse-resize;
+}
+.cornerHandleTopRight {
+  top: -7px;
+  right: -7px;
+  cursor: nesw-resize;
+}
+.cornerHandleBottomLeft {
+  bottom: -7px;
+  left: -7px;
+  cursor: nesw-resize;
+}
+.cornerHandleBottomRight {
+  bottom: -7px;
+  right: -7px;
+  cursor: nwse-resize;
+}
+
+.guideToggleGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.guideToggleBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.guideToggleBtnActive {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.statusAdjusted {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+

@@ -1,0 +1,17 @@
+
+> storybook-generator@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3002
+- Network:       http://192.168.0.249:3002
+✓ Ready in 1777ms
+Creating turbopack project { dir: 'C:\\xampp_lite_8_3\\www\\githubstory\\sto1', testMode: true }
+
+ GET / 200 in 3.1s (next.js: 2.7s, application-code: 346ms)
+ GET / 200 in 133ms (next.js: 17ms, application-code: 116ms)
+ POST /api/prompts 200 in 1136ms (next.js: 1056ms, application-code: 80ms)
+ POST /api/generate 500 in 3.0s (next.js: 3.0s, application-code: 19ms)
+  Reload env: .env.local
+ GET / 200 in 336ms (next.js: 195ms, application-code: 141ms)
+[?25h

@@ -117,10 +117,7 @@ export const ART_STYLE =
   "No watermarks, signatures, logos, frames, or borders. " +
   "Warm, friendly, and safe for young children.";
 
-/** Prompt for the one-time master "character reference" portrait. */
-export const CHARACTER_ANCHOR_STYLE =
-  "Photorealistic, head-and-shoulders portrait of THIS specific real child, " +
-  "facing forward with a gentle natural smile, evenly lit against a simple soft " +
-  "background. This is the MASTER CHARACTER REFERENCE: capture the child's exact " +
-  "real face, skin tone, eye color, and hair from the photos — do not " +
-  "cartoonify, stylize, age up, or beautify. Square 1:1. No text or borders.";
+// The character-reference ("00-character.png") prompt lives in
+// lib/story/prompt/characterAnchor.ts — it's shared by every book, not
+// specific to any one template, so it doesn't belong in per-story files or
+// this general config.

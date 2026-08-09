@@ -72,4 +72,58 @@ describe("greatAdventureTemplate", () => {
       expect(pages[idx].ink).toBe("dark");
     }
   });
+
+  it("routes every page through the shared prompt engine (identity + negative rules present)", () => {
+    for (const page of buildPages(child, BOOK_ID)) {
+      expect(page.prompt).toContain("IDENTITY FIRST");
+      expect(page.prompt).toContain("DO NOT:");
+    }
+  });
+
+  it("pins the default explorer outfit on an ordinary scene", () => {
+    const pages = buildPages(child, BOOK_ID);
+    const jungle = pages.find((p) => p.prompt.includes("cheeky monkeys"));
+    expect(jungle?.prompt).toContain("khaki explorer vest");
+  });
+
+  it("swaps to a special outfit on scenes that call for one (winter, underwater, pajamas)", () => {
+    const pages = buildPages(child, BOOK_ID);
+    const mountain = pages.find((p) => p.prompt.includes("snowy, rocky mountain path"));
+    expect(mountain?.prompt).toContain("winter coat");
+    expect(mountain?.prompt).not.toContain("khaki explorer vest");
+
+    const snorkel = pages.find((p) => p.prompt.includes("Snorkelling happily"));
+    expect(snorkel?.prompt).toContain("snorkel mask");
+
+    const closing = pages.at(-2); // closing page, before the back cover
+    expect(closing?.prompt).toContain("pajamas");
+  });
+
+  it("keeps Scout consistent via companionRules, except the solo whale-ride rest scene", () => {
+    const pages = buildPages(child, BOOK_ID);
+    const whale = pages.find((p) => p.prompt.includes("huge friendly blue whale"));
+    expect(whale?.prompt).not.toContain("COMPANION CONTINUITY");
+
+    const jungle = pages.find((p) => p.prompt.includes("cheeky monkeys"));
+    expect(jungle?.prompt).toContain("COMPANION CONTINUITY");
+  });
+
+  it("gives spread scenes the strong gutter/edge-safety composition rules instead of the legacy note", () => {
+    const pages = buildPages(child, BOOK_ID);
+    const bridge = pages.find((p) => p.prompt.includes("wobbly rope bridge"));
+    expect(bridge?.prompt).toContain("CENTER GUTTER");
+    expect(bridge?.prompt).toContain(
+      "NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE",
+    );
+    expect(bridge?.prompt).not.toContain("IMPORTANT COMPOSITION");
+  });
+
+  it("adds scene-specific composition notes for the previously flagged problem scenes", () => {
+    const pages = buildPages(child, BOOK_ID);
+    const whale = pages.find((p) => p.prompt.includes("huge friendly blue whale"));
+    expect(whale?.prompt.toLowerCase()).toContain("never enlarge the child");
+
+    const flyingHome = pages.at(-3); // last journey scene, before closing + back cover
+    expect(flyingHome?.prompt.toLowerCase()).toContain("safe art page");
+  });
 });

@@ -16,7 +16,7 @@ import {
   MAX_REFERENCE_PHOTOS,
 } from "../config";
 import { buildBook } from "../pdf/buildBook";
-import { characterAnchorPrompt } from "../story/dreamBigTemplate";
+import { characterAnchorPrompt } from "../story/prompt/characterAnchor";
 import { buildPages, DEFAULT_BOOK_ID } from "../story/registry";
 import type { ChildProfile, GeneratedPage, ReferencePhoto } from "../story/types";
 import { generateIllustration } from "../gemini/imageClient";

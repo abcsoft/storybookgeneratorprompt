@@ -7,15 +7,19 @@
  * instead of paying for API calls.
  */
 
-import { ASPECT_SINGLE, ASPECT_SPREAD } from "../config";
-import { characterAnchorPrompt } from "../story/dreamBigTemplate";
+import { getPrintProfile } from "../print/registry";
+import { characterAnchorPrompt } from "../story/prompt/characterAnchor";
 import { buildPages, DEFAULT_BOOK_ID, getBook } from "../story/registry";
-import type { ChildProfile } from "../story/types";
+import type { ChildProfile, PageLayout } from "../story/types";
 
 export interface ManualPage {
-  /** 1-based page number, matching the saved filename. */
+  /** 1-based illustration number (1 for 01.png). */
+  illustrationNumber?: number;
+  /** 0-based illustration index (0, 1, 2...). */
+  illustrationIndex?: number;
+  /** 1-based illustration number, matching saved filename (backward compatibility). */
   page: number;
-  /** 0-based template index used internally to pair images to pages. */
+  /** 0-based template index (backward compatibility). */
   index: number;
   kind: string;
   role?: string;
@@ -25,6 +29,8 @@ export interface ManualPage {
   text: string;
   /** True for a two-page spread (generate the image extra-wide). */
   spread: boolean;
+  /** Authoritative page layout model ("single" or "spread"). */
+  pageLayout?: PageLayout;
   /** Aspect ratio to set in the Gemini app, e.g. "3:2" or "21:9". */
   aspect: string;
 }
@@ -34,29 +40,46 @@ export function imageFilename(index: number): string {
   return `${String(index + 1).padStart(2, "0")}.png`;
 }
 
+/**
+ * @param profileId Which print profile's aspect ratios to use for the
+ *   generated images. Defaults to the classic landscape profile, so existing
+ *   callers (no `profileId` passed) get byte-identical output to before the
+ *   print-profile system existed.
+ */
 export function buildManifest(
   child: ChildProfile,
   bookId: string = DEFAULT_BOOK_ID,
+  profileId?: string,
 ): ManualPage[] {
-  return buildPages(child, bookId).map((p) => ({
-    page: p.index + 1,
-    index: p.index,
-    kind: p.kind,
-    role: p.role,
-    filename: imageFilename(p.index),
-    prompt: p.prompt,
-    text: p.text,
-    spread: p.spread,
-    aspect: p.spread ? ASPECT_SPREAD : ASPECT_SINGLE,
-  }));
+  const profile = getPrintProfile(profileId);
+  return buildPages(child, bookId, profileId).map((p) => {
+    const isSpread = p.pageLayout ? p.pageLayout === "spread" : (p.spread ?? false);
+    const layout: PageLayout = isSpread ? "spread" : "single";
+    return {
+      illustrationNumber: p.index + 1,
+      illustrationIndex: p.index,
+      page: p.index + 1,
+      index: p.index,
+      kind: p.kind,
+      role: p.role,
+      filename: imageFilename(p.index),
+      prompt: p.prompt,
+      text: p.text,
+      spread: isSpread,
+      pageLayout: layout,
+      aspect: isSpread ? profile.spreadAspect : profile.singleAspect,
+    };
+  });
 }
 
 /** A human-readable prompts.md the user can follow in the Gemini app. */
 export function renderPromptsMarkdown(
   child: ChildProfile,
   bookId: string = DEFAULT_BOOK_ID,
+  profileId?: string,
 ): string {
-  const manifest = buildManifest(child, bookId);
+  const manifest = buildManifest(child, bookId, profileId);
+  const profile = getPrintProfile(profileId);
   const name = child.name;
   const header = `# ${name}'s ${getBook(bookId).title} — image prompts
 
@@ -79,16 +102,16 @@ This one step is what keeps every page looking like the *same* ${name}:
 3. If it doesn't look like ${name}, regenerate until it does — this portrait is
    your anchor for every page.
 
-## Then for each page (01–${manifest.length})
+## Then for each illustration (01–${manifest.length})
 1. In the **same chat**, attach **\`00-character.png\` plus one real photo**.
-2. **Set the aspect ratio** shown for the page — most are **${ASPECT_SINGLE}**; the
-   few marked **WIDE SPREAD** are **${ASPECT_SPREAD}** (they print across two pages).
-3. Paste the page prompt and **save with the exact filename shown** (e.g. \`01.png\`).
+2. **Set the aspect ratio** shown for the illustration — most are **${profile.singleAspect}**; the
+   few marked **WIDE SPREAD** are **${profile.spreadAspect}** (they print across two pages).
+3. Paste the prompt and **save with the exact filename shown** (e.g. \`01.png\`).
 4. Upload all images in the website's "I'll make the images" mode (or run
    \`npm run assemble\`) to build the PDF.
 
 > Staying in one chat with the character reference attached keeps ${name}
-> consistent across all ${manifest.length} pages.
+> consistent across all ${manifest.length} illustrations.
 
 ---
 `;
@@ -97,7 +120,7 @@ This one step is what keeps every page looking like the *same* ${name}:
     .map((m) => {
       const label = m.role ? `${m.role}` : m.kind.toUpperCase();
       const aspectLabel = m.spread ? `${m.aspect} · WIDE SPREAD` : m.aspect;
-      return `### Page ${String(m.page).padStart(2, "0")} · ${label} · ${aspectLabel} → save as \`${m.filename}\`
+      return `### Illustration ${String(m.illustrationNumber).padStart(2, "0")} · ${label} · ${aspectLabel} → save as \`${m.filename}\`
 
 **Prompt:**
 ${m.prompt}

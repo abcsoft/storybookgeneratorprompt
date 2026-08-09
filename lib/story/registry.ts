@@ -6,10 +6,17 @@
  * Everything else (generation, prompts, PDF, UI picker) works off this list.
  */
 
+import { bedtimeDreamBook } from "./bedtimeDreamTemplate";
+import { dinosaurDiscoveryBook } from "./dinosaurDiscoveryTemplate";
 import { dreamBigBook } from "./dreamBigTemplate";
 import { greatAdventureBook } from "./greatAdventureTemplate";
+import { kindnessGardenBook } from "./kindnessGardenTemplate";
+import { rainbowKingdomBook } from "./rainbowKingdomTemplate";
+import { safariFriendshipBook } from "./safariFriendshipTemplate";
+import { spaceExplorerBook } from "./spaceExplorerTemplate";
 import { theGreatDetectiveBook } from "./theGreatDetectiveTemplate";
-import type { ChildProfile, PageKind, StoryTemplate } from "./types";
+import { underwaterKingdomBook } from "./underwaterKingdomTemplate";
+import type { ChildProfile, PageKind, PageLayout, StoryTemplate } from "./types";
 
 export const DEFAULT_BOOK_ID = "dream-big";
 
@@ -17,6 +24,13 @@ export const STORY_BOOKS: StoryTemplate[] = [
   dreamBigBook,
   greatAdventureBook,
   theGreatDetectiveBook,
+  kindnessGardenBook,
+  dinosaurDiscoveryBook,
+  spaceExplorerBook,
+  rainbowKingdomBook,
+  safariFriendshipBook,
+  underwaterKingdomBook,
+  bedtimeDreamBook,
 ];
 
 export function listBooks(): StoryTemplate[] {
@@ -50,34 +64,55 @@ export interface BuiltPage {
   prompt: string;
   text: string;
   spread: boolean;
+  pageLayout?: PageLayout;
   /** Optional verse ink/panel override carried from the template. */
   ink?: "light" | "dark";
 }
 
-/** Personalize a whole book for a child. */
-export function buildPages(
-  child: ChildProfile,
-  bookId: string = DEFAULT_BOOK_ID,
-): BuiltPage[] {
-  const SPREAD_NOTE =
-    " IMPORTANT COMPOSITION — this is an extra-wide illustration that will be " +
-    "printed across two facing pages and folded down the exact vertical center. " +
-    "Place the child, and especially the child's full face and head, entirely " +
-    "within the RIGHT half of the image and well clear of that center line, so the " +
-    "fold never crosses the face or body. Keep the whole LEFT half and the central " +
-    "strip as calm, open background scenery (sky, soft landscape) with no important " +
-    "subject, leaving the lower-left clear for a few lines of text.";
+const SPREAD_NOTE =
+  " IMPORTANT COMPOSITION — this is an extra-wide illustration that will be " +
+  "printed across two facing pages and folded down the exact vertical center. " +
+  "Place the child, and especially the child's full face and head, entirely " +
+  "within the RIGHT half of the image and well clear of that center line, so the " +
+  "fold never crosses the face or body. Keep the whole LEFT half and the central " +
+  "strip as calm, open background scenery (sky, soft landscape) with no important " +
+  "subject, leaving the lower-left clear for a few lines of text.";
 
-  return getBook(bookId).pages.map((spec, index) => {
-    const spread = spec.spread ?? false;
+/**
+ * Personalize an already-resolved book object for a child. Split out from
+ * `buildPages()` (which resolves a book by id from the registry) so callers
+ * that already have a `StoryTemplate` in hand — notably `validateStory.ts`,
+ * which needs to validate a story regardless of whether it's registered —
+ * can build its pages directly instead of round-tripping through an id
+ * lookup that would silently substitute the registered version.
+ */
+export function buildPagesFor(
+  child: ChildProfile,
+  book: StoryTemplate,
+  profileId?: string,
+): BuiltPage[] {
+  return book.pages.map((spec, index) => {
+    const isSpread = spec.pageLayout ? spec.pageLayout === "spread" : (spec.spread ?? false);
+    const layout: PageLayout = isSpread ? "spread" : "single";
+    const legacySpreadNote = spec.layout ? "" : isSpread ? SPREAD_NOTE : "";
     return {
       index,
       kind: spec.kind,
       role: spec.role,
-      prompt: spec.illustrationPrompt(child) + (spread ? SPREAD_NOTE : ""),
+      prompt: spec.illustrationPrompt(child, profileId) + legacySpreadNote,
       text: spec.text(child),
-      spread,
+      spread: isSpread,
+      pageLayout: layout,
       ink: spec.ink,
     };
   });
+}
+
+/** Personalize a whole book for a child, resolved by id from the registry. */
+export function buildPages(
+  child: ChildProfile,
+  bookId: string = DEFAULT_BOOK_ID,
+  profileId?: string,
+): BuiltPage[] {
+  return buildPagesFor(child, getBook(bookId), profileId);
 }

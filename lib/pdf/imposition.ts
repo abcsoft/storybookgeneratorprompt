@@ -22,8 +22,12 @@ export interface ImposablePage {
   spread?: boolean;
 }
 
-/** A spread occupies two print leaves; a single page occupies one. */
-function leavesFor(page: ImposablePage): number {
+/** A spread occupies two print leaves; a single page occupies one. Takes just
+ *  `{ spread }` (a strict subset of `ImposablePage`) so it's reusable from
+ *  contexts that don't have a full `ImposablePage` on hand — e.g.
+ *  lib/manual/reviewOrder.ts, so the review UI's page numbering can never
+ *  silently disagree with the actual print imposition rule. */
+export function leavesFor(page: { spread?: boolean }): number {
   return page.spread ? 2 : 1;
 }
 

@@ -8,83 +8,80 @@
  * (continuous flowing prose) plus the recurring map + Scout; each illustration
  * prompt is still fully self-contained so it generates independently.
  *
+ * This is the first book migrated onto the reusable prompt engine
+ * (lib/story/prompt) — wardrobe and companion continuity are declared once as
+ * story metadata below instead of being spelled out by hand in every scene, and
+ * every page routes through `buildIllustrationPrompt` for its identity/style/
+ * composition/negative rules instead of a bespoke local prompt builder.
+ *
  * Pure data + pure functions, so it is trivially unit-testable with no Gemini or
  * PDF involved.
  *
  * ~21 pages: cover, opening, 17 journey scenes, a closing, and a back cover.
  */
 
-import { ART_STYLE } from "../config";
-import type { ChildProfile, Gender, PageSpec, StoryTemplate } from "./types";
+import { buildIllustrationPrompt } from "./prompt/buildIllustrationPrompt";
+import { pronouns, cap, type Pronouns } from "./textHelpers";
+import type {
+  ChildProfile,
+  CompanionSpec,
+  LayoutType,
+  PageSpec,
+  StoryTemplate,
+} from "./types";
 
-interface Pronouns {
-  subj: string; // he / she / they
-  obj: string; // him / her / them
-  poss: string; // his / her / their
-}
+/** Scout, kept consistent page-to-page via the shared companion-rules block
+ *  instead of being re-described by hand in every scene (see item 4). */
+const SCOUT: CompanionSpec = {
+  name: "Scout",
+  description: "a small fluffy light-brown puppy",
+  consistencyRules:
+    "same floppy ears, same fur color and length, same size and body " +
+    "proportions on every page — a single puppy only, never duplicated, " +
+    "never a different breed",
+};
 
-function pronouns(gender: Gender): Pronouns {
-  switch (gender) {
-    case "boy":
-      return { subj: "he", obj: "him", poss: "his" };
-    case "girl":
-      return { subj: "she", obj: "her", poss: "her" };
-    default:
-      return { subj: "they", obj: "them", poss: "their" };
-  }
-}
+/** The standard adventure outfit, worn on every page unless a scene opts into
+ *  one of the special outfits below (see item 3 — configurable per story, not
+ *  hardcoded into the generic prompt engine). */
+const DEFAULT_OUTFIT =
+  "a light neutral T-shirt, a khaki explorer vest, khaki shorts, dark outdoor " +
+  "shoes, and a small brown explorer backpack";
 
-function childNoun(gender: Gender): string {
-  if (gender === "boy") return "boy";
-  if (gender === "girl") return "girl";
-  return "child";
-}
+const SPECIAL_OUTFITS: Record<string, string> = {
+  winter:
+    "a warm padded winter coat, hat, and mittens over the same explorer shorts " +
+    "and dark boots, with the same small brown explorer backpack",
+  underwater: "swim shorts and a snorkel mask — no vest or backpack",
+  pajamas: "cozy pajamas — no vest, backpack, or shoes",
+};
 
-/** Capitalize the first letter — for a pronoun at the start of a sentence. */
-const cap = (s: string): string => s[0].toUpperCase() + s.slice(1);
+const STORY_META = { defaultOutfit: DEFAULT_OUTFIT, companion: SCOUT };
 
-/** Fixed description of the companion so it stays roughly consistent page-to-page
- *  (the engine only anchors the child's likeness, not the puppy). */
-const SCOUT =
-  "Scout, exactly one small fluffy light-brown puppy (a single puppy only — no " +
-  "other dogs anywhere in the scene)";
-
-/** Lead with identity and reaffirm it after the style block. Nano Banana 2 keeps
- *  a child's likeness best when "match the real face" comes FIRST and style is
- *  explicitly subordinated to it. Kept generic — hair/eyes defer to each child's
- *  reference photos — so the template works for any kid. */
-const IDENTITY_FIRST =
-  "IDENTITY FIRST — match the real child in the attached reference photos " +
-  "exactly: the same face, the same facial proportions, the same eye color, and " +
-  "the same hair (its real style, length, texture, and color); do not reshape " +
-  "the face, change its proportions, or change the hair, and keep the likeness " +
-  "clear even when the child is small in the scene.";
-
-const IDENTITY_OVER_STYLE =
-  "Identity and likeness take priority over the art style — never sacrifice the " +
-  "child's real face or hair for the styling.";
-
-/** Build a full illustration prompt: identity-first header + shared art style +
- *  an identity-over-style reminder + the personalized scene. `light` (optional)
- *  describes the scene's own light + camera so the child can be matched to it —
- *  the single biggest lever against a "pasted-on" composite (see research notes:
- *  mismatched light direction/temperature and camera angle are why composites read
- *  as fake). */
-function illustration(scene: string, light?: string) {
-  return (c: ChildProfile): string => {
-    const lighting = light
-      ? ` LIGHTING & CAMERA — match the child to the scene so the composite never ` +
-        `looks pasted-on: ${light} Light ${c.name} with exactly this light (same ` +
-        `direction, color temperature, and softness) and matching shadows, and frame ` +
-        `${c.name} at this same camera angle and horizon line.`
-      : "";
-    return (
-      `${IDENTITY_FIRST} ${ART_STYLE} ${IDENTITY_OVER_STYLE} This is ${c.name}, a ` +
-      `${c.age}-year-old ${childNoun(c.gender)}, a brave little explorer on a grand ` +
-      `treasure-hunt adventure. ${scene}${lighting} Keep ${c.name} looking exactly ` +
-      `like the attached character reference and photos — same real face and hair.`
-    );
-  };
+/** Build a full illustration prompt through the shared prompt engine. */
+function illustration(
+  scene: string,
+  opts: {
+    light?: string;
+    spread?: boolean;
+    compositionNotes?: string;
+    outfitOverride?: string;
+    companionOverride?: CompanionSpec | null;
+  } = {},
+) {
+  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (c: ChildProfile, profileId?: string): string =>
+    buildIllustrationPrompt({
+      child: c,
+      story: STORY_META,
+      scene,
+      layout,
+      profileId,
+      compositionNotes: opts.compositionNotes,
+      light: opts.light,
+      outfitOverride: opts.outfitOverride,
+      companionOverride: opts.companionOverride,
+    });
 }
 
 /** One beat of the journey: the scene to illustrate and the verse on the page. */
@@ -96,6 +93,12 @@ interface Beat {
   /** The scene's own light + camera, so the child is lit/framed to match (kills
    *  the "pasted-on" look). Direction + color temperature + softness + camera. */
   light?: string;
+  /** Scene-specific composition guidance for problem-prone shots (item 6). */
+  compositionNotes?: string;
+  /** Temporary costume override (winter/underwater/pajamas) — see SPECIAL_OUTFITS. */
+  outfitOverride?: string;
+  /** Explicitly drop the companion for a scene that doesn't include Scout. */
+  companionOverride?: CompanionSpec | null;
 }
 
 const STORY: Beat[] = [
@@ -103,7 +106,7 @@ const STORY: Beat[] = [
     scene:
       "Standing proudly at the front of a small wooden sailboat leaving a sunny " +
       "little harbour, holding a rolled-up treasure map and pointing out toward " +
-      `the open sea, with ${SCOUT} beside them; gentle waves, soft clouds, and a ` +
+      "the open sea, with Scout beside them; gentle waves, soft clouds, and a " +
       "few friendly seagulls.",
     copy: (c, p) =>
       `${c.name} held the map up high and pointed across the bay.\n` +
@@ -115,7 +118,7 @@ const STORY: Beat[] = [
     scene:
       "Trekking along a leafy trail deep in a lush green jungle, pushing aside big " +
       "leaves, as cheeky monkeys swing overhead and bright toucans point the way; " +
-      `${SCOUT} trots alongside with a wagging tail.`,
+      "Scout trots alongside with a wagging tail.",
     copy: (c) =>
       `Their journey first led them into a deep, green jungle. Through the ` +
       `tangled vines, ${c.name} and Scout followed the track. Monkeys swung ` +
@@ -128,7 +131,7 @@ const STORY: Beat[] = [
     scene:
       "Carefully crossing a wobbly rope bridge over a thundering jungle waterfall, " +
       "holding the rope with one hand and the map in the other, looking brave, " +
-      `with ${SCOUT} tucked safely in the backpack; misty spray and a little ` +
+      "with Scout tucked safely in the backpack; misty spray and a little " +
       "rainbow in the air.",
     copy: (c) =>
       `Soon, the path ended at a rushing river, with a wobbly wooden bridge ` +
@@ -139,12 +142,15 @@ const STORY: Beat[] = [
     ink: "dark", // misty light jungle — dark text on a panel reads better than white
     light:
       "Cool, misty, diffuse daylight from the upper left with overcast sky and waterfall spray; eye-level camera looking across the gorge.",
+    compositionNotes:
+      "keep both of the child's hands and their head fully visible — one hand on " +
+      "the rope, the other holding the map — with nothing crossing the center gutter.",
   },
   {
     scene:
       "Riding atop a friendly camel across rolling golden desert dunes toward a " +
       "green palm oasis shimmering in the distance, shading their eyes to read the " +
-      `map, with ${SCOUT} riding happily along; warm sunset sky.`,
+      "map, with Scout riding happily along; warm sunset sky.",
     copy: (c) =>
       `Leaving the jungle behind, the air grew warm as they stepped into a ` +
       `golden desert. Over the rolling sandy dunes, ${c.name} and Scout rode a ` +
@@ -152,12 +158,16 @@ const STORY: Beat[] = [
     spread: true,
     light:
       "Warm low golden sunset light from the right casting long soft shadows over the dunes; slightly low camera across the desert.",
+    compositionNotes:
+      "show enough of the camel to clearly read as a ride, but keep the whole " +
+      "child and Scout comfortably inside the safe region — don't crop the camel " +
+      "or its rider at the frame edge.",
   },
   {
     scene:
       "Exploring ancient sandstone ruins with tall carved pillars, kneeling to " +
       "study a mysterious symbol carved into a stone wall that matches the map, " +
-      `with ${SCOUT} sniffing curiously nearby; warm dusty light and climbing vines.`,
+      "with Scout sniffing curiously nearby; warm dusty light and climbing vines.",
     copy: (c, p) =>
       `The camel brought them to ancient stone ruins, where ${c.name} found ` +
       `${p.poss} next clue—a secret carving on the wall that showed ${p.obj} ` +
@@ -169,7 +179,7 @@ const STORY: Beat[] = [
     scene:
       "Walking along a wide grassy savanna riverbank at sunset, waving up at gentle " +
       "tall giraffes and a herd of elephants drinking at the water, with " +
-      `${SCOUT} at their heels; a glowing golden-orange sky.`,
+      "Scout at their heels; a glowing golden-orange sky.",
     copy: (c) =>
       `Following the clue, they traveled to a wide, sunny river valley. ` +
       `${c.name} waved to giraffes standing so tall in the grass. The ` +
@@ -182,19 +192,20 @@ const STORY: Beat[] = [
     scene:
       "Climbing a snowy, rocky mountain path bundled in a warm coat and little " +
       "backpack, reaching a high ledge where a great eagle soars and the far-off " +
-      `sea sparkles far below, with ${SCOUT} climbing close behind.`,
+      "sea sparkles far below, with Scout climbing close behind.",
     copy: (c) =>
       `But the map pointed higher, leading them up a towering snowy mountain. ` +
       `${c.name} climbed so high that the air grew chilly. At the peak, a great ` +
       `eagle spread its wings and pointed its beak toward the sparkling sea.`,
     light:
       "Bright, cold, high-altitude daylight from the upper left, crisp and slightly blue; slightly low camera on the snowy ledge.",
+    outfitOverride: SPECIAL_OUTFITS.winter,
   },
   {
     scene:
       "Standing on a frozen, snowy Arctic shore beneath shimmering green-and-pink " +
       "northern lights, smiling at two friendly polar bears on the ice, with " +
-      `${SCOUT} bouncing in the snow; a little wooden boat waiting at the water's edge.`,
+      "Scout bouncing in the snow; a little wooden boat waiting at the water's edge.",
     copy: (c) =>
       `Before they reached the water, they crossed a land of snowy ice where ` +
       `fluffy polar bears played all around. As night fell, ${c.name} looked up ` +
@@ -202,13 +213,14 @@ const STORY: Beat[] = [
       `guided them right to the shore.`,
     light:
       "Dark Arctic night lit by the green-and-pink aurora glow from above and cool moonlight on the snow; eye-level camera on the ice.",
+    outfitOverride: SPECIAL_OUTFITS.winter,
   },
   {
     scene:
       "Snorkelling happily underwater in a bright coral reef while wearing a diving " +
       "mask, surrounded by colourful fish as a smiling dolphin and a sea turtle " +
-      `guide them gently downward toward a softly glowing passage, with ${SCOUT} ` +
-      "paddling happily alongside wearing its own little diving mask; sparkling " +
+      "guide them gently downward toward a softly glowing passage, with Scout " +
+      "paddling happily alongside, wearing its own little diving mask; sparkling " +
       "sunbeams through clear blue water.",
     copy: (c) =>
       `Taking a deep breath, ${c.name} and Scout dove beneath the waves, ` +
@@ -217,6 +229,10 @@ const STORY: Beat[] = [
     spread: true,
     light:
       "Cool blue underwater light with bright sunbeams streaming down from the surface above; eye-level underwater camera.",
+    outfitOverride: SPECIAL_OUTFITS.underwater,
+    compositionNotes:
+      "frame wide enough that no arm, hand, or fin is cut at the edge of the " +
+      "frame — keep the whole child and Scout comfortably inside the safe region.",
   },
   {
     scene:
@@ -233,12 +249,18 @@ const STORY: Beat[] = [
     spread: true,
     light:
       "Dim, deep-blue underwater light from above with a soft glow from the jellyfish; wide eye-level underwater camera.",
+    outfitOverride: SPECIAL_OUTFITS.underwater,
+    companionOverride: null, // Scout isn't part of this scene — a solo rest moment for the child.
+    compositionNotes:
+      "show enough of the whale AND the child's complete body — never enlarge " +
+      "the child so much that the rider crops at the frame edge; widen the shot " +
+      "instead of zooming in.",
   },
   {
     scene:
       "Holding tight to the mast of a small wooden boat in a splashy ocean storm, " +
       "clutching the treasure map and looking determined and brave, with " +
-      `${SCOUT} sheltered under one arm; big rolling waves and dramatic clouds, but ` +
+      "Scout sheltered under one arm; big rolling waves and dramatic clouds, but " +
       "a hopeful break of golden light ahead.",
     copy: (c, p) =>
       `But suddenly, they burst up to the surface to find a storm! The waves ` +
@@ -246,12 +268,15 @@ const STORY: Beat[] = [
       `and Scout stayed by ${p.poss} side all along.`,
     light:
       "Dramatic stormy grey overcast light with a hopeful warm break of sun from the upper right; eye-level camera amid the waves.",
+    compositionNotes:
+      "keep the child's mast-holding arm and hand fully inside the frame — no " +
+      "hand, rope, or rigging may cross the edge of the page.",
   },
   {
     scene:
       "Arriving at a sunny tropical treasure island, stepping onto a sandy " +
       "palm-lined cove and pointing excitedly at a tall X-shaped rock, with " +
-      `${SCOUT} splashing happily in the shallows; turquoise water and swaying palms.`,
+      "Scout splashing happily in the shallows; turquoise water and swaying palms.",
     copy: (c) =>
       `Just as the storm cleared, they spotted land—a little island with tall, ` +
       `swaying palm trees. ${c.name} looked at the map, then up at a tall rock ` +
@@ -260,12 +285,15 @@ const STORY: Beat[] = [
       `"We found it! Our treasure is waiting!"`,
     light:
       "Bright tropical midday sun from above, warm and clear over turquoise water; eye-level camera on the sandy cove.",
+    compositionNotes:
+      "the pointing hand and arm must stay fully inside the frame — do not crop " +
+      "the pointing gesture at the edge of the page.",
   },
   {
     scene:
       "Exploring a glittering crystal cave lit by the warm glow of the sparkling " +
       "gems themselves, eyes wide at walls of colourful crystals, following a trail " +
-      `deeper inside, with ${SCOUT} sniffing the path ahead.`,
+      "deeper inside, with Scout sniffing the path ahead.",
     copy: (c) =>
       `Hidden in the rocks was a sparkling crystal cave, where shiny gems ` +
       `glowed all around. ${c.name} and Scout tiptoed inside, following the ` +
@@ -278,7 +306,7 @@ const STORY: Beat[] = [
     scene:
       "Standing in a hidden stone chamber before a big old wooden treasure chest " +
       "that sits on a glowing X marked on the floor, reaching out a hand with a " +
-      `thrilled expression, with ${SCOUT} beside them; shafts of golden light from above.`,
+      "thrilled expression, with Scout beside them; shafts of golden light from above.",
     copy: (c, p) =>
       `Deeper inside, the map's X glowed on the cave floor—and right on top sat ` +
       `the treasure chest at last! ${c.name} took a deep breath, reached out ` +
@@ -286,12 +314,15 @@ const STORY: Beat[] = [
     ink: "dark",
     light:
       "Dramatic warm golden shafts of light from above into a dim stone chamber; eye-level camera.",
+    compositionNotes:
+      "the reaching hand and arm must stay fully inside the frame — do not crop " +
+      "the reach at the edge of the page.",
   },
   {
     scene:
       "The big wooden treasure chest bursting open in a magnificent swirl of " +
       "golden, sparkling starlight that fills the chamber, the child's face lit " +
-      `with wonder and joy, with ${SCOUT} bouncing with excitement; magical glowing ` +
+      "with wonder and joy, with Scout bouncing with excitement; magical glowing " +
       "particles everywhere.",
     copy: () =>
       `The lid popped open! Golden light sparkled everywhere. Tiny, twinkling ` +
@@ -305,7 +336,7 @@ const STORY: Beat[] = [
     scene:
       "A single friendly glowing star floating in the air beside the smiling child, " +
       "lighting a sparkling path that points the way home, with " +
-      `${SCOUT} gazing up in wonder; a soft magical glow all around.`,
+      "Scout gazing up in wonder; a soft magical glow all around.",
     copy: (c) =>
       `To their surprise, the greatest treasure wasn't gold or jewels. It was a ` +
       `little shining star—a forever friend who promised to show ${c.name} and ` +
@@ -318,7 +349,7 @@ const STORY: Beat[] = [
     scene:
       "Soaring joyfully through a beautiful starry night sky high above the clouds, " +
       "carried along a glowing trail of stars back toward home; one arm reaches " +
-      `forward with pure delight while the other arm cradles ${SCOUT} securely ` +
+      "forward with pure delight while the other arm cradles Scout securely " +
       "against the chest — exactly TWO arms and two hands total, never a third arm " +
       "or an extra hand; the moon and twinkling stars all around.",
     copy: (c) =>
@@ -328,6 +359,10 @@ const STORY: Beat[] = [
     spread: true,
     light:
       "Soft cool moonlight and starlight from above with a magical glowing star-trail; slightly low camera against the night sky.",
+    compositionNotes:
+      "the forward-reaching arm must stay fully within the safe art page — it " +
+      "must never cross into the left (text) page or the center gutter, and " +
+      "no hand may enter from any edge.",
   },
 ];
 
@@ -336,20 +371,24 @@ const greatAdventurePages: PageSpec[] = [
   // Front cover
   {
     kind: "cover",
+    layout: "single-page",
     illustrationPrompt: illustration(
       "A wide cover hero scene at golden hour: standing on a grassy clifftop on " +
         "the RIGHT side of the frame and turned toward the viewer with a big " +
         "joyful smile, holding up a rolled treasure map, with a vast world of " +
-        `distant mountains, sea, and sky behind them and ${SCOUT} at their side. ` +
+        "distant mountains, sea, and sky behind them and Scout at their side. " +
         "Frame the child from about the waist up so the FACE IS LARGE, clear, and " +
         "front-facing (or a gentle three-quarter angle) toward the camera — the " +
         "face is the focal point and must unmistakably look like the real child " +
-        "in the reference photos, with their hair exactly as in those photos. " +
-        "Keep the entire LEFT side and the lower-left " +
-        "calm and open — soft sky and gentle scenery with no part of the child " +
-        "there — so a large title can sit in the lower-left without covering the " +
-        "child.",
-      "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera on the grassy clifftop.",
+        "in the reference photos, with their hair exactly as in those photos.",
+      {
+        light:
+          "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera on the grassy clifftop.",
+        compositionNotes:
+          "keep the entire LEFT side and the lower-left calm and open — soft sky " +
+          "and gentle scenery with no part of the child there — so a large title " +
+          "can sit in the lower-left without covering the child.",
+      },
     ),
     text: (c) => `${c.name}'s Great Adventure`,
   },
@@ -357,12 +396,17 @@ const greatAdventurePages: PageSpec[] = [
   {
     kind: "intro",
     spread: true,
+    layout: "text-left-subject-right",
     illustrationPrompt: illustration(
       "In a cozy bedroom at dawn, kneeling on the floor unrolling a glowing old " +
         "treasure map with a big excited smile, a packed explorer's backpack beside " +
-        `them and ${SCOUT} wagging happily nearby; warm golden morning light through ` +
+        "them and Scout wagging happily nearby; warm golden morning light through " +
         "the window.",
-      "Warm golden morning light streaming from the window on the right plus the map's soft glow; eye-level camera at floor height.",
+      {
+        spread: true,
+        light:
+          "Warm golden morning light streaming from the window on the right plus the map's soft glow; eye-level camera at floor height.",
+      },
     ),
     text: (c) => {
       const p = pronouns(c.gender);
@@ -380,7 +424,14 @@ const greatAdventurePages: PageSpec[] = [
       kind: "scene",
       spread: b.spread,
       ink: b.ink,
-      illustrationPrompt: illustration(b.scene, b.light),
+      layout: b.spread ? "text-left-subject-right" : "single-page",
+      illustrationPrompt: illustration(b.scene, {
+        light: b.light,
+        spread: b.spread,
+        compositionNotes: b.compositionNotes,
+        outfitOverride: b.outfitOverride,
+        companionOverride: b.companionOverride,
+      }),
       text: (c) => b.copy(c, pronouns(c.gender)),
     }),
   ),
@@ -388,12 +439,18 @@ const greatAdventurePages: PageSpec[] = [
   {
     kind: "closing",
     spread: true,
+    layout: "text-left-subject-right",
     ink: "dark", // verse sits on the pale bedroom (left leaf) — dark text on a panel reads better
     illustrationPrompt: illustration(
       "Tucked cozily in bed at night in a warm bedroom, with the treasure map and a " +
-        `tiny glowing star resting on the windowsill and ${SCOUT} asleep at the foot ` +
+        "tiny glowing star resting on the windowsill and Scout asleep at the foot " +
         "of the bed; soft moonlight and a peaceful, happy smile.",
-      "Soft cool blue moonlight from the window plus the tiny star's warm glow; eye-level camera beside the bed.",
+      {
+        spread: true,
+        light:
+          "Soft cool blue moonlight from the window plus the tiny star's warm glow; eye-level camera beside the bed.",
+        outfitOverride: SPECIAL_OUTFITS.pajamas,
+      },
     ),
     text: (c) => {
       const p = pronouns(c.gender);
@@ -410,9 +467,10 @@ const greatAdventurePages: PageSpec[] = [
   // Back cover
   {
     kind: "backcover",
+    layout: "single-page",
     illustrationPrompt: illustration(
       "Waving cheerfully with a big joyful smile and a little explorer's backpack, " +
-        `with ${SCOUT} beside them, against a soft simple pastel sky with a few ` +
+        "with Scout beside them, against a soft simple pastel sky with a few " +
         "gentle stars.",
     ),
     text: (c) =>
@@ -420,10 +478,84 @@ const greatAdventurePages: PageSpec[] = [
   },
 ];
 
+import { registerPrintEdition, type PrintEdition, type PhysicalPageMapping } from "./editions";
+
 /** The "Great Adventure" book, ready to register in `registry.ts`. */
 export const greatAdventureBook: StoryTemplate = {
   id: "great-adventure",
   title: "Great Adventure",
   subtitle: "A brave little explorer's quest across the wild, wide world.",
   pages: greatAdventurePages,
+  defaultOutfit: DEFAULT_OUTFIT,
+  specialOutfits: SPECIAL_OUTFITS,
+  companion: SCOUT,
 };
+
+/** Printify Hardcover Square 8x8 Edition — maps 21 illustrations to exactly 24 physical interior pages. */
+export const greatAdventurePrintify24Edition: PrintEdition = {
+  id: "great-adventure-printify-24",
+  storyId: "great-adventure",
+  profileId: "printify-hardcover-square-8x8",
+  interiorPageCount: 24,
+  coverIllustrationIndex: 0,
+  backCoverIllustrationIndex: 20,
+  illustrations: greatAdventurePages.map((p, i) => ({
+    index: i,
+    number: i + 1,
+    filename: `${String(i + 1).padStart(2, "0")}.png`,
+    kind: p.kind,
+    role: p.role,
+    prompt: p.illustrationPrompt,
+    text: p.text,
+    spread: p.spread ?? false,
+    recommendedAspect: p.spread ? "2:1" : "1:1",
+  })),
+  physicalPages: [
+    // Page 1: Sailboat (Illus 3, 03.png)
+    { physicalPageNumber: 1, illustrationIndex: 2, illustrationNumber: 3, filename: "03.png", side: "full", text: greatAdventurePages[2].text },
+    // Pages 2-3: Intro (Illus 2, 02.png, spread)
+    { physicalPageNumber: 2, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "left", text: greatAdventurePages[1].text },
+    { physicalPageNumber: 3, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "right", text: null },
+    // Pages 4-5: Waterfall (Illus 5, 05.png, spread)
+    { physicalPageNumber: 4, illustrationIndex: 4, illustrationNumber: 5, filename: "05.png", side: "left", text: greatAdventurePages[4].text, ink: "dark" },
+    { physicalPageNumber: 5, illustrationIndex: 4, illustrationNumber: 5, filename: "05.png", side: "right", text: null, ink: "dark" },
+    // Pages 6-7: Desert Camel (Illus 6, 06.png, spread)
+    { physicalPageNumber: 6, illustrationIndex: 5, illustrationNumber: 6, filename: "06.png", side: "left", text: greatAdventurePages[5].text },
+    { physicalPageNumber: 7, illustrationIndex: 5, illustrationNumber: 6, filename: "06.png", side: "right", text: null },
+    // Page 8: Jungle Trail (Illus 4, 04.png)
+    { physicalPageNumber: 8, illustrationIndex: 3, illustrationNumber: 4, filename: "04.png", side: "full", text: greatAdventurePages[3].text, ink: "dark" },
+    // Page 9: Ancient Ruins (Illus 7, 07.png)
+    { physicalPageNumber: 9, illustrationIndex: 6, illustrationNumber: 7, filename: "07.png", side: "full", text: greatAdventurePages[6].text },
+    // Page 10: Savanna (Illus 8, 08.png)
+    { physicalPageNumber: 10, illustrationIndex: 7, illustrationNumber: 8, filename: "08.png", side: "full", text: greatAdventurePages[7].text },
+    // Page 11: Snowy Mountain (Illus 9, 09.png)
+    { physicalPageNumber: 11, illustrationIndex: 8, illustrationNumber: 9, filename: "09.png", side: "full", text: greatAdventurePages[8].text },
+    // Pages 12-13: Coral Reef (Illus 11, 11.png, spread)
+    { physicalPageNumber: 12, illustrationIndex: 10, illustrationNumber: 11, filename: "11.png", side: "left", text: greatAdventurePages[10].text },
+    { physicalPageNumber: 13, illustrationIndex: 10, illustrationNumber: 11, filename: "11.png", side: "right", text: null },
+    // Page 14: Polar Bears (Illus 10, 10.png)
+    { physicalPageNumber: 14, illustrationIndex: 9, illustrationNumber: 10, filename: "10.png", side: "full", text: greatAdventurePages[9].text },
+    // Page 15: Blue Whale (Illus 12, 12.png)
+    { physicalPageNumber: 15, illustrationIndex: 11, illustrationNumber: 12, filename: "12.png", side: "full", text: greatAdventurePages[11].text, ink: "dark" },
+    // Page 16: Stormy Boat (Illus 13, 13.png)
+    { physicalPageNumber: 16, illustrationIndex: 12, illustrationNumber: 13, filename: "13.png", side: "full", text: greatAdventurePages[12].text },
+    // Page 17: Tropical Island X (Illus 14, 14.png)
+    { physicalPageNumber: 17, illustrationIndex: 13, illustrationNumber: 14, filename: "14.png", side: "full", text: greatAdventurePages[13].text },
+    // Page 18: Crystal Cave (Illus 15, 15.png)
+    { physicalPageNumber: 18, illustrationIndex: 14, illustrationNumber: 15, filename: "15.png", side: "full", text: greatAdventurePages[14].text, ink: "dark" },
+    // Page 19: Stone Chamber (Illus 16, 16.png)
+    { physicalPageNumber: 19, illustrationIndex: 15, illustrationNumber: 16, filename: "16.png", side: "full", text: greatAdventurePages[15].text, ink: "dark" },
+    // Pages 20-21: Flying Home (Illus 19, 19.png, spread)
+    { physicalPageNumber: 20, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "left", text: greatAdventurePages[18].text },
+    { physicalPageNumber: 21, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "right", text: null },
+    // Page 22: Chest Open (Illus 17, 17.png)
+    { physicalPageNumber: 22, illustrationIndex: 16, illustrationNumber: 17, filename: "17.png", side: "full", text: greatAdventurePages[16].text, ink: "dark" },
+    // Page 23: Star Friend (Illus 18, 18.png)
+    { physicalPageNumber: 23, illustrationIndex: 17, illustrationNumber: 18, filename: "18.png", side: "full", text: greatAdventurePages[17].text, ink: "dark" },
+    // Page 24: Closing Bedtime (Illus 20, 20.png)
+    { physicalPageNumber: 24, illustrationIndex: 19, illustrationNumber: 20, filename: "20.png", side: "full", text: greatAdventurePages[19].text, ink: "dark" },
+  ],
+};
+
+registerPrintEdition(greatAdventurePrintify24Edition);
+

@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildManifest, renderPromptsMarkdown } from "@/lib/manual/manifest";
-import { characterAnchorPrompt } from "@/lib/story/dreamBigTemplate";
+import { characterAnchorPrompt } from "@/lib/story/prompt/characterAnchor";
 import type { ChildProfile } from "@/lib/story/types";
 
 export const runtime = "nodejs";
@@ -42,9 +42,13 @@ export async function POST(request: Request): Promise<Response> {
     typeof (body as { bookId?: unknown }).bookId === "string"
       ? (body as { bookId: string }).bookId
       : undefined;
+  const profileId =
+    typeof (body as { profileId?: unknown }).profileId === "string"
+      ? (body as { profileId: string }).profileId
+      : undefined;
 
-  const pages = buildManifest(child, bookId);
-  const markdown = renderPromptsMarkdown(child, bookId);
+  const pages = buildManifest(child, bookId, profileId);
+  const markdown = renderPromptsMarkdown(child, bookId, profileId);
   const anchorPrompt = characterAnchorPrompt(child);
 
   return NextResponse.json({ pages, markdown, anchorPrompt });

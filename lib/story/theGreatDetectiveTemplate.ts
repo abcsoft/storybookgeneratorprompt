@@ -22,33 +22,8 @@
  */
 
 import { ART_STYLE } from "../config";
-import type { ChildProfile, Gender, PageSpec, StoryTemplate } from "./types";
-
-interface Pronouns {
-  subj: string; // he / she / they
-  obj: string; // him / her / them
-  poss: string; // his / her / their
-}
-
-function pronouns(gender: Gender): Pronouns {
-  switch (gender) {
-    case "boy":
-      return { subj: "he", obj: "him", poss: "his" };
-    case "girl":
-      return { subj: "she", obj: "her", poss: "her" };
-    default:
-      return { subj: "they", obj: "them", poss: "their" };
-  }
-}
-
-function childNoun(gender: Gender): string {
-  if (gender === "boy") return "boy";
-  if (gender === "girl") return "girl";
-  return "child";
-}
-
-/** Capitalize the first letter — for a pronoun at the start of a sentence. */
-const cap = (s: string): string => s[0].toUpperCase() + s.slice(1);
+import { cap, childNoun, pronouns, type Pronouns } from "./textHelpers";
+import type { ChildProfile, PageSpec, StoryTemplate, LayoutType, PageKind } from "./types";
 
 /** The detective's signature tool — kept consistent page-to-page. */
 const MAGNIFIER = "a child-sized brass magnifying glass";
@@ -134,16 +109,25 @@ const ART_STYLE_WITH_SIGN = ((): string => {
  *  (mismatched light direction/temperature and camera angle are why composites
  *  read as fake). `style` overrides the art-style block (e.g. to allow sign text
  *  on the back cover). */
-function illustration(scene: string, light?: string, style: string = ART_STYLE) {
-  return (c: ChildProfile): string => {
+import { buildTargetFormatBlock } from "./prompt/compositionRules";
+
+function illustration(
+  scene: string,
+  light?: string,
+  style: string = ART_STYLE,
+  layout: LayoutType = "single-page",
+  kind: PageKind = "scene",
+) {
+  return (c: ChildProfile, profileId?: string): string => {
     const lighting = light
       ? ` LIGHTING & CAMERA — match the child to the scene so the composite never ` +
         `looks pasted-on: ${light} Light ${c.name} with exactly this light (same ` +
         `direction, color temperature, and softness) and matching shadows, and frame ` +
         `${c.name} at this same camera angle and horizon line.`
       : "";
+    const targetFormat = buildTargetFormatBlock(profileId, layout, kind);
     return (
-      `${IDENTITY_FIRST} ${style} ${IDENTITY_OVER_STYLE} This is ${c.name}, a ` +
+      `${IDENTITY_FIRST} ${style} ${IDENTITY_OVER_STYLE} ${targetFormat} This is ${c.name}, a ` +
       `${c.age}-year-old ${childNoun(c.gender)}, a clever little detective solving ` +
       `the mystery of a missing yellow ball, ${HERO_OUTFIT}. ${scene}${lighting} ` +
       `Keep ${c.name} looking exactly like the attached character reference and ` +
