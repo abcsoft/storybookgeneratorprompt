@@ -839,6 +839,10 @@ export default function ManualFlow({
                 onMarkNeedsRegeneration={() => onMarkNeedsRegeneration(p.index)}
                 onClearNeedsRegeneration={() => onClearNeedsRegeneration(p.index)}
                 onOpenCorrection={() => setCorrectionIndex(p.index)}
+                onOpenFramingEditor={() => {
+                  setStep("review");
+                  // BookReview component handles framingEditorIndex
+                }}
               />
             ))}
           </div>

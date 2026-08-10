@@ -21,6 +21,7 @@ export default function IllustrationCard({
   onMarkNeedsRegeneration,
   onClearNeedsRegeneration,
   onOpenCorrection,
+  onOpenFramingEditor,
 }: {
   page: ManualPage;
   pageLabel: string;
@@ -33,6 +34,7 @@ export default function IllustrationCard({
   onMarkNeedsRegeneration: () => void;
   onClearNeedsRegeneration?: () => void;
   onOpenCorrection: () => void;
+  onOpenFramingEditor?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
@@ -99,6 +101,16 @@ export default function IllustrationCard({
           <button className={styles.copyButton} onClick={onOpenCorrection}>
             Fix Image
           </button>
+          {onOpenFramingEditor && (
+            <button
+              className={styles.copyButton}
+              style={{ borderColor: "var(--star)", color: "var(--ink)", fontWeight: 700 }}
+              onClick={onOpenFramingEditor}
+              disabled={!hasImage}
+            >
+              🖼️ Adjust framing
+            </button>
+          )}
           <button
             className={styles.copyButton}
             onClick={onApprove}

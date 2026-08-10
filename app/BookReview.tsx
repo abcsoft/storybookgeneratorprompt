@@ -1093,7 +1093,7 @@ export default function BookReview({
             <div key={e.manifestIndex} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               <div
                 className={styles.reviewTile}
-                onClick={() => setOpenIndex(e.manifestIndex)}
+                onClick={() => setFramingEditorIndex(e.manifestIndex)}
                 style={{ cursor: "pointer" }}
               >
                 <div className={styles.reviewArt} style={{ aspectRatio: tileAspect, position: "relative" }}>
@@ -1131,7 +1131,7 @@ export default function BookReview({
                 <button
                   type="button"
                   className={styles.editorModeBtn}
-                  style={{ flex: 1, fontSize: "12px", padding: "6px 8px", borderColor: "var(--star)", color: "#fff" }}
+                  style={{ flex: 1, fontSize: "12px", padding: "6px 8px", borderColor: "var(--star)", color: "#fff", background: "rgba(245, 183, 60, 0.15)" }}
                   onClick={() => setFramingEditorIndex(e.manifestIndex)}
                 >
                   🖼️ Adjust framing
@@ -1172,7 +1172,7 @@ export default function BookReview({
             type="button"
             className={styles.button}
             style={{ padding: "8px 14px", fontSize: "13px", background: "var(--star)", color: "#1c1440" }}
-            onClick={() => setOpenIndex(unresolvedIndices[0])}
+            onClick={() => setFramingEditorIndex(unresolvedIndices[0])}
           >
             Review unresolved pages ({unresolvedIndices.length}) 🔍
           </button>
