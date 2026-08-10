@@ -36,6 +36,8 @@ export interface PhysicalPageMapping {
   filename: string;
   /** Framing side: "full" for single page, "left" or "right" for wide spread. */
   side: "full" | "left" | "right";
+  /** Explicit physical leaf for story text ("left", "right", or "none"). */
+  storyTextLeaf?: "left" | "right" | "none";
   /** Personalized copy shown on this physical leaf (function or null). */
   text: ((child: ChildProfile) => string) | string | null;
   ink?: "light" | "dark";

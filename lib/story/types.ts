@@ -62,6 +62,8 @@ export interface PageSpec {
   spread?: boolean;
   /** Explicit page layout model ("single" or "spread"). */
   pageLayout?: PageLayout;
+  /** Explicit physical leaf where story text is positioned ("left", "right", or "none"). */
+  storyTextLeaf?: "left" | "right" | "none";
   /** Force the verse ink/panel instead of auto-detecting from the art:
    *  "dark" = dark text on a light translucent panel (best over light or busy
    *  scenes), "light" = plain white text. Omit to auto-pick during PDF assembly. */

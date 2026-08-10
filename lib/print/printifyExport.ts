@@ -181,7 +181,11 @@ async function screenshotPage(
     });
     return Buffer.from(png);
   } finally {
-    await page.close();
+    try {
+      await page.close();
+    } catch {
+      /* ignore cleanup close error */
+    }
   }
 }
 

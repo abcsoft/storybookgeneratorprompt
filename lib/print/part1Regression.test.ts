@@ -28,7 +28,7 @@ describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regressi
     const dummyChild = { name: "Test", age: 5, gender: "boy" as const };
     const res = await runPreflight({
       child: dummyChild,
-      bookId: "dream-big", // Dream Big does not have a 24-page Printify edition yet
+      bookId: "dinosaur-discovery", // Dinosaur Discovery does not have a 24-page Printify edition yet
       profileId: "printify-hardcover-square-8x8",
       files: [],
     });

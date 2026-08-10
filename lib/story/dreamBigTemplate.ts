@@ -342,6 +342,8 @@ const dreamBigPages: PageSpec[] = [
   },
 ];
 
+import { registerPrintEdition, type PrintEdition } from "./editions";
+
 /** The "Dream Big" book, ready to register in `registry.ts`. */
 export const dreamBigBook: StoryTemplate = {
   id: "dream-big",
@@ -349,3 +351,55 @@ export const dreamBigBook: StoryTemplate = {
   subtitle: "Your child as a pilot, astronaut, explorer and more.",
   pages: dreamBigPages,
 };
+
+/** Printify Hardcover Square 8x8 Edition — maps 24 illustrations/pages to exactly 24 physical interior pages. */
+export const dreamBigPrintify24Edition: PrintEdition = {
+  id: "dream-big-printify-24",
+  storyId: "dream-big",
+  profileId: "printify-hardcover-square-8x8",
+  interiorPageCount: 24,
+  coverIllustrationIndex: 0,
+  backCoverIllustrationIndex: 23,
+  illustrations: dreamBigPages.map((p, i) => ({
+    index: i,
+    number: i + 1,
+    filename: `${String(i + 1).padStart(2, "0")}.png`,
+    kind: p.kind,
+    role: p.role,
+    prompt: p.illustrationPrompt,
+    text: p.text,
+    spread: p.spread ?? false,
+    recommendedAspect: p.spread ? "2:1" : "1:1",
+  })),
+  physicalPages: [
+    // Pages 1-2: Intro Spread (Illustration Index 1, 02.png)
+    { physicalPageNumber: 1, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "left", storyTextLeaf: "left", text: dreamBigPages[1].text },
+    { physicalPageNumber: 2, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "right", storyTextLeaf: "none", text: null },
+    // Pages 3 to 22: 20 Career Scenes (Single-page interior)
+    { physicalPageNumber: 3, illustrationIndex: 2, illustrationNumber: 3, filename: "03.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[2].text },
+    { physicalPageNumber: 4, illustrationIndex: 3, illustrationNumber: 4, filename: "04.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[3].text },
+    { physicalPageNumber: 5, illustrationIndex: 4, illustrationNumber: 5, filename: "05.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[4].text },
+    { physicalPageNumber: 6, illustrationIndex: 5, illustrationNumber: 6, filename: "06.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[5].text },
+    { physicalPageNumber: 7, illustrationIndex: 6, illustrationNumber: 7, filename: "07.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[6].text },
+    { physicalPageNumber: 8, illustrationIndex: 7, illustrationNumber: 8, filename: "08.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[7].text },
+    { physicalPageNumber: 9, illustrationIndex: 8, illustrationNumber: 9, filename: "09.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[8].text },
+    { physicalPageNumber: 10, illustrationIndex: 9, illustrationNumber: 10, filename: "10.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[9].text },
+    { physicalPageNumber: 11, illustrationIndex: 10, illustrationNumber: 11, filename: "11.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[10].text },
+    { physicalPageNumber: 12, illustrationIndex: 11, illustrationNumber: 12, filename: "12.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[11].text },
+    { physicalPageNumber: 13, illustrationIndex: 12, illustrationNumber: 13, filename: "13.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[12].text },
+    { physicalPageNumber: 14, illustrationIndex: 13, illustrationNumber: 14, filename: "14.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[13].text },
+    { physicalPageNumber: 15, illustrationIndex: 14, illustrationNumber: 15, filename: "15.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[14].text },
+    { physicalPageNumber: 16, illustrationIndex: 15, illustrationNumber: 16, filename: "16.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[15].text },
+    { physicalPageNumber: 17, illustrationIndex: 16, illustrationNumber: 17, filename: "17.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[16].text },
+    { physicalPageNumber: 18, illustrationIndex: 17, illustrationNumber: 18, filename: "18.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[17].text },
+    { physicalPageNumber: 19, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[18].text },
+    { physicalPageNumber: 20, illustrationIndex: 19, illustrationNumber: 20, filename: "20.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[19].text },
+    { physicalPageNumber: 21, illustrationIndex: 20, illustrationNumber: 21, filename: "21.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[20].text },
+    { physicalPageNumber: 22, illustrationIndex: 21, illustrationNumber: 22, filename: "22.png", side: "full", storyTextLeaf: "left", text: dreamBigPages[21].text },
+    // Pages 23-24: Closing Spread (Illustration Index 22, 23.png)
+    { physicalPageNumber: 23, illustrationIndex: 22, illustrationNumber: 23, filename: "23.png", side: "left", storyTextLeaf: "left", text: dreamBigPages[22].text },
+    { physicalPageNumber: 24, illustrationIndex: 22, illustrationNumber: 23, filename: "23.png", side: "right", storyTextLeaf: "none", text: null },
+  ],
+};
+
+registerPrintEdition(dreamBigPrintify24Edition);
