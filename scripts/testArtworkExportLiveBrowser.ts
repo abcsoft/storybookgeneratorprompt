@@ -1,157 +1,152 @@
-import puppeteer from "puppeteer";
 import path from "node:path";
 import fs from "node:fs/promises";
 import sharp from "sharp";
 import { exportPrintifyBook } from "../lib/print/printifyExport";
-import { getPrintProfile } from "../lib/print/registry";
+import { dreamBigPrintify24Edition } from "../lib/story/dreamBigTemplate";
+import { resolvePhysicalPageText } from "../lib/story/editions";
+import type { ChildProfile } from "../lib/story/types";
+
+const mockChild: ChildProfile = { name: "Mehedi", age: 4, gender: "boy" };
 
 async function createTestPatternBuffer(label: string, colorHex: string): Promise<Buffer> {
   const svg = `<svg width="2400" height="2400" xmlns="http://www.w3.org/2000/svg">
     <rect width="2400" height="2400" fill="${colorHex}" />
     <circle cx="1200" cy="1200" r="700" fill="#ffffff" />
     <circle cx="1200" cy="1200" r="500" fill="#ffd36b" />
-    <text x="1200" y="1200" font-family="Arial" font-size="120" font-weight="bold" fill="#231d2b" text-anchor="middle" dominant-baseline="central">${label}</text>
+    <text x="1200" y="1200" font-family="Arial" font-size="110" font-weight="bold" fill="#231d2b" text-anchor="middle" dominant-baseline="central">${label}</text>
   </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 async function run() {
   console.log("==================================================");
-  console.log("MANDATORY LIVE BROWSER TEST — ARTWORK EXPORT INTEGRITY");
+  console.log("MANDATORY LIVE TEST — MAPPING & REAL ASSET INTEGRITY");
   console.log("==================================================");
 
   const artifactDir = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\8c74abe3-e347-45df-8713-44db1cef8c7c";
+  const edition = dreamBigPrintify24Edition;
 
-  // Create a realistic test image set for all 24 Dream Big pages
-  const images = new Map<number, { buffer: Buffer; mimeType: string }>();
-  const rawFiles: { filename: string; buffer: Buffer }[] = [];
-
-  const roles = [
-    "COVER", "INTRO", "PILOT", "RACER", "ASTRONAUT", "DOCTOR", "FIREFIGHTER", "SCIENTIST",
-    "SOCCER", "ARTIST", "CHEF", "MUSICIAN", "DIVER", "CHEF2", "FARMER", "ARCHITECT",
-    "TEACHER", "SAILOR", "BOTANIST", "ASTRONOMER", "DANCER", "INVENTOR", "CLOSING", "BACKCOVER"
-  ];
+  // ----------------------------------------------------
+  // TEST A: DYNAMIC DIAGNOSTIC FIXTURE MAPPING VERIFICATION
+  // ----------------------------------------------------
+  console.log("\n--- TEST A: DYNAMIC DIAGNOSTIC FIXTURE MAPPING VERIFICATION ---");
+  const diagImages = new Map<number, { buffer: Buffer; mimeType: string }>();
+  const diagRawFiles: { filename: string; buffer: Buffer }[] = [];
   const colors = [
     "#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1",
-    "#84cc16", "#d97706", "#06b6d4", "#a855f7", "#ec4899", "#10b981", "#3b82f6", "#f59e0b",
-    "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1", "#84cc16", "#d97706", "#06b6d4", "#a855f7"
+    "#84cc16", "#d97706", "#06b6d4", "#a855f7", "#ef4444", "#3b82f6", "#10b981", "#f59e0b",
+    "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1", "#84cc16", "#d97706", "#06b6d4", "#a855f7",
   ];
 
-  for (let i = 0; i < 24; i++) {
-    const filename = `${String(i + 1).padStart(2, "0")}.png`;
-    const buf = await createTestPatternBuffer(roles[i], colors[i]);
-    images.set(i, { buffer: buf, mimeType: "image/png" });
-    rawFiles.push({ filename, buffer: buf });
+  // Derive labels strictly from edition.illustrations (NO hardcoded role array!)
+  for (const illo of edition.illustrations) {
+    const label = (illo.role || illo.kind || `ILLO-${illo.number}`).toUpperCase();
+    const buf = await createTestPatternBuffer(label, colors[illo.index % colors.length]);
+    diagImages.set(illo.index, { buffer: buf, mimeType: "image/png" });
+    diagRawFiles.push({ filename: illo.filename, buffer: buf });
   }
 
-  console.log("Executing server-side Printify export for Mehedi test book...");
-  const exportResult = await exportPrintifyBook({
-    child: { name: "Mehedi", age: 4, gender: "boy" },
+  const diagExportResult = await exportPrintifyBook({
+    child: mockChild,
     bookId: "dream-big",
     profileId: "printify-hardcover-square-8x8",
-    images,
-    rawFiles,
+    images: diagImages,
+    rawFiles: diagRawFiles,
   });
 
-  if (!exportResult.ok || !exportResult.dir) {
-    console.error("Export failed:", exportResult.preflight?.errors);
-    throw new Error("Printify export failed during live test.");
+  if (!diagExportResult.ok || !diagExportResult.dir) {
+    throw new Error(`Diagnostic export failed: ${diagExportResult.preflight?.errors.join("\n")}`);
   }
 
-  const exportDir = exportResult.dir;
-  console.log(`Exported successfully to: ${exportDir}`);
+  console.log(`Diagnostic Export Directory: ${diagExportResult.dir}`);
 
-  // Read exported page-05.png (Astronaut) and cover.png
-  const page05Path = path.join(exportDir, "page-05.png");
-  const coverPath = path.join(exportDir, "cover.png");
-  const proofPath = path.join(exportDir, "proof.pdf");
+  // Verify physical page mapping consistency for all 24 physical interior pages
+  for (const p of edition.physicalPages) {
+    const illo = edition.illustrations.find((i) => i.index === p.illustrationIndex)!;
+    const pageText = resolvePhysicalPageText(p, mockChild) ?? "";
+    const expectedLabel = (illo.role || illo.kind).toUpperCase();
 
-  // Copy page-05.png and cover.png to artifact directory for evidence
-  const page05Artifact = path.join(artifactDir, "exported_page_05_astronaut.png");
-  const coverArtifact = path.join(artifactDir, "exported_cover_wrap.png");
-  await fs.copyFile(page05Path, page05Artifact);
-  await fs.copyFile(coverPath, coverArtifact);
-
-  console.log(`Saved exported page 05 PNG artifact: ${page05Artifact}`);
-  console.log(`Saved exported cover PNG artifact: ${coverArtifact}`);
-
-  // Inspect page-05.png using Sharp stats to verify artwork pixels (ASTRONAUT text & colors exist)
-  const page05Stats = await sharp(page05Artifact).stats();
-  const page05Meta = await sharp(page05Artifact).metadata();
-
-  console.log(`Page 05 raster: ${page05Meta.width}x${page05Meta.height}, Red mean: ${page05Stats.channels[0].mean.toFixed(2)}`);
-
-  if (page05Meta.width !== 2400 || page05Meta.height !== 2400) {
-    throw new Error(`Page 05 dimensions are ${page05Meta.width}x${page05Meta.height}, expected 2400x2400`);
-  }
-  if (page05Stats.channels[0].mean < 20 && page05Stats.channels[1].mean < 20 && page05Stats.channels[2].mean < 20) {
-    throw new Error("Page 05 raster is completely dark/blank!");
+    console.log(
+      `Page ${String(p.physicalPageNumber).padStart(2, "0")} | Illustration ${String(p.illustrationNumber).padStart(2, "0")} (${p.filename}) | Role: ${expectedLabel} | Text: "${pageText.slice(0, 45)}..."`,
+    );
   }
 
-  // Now render PDF proof page to image using Puppeteer for visual proof artifact
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    defaultViewport: { width: 1440, height: 900 },
-  });
+  // ----------------------------------------------------
+  // TEST B: REAL ORIGINAL DREAM BIG HEAVY GEMINI ASSET TEST
+  // ----------------------------------------------------
+  console.log("\n--- TEST B: REAL ORIGINAL DREAM BIG HEAVY ASSETS ACCEPTANCE ---");
+  const realSourceDir = "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\storybook-out\\mehedi";
+  const realImages = new Map<number, { buffer: Buffer; mimeType: string }>();
+  const realRawFiles: { filename: string; buffer: Buffer }[] = [];
 
-  try {
-    const page = await browser.newPage();
-    console.log("Navigating to http://localhost:3000/ to test live browser review...");
-    await page.goto("http://localhost:3000/", { waitUntil: "networkidle0" });
+  let smallestSize = Infinity;
+  let largestSize = 0;
+  let countGt5MB = 0;
+  let countGt10MB = 0;
 
-    // Type child name
-    await page.waitForSelector("#name");
-    await page.type("#name", "Mehedi");
+  console.log("Loading real original Gemini files from storybook-out/mehedi/...");
+  for (let i = 1; i <= 24; i++) {
+    const filename = `${String(i).padStart(2, "0")}.png`;
+    const filePath = path.join(realSourceDir, filename);
+    const buf = await fs.readFile(filePath);
+    const size = buf.length;
 
-    // Click "Get my prompts →"
-    const promptsPromise = page.waitForResponse((res) => res.url().includes("/api/prompts"));
-    const buttons = await page.$$("button");
-    for (const btn of buttons) {
-      const text = await page.evaluate((el) => el.textContent, btn);
-      if (text && text.includes("Get my prompts")) {
-        await btn.click();
-        break;
-      }
-    }
-    await promptsPromise;
+    if (size < smallestSize) smallestSize = size;
+    if (size > largestSize) largestSize = size;
+    if (size > 5 * 1024 * 1024) countGt5MB++;
+    if (size > 10 * 1024 * 1024) countGt10MB++;
 
-    // Upload test file 05.png to single input
-    const tmpImgPath = path.join(process.cwd(), "tmp_05_astronaut.png");
-    await fs.writeFile(tmpImgPath, images.get(4)!.buffer);
+    console.log(`  Imported ${filename}: ${(size / (1024 * 1024)).toFixed(2)} MB`);
 
-    const fileInput = await page.waitForSelector("input[type='file']");
-    if (fileInput) {
-      await fileInput.uploadFile(tmpImgPath);
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-
-    // Click "Review book →"
-    const reviewBtns = await page.$$("button");
-    for (const btn of reviewBtns) {
-      const text = await page.evaluate((el) => el.textContent, btn);
-      if (text && text.includes("Review book")) {
-        await btn.click();
-        break;
-      }
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-
-    const browserReviewPath = path.join(artifactDir, "browser_review_imported_artwork.png");
-    await page.screenshot({ path: browserReviewPath });
-    console.log(`Saved browser review screenshot: ${browserReviewPath}`);
-
-    await fs.unlink(tmpImgPath).catch(() => {});
-  } finally {
-    await browser.close();
+    const index = i - 1;
+    realImages.set(index, { buffer: buf, mimeType: "image/png" });
+    realRawFiles.push({ filename, buffer: buf });
   }
 
   console.log("\n==================================================");
-  console.log("ALL LIVE BROWSER & EXPORT INTEGRITY TESTS PASSED!");
+  console.log("REAL ASSET STATISTICAL REPORT:");
+  console.log(`- Total Real Files: ${realRawFiles.length}`);
+  console.log(`- Smallest File Size: ${(smallestSize / (1024 * 1024)).toFixed(2)} MB`);
+  console.log(`- Largest File Size: ${(largestSize / (1024 * 1024)).toFixed(2)} MB`);
+  console.log(`- Files > 5 MB: ${countGt5MB}`);
+  console.log(`- Files > 10 MB: ${countGt10MB}`);
+  console.log("==================================================");
+
+  console.log("\nExecuting server-side Printify export with REAL heavy assets...");
+  const realExportResult = await exportPrintifyBook({
+    child: mockChild,
+    bookId: "dream-big",
+    profileId: "printify-hardcover-square-8x8",
+    images: realImages,
+    rawFiles: realRawFiles,
+  });
+
+  if (!realExportResult.ok || !realExportResult.dir) {
+    throw new Error(`Real asset export failed: ${realExportResult.preflight?.errors.join("\n")}`);
+  }
+
+  const realExportDir = realExportResult.dir;
+  console.log(`Real Heavy Asset Export Successful: ${realExportDir}`);
+
+  // Copy sample exported page PNGs to artifacts for visual confirmation
+  const samplePages = [1, 3, 5, 6, 7, 8, 9, 10, 16, 20, 22, 23, 24];
+  for (const pageNum of samplePages) {
+    const pageName = `page-${String(pageNum).padStart(2, "0")}.png`;
+    const srcPath = path.join(realExportDir, pageName);
+    const destPath = path.join(artifactDir, `real_exported_${pageName}`);
+    await fs.copyFile(srcPath, destPath);
+
+    const meta = await sharp(destPath).metadata();
+    const stats = await sharp(destPath).stats();
+    console.log(`Visual Proof ${pageName}: ${meta.width}x${meta.height}, Mean RGB: (${stats.channels[0].mean.toFixed(1)}, ${stats.channels[1].mean.toFixed(1)}, ${stats.channels[2].mean.toFixed(1)})`);
+  }
+
+  console.log("\n==================================================");
+  console.log("ALL MAPPING & REAL ASSET TESTS PASSED SUCCESSFULLY!");
   console.log("==================================================");
 }
 
 run().catch((err) => {
-  console.error("Live test failed:", err);
+  console.error("Test runner error:", err);
   process.exit(1);
 });

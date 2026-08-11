@@ -47,22 +47,26 @@ export async function composeCover(
       deviceScaleFactor: 1,
     });
     await page.setContent(html, { waitUntil: "load" });
-    await page.evaluate(async () => {
-      const imgs = Array.from(document.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map(
-          (img) =>
-            new Promise((resolve) => {
-              if (img.complete && img.naturalWidth !== 0) {
-                resolve(true);
-              } else {
-                img.onload = () => resolve(true);
-                img.onerror = () => resolve(false);
-              }
-            }),
-        ),
-      );
-    });
+    try {
+      await page.evaluate(async () => {
+        const imgs = Array.from(document.querySelectorAll("img"));
+        await Promise.all(
+          imgs.map(
+            (img) =>
+              new Promise((resolve) => {
+                if (img.complete && img.naturalWidth !== 0) {
+                  resolve(true);
+                } else {
+                  img.onload = () => resolve(true);
+                  img.onerror = () => resolve(false);
+                }
+              }),
+          ),
+        );
+      });
+    } catch {
+      // ignore evaluation error if page closed
+    }
 
     const png = await page.screenshot({
       type: "png",

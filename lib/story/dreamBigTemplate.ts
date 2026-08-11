@@ -262,7 +262,7 @@ const ROLES: Role[] = [
 ];
 
 /** The full ordered book: cover + dedication + scenes + closing + back cover. */
-const dreamBigPages: PageSpec[] = [
+export const dreamBigPages: PageSpec[] = [
   // Front cover
   {
     kind: "cover",
