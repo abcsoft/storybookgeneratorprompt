@@ -175,6 +175,22 @@ async function screenshotPage(
       deviceScaleFactor: 1,
     });
     await page.setContent(html, { waitUntil: "load" });
+    await page.evaluate(async () => {
+      const imgs = Array.from(document.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete && img.naturalWidth !== 0) {
+                resolve(true);
+              } else {
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+              }
+            }),
+        ),
+      );
+    });
     const png = await page.screenshot({
       type: "png",
       clip: { x: 0, y: 0, width: canvasPx.width, height: canvasPx.height },
@@ -242,7 +258,7 @@ export async function validateExportedFolder(
           errors.push(`Exported file "${reqFile}" is empty (0 bytes).`);
         }
       } catch {
-        errors.push(`Exported file "${reqFile}" is missing.`);
+        errors.push(`Exported file "${reqFile}" is missing or unreadable.`);
       }
     }
   } catch {
@@ -384,6 +400,8 @@ export async function exportPrintifyBook(
       for (const p of edition.physicalPages) {
         const provided = opts.images.get(p.illustrationIndex);
         let pageDataUri: string | null = null;
+        let sourcePx: PxSize | undefined = undefined;
+
         if (provided) {
           if (p.side === "left") {
             const split = spreadSplits.get(p.illustrationIndex);
@@ -393,6 +411,14 @@ export async function exportPrintifyBook(
             if (split) pageDataUri = dataUri({ buffer: split[1], mimeType: "image/png" });
           } else {
             pageDataUri = dataUri(provided);
+            try {
+              const meta = await sharp(provided.buffer).metadata();
+              if (meta.width && meta.height) {
+                sourcePx = { width: meta.width, height: meta.height };
+              }
+            } catch {
+              // ignore
+            }
           }
         }
 
@@ -403,6 +429,7 @@ export async function exportPrintifyBook(
             text: resolvePhysicalPageText(p, opts.child),
             ink: p.ink,
             transform: p.side === "full" ? provided?.transform : undefined,
+            sourcePx: p.side === "full" ? sourcePx : undefined,
           }),
         });
       }

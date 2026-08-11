@@ -79,6 +79,10 @@ export function renderPrintifyPageHtml(
     const pct = computePercentGeometry(geo);
     subjectStyleAttr = `style="position: absolute; left: ${pct.leftPct.toFixed(3)}%; top: ${pct.topPct.toFixed(3)}%; width: ${pct.widthPct.toFixed(3)}%; height: ${pct.heightPct.toFixed(3)}%; object-fit: fill;"`;
     showBackdrop = geo.showBackdrop;
+  } else if (input.imageDataUri) {
+    const geo = computeTransformGeometry(canvas, canvas, transform);
+    const pct = computePercentGeometry(geo);
+    subjectStyleAttr = `style="position: absolute; left: ${pct.leftPct.toFixed(3)}%; top: ${pct.topPct.toFixed(3)}%; width: ${pct.widthPct.toFixed(3)}%; height: ${pct.heightPct.toFixed(3)}%; object-fit: fill;"`;
   }
 
   const background = input.imageDataUri
