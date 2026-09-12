@@ -58,6 +58,7 @@ export interface ManualPage {
   spread?: boolean;
   pageLayout?: PageLayout;
   physicalPages?: number[];
+  resolvedSlot?: ResolvedAssetSlot;
 }
 
 type Step = "profile" | "prompts" | "review";
@@ -129,6 +130,7 @@ export default function ManualFlow({
   }, [bookId, layoutMode, customSpreads]);
 
   const [pages, setPages] = useState<ManualPage[]>([]);
+  const [resolvedSlots, setResolvedSlots] = useState<ResolvedAssetSlot[]>([]);
   const [markdown, setMarkdown] = useState("");
   const [anchorPrompt, setAnchorPrompt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -232,8 +234,12 @@ export default function ManualFlow({
       }
       collectObjectUrls(illustrations).forEach((u) => URL.revokeObjectURL(u));
       const nextPages = data.pages as ManualPage[];
+      const nextResolvedSlots: ResolvedAssetSlot[] =
+        data.resolvedSlots ??
+        (nextPages.map((p) => p.resolvedSlot).filter(Boolean) as ResolvedAssetSlot[]);
 
       setPages(nextPages);
+      setResolvedSlots(nextResolvedSlots);
       setMarkdown(data.markdown);
       setAnchorPrompt(data.anchorPrompt ?? "");
       setIllustrations(freshIllustrations(nextPages.map((p) => p.index)));
@@ -309,6 +315,9 @@ export default function ManualFlow({
         return;
       }
       const nextPages = data.pages as ManualPage[];
+      const nextResolvedSlots: ResolvedAssetSlot[] =
+        data.resolvedSlots ??
+        (nextPages.map((p) => p.resolvedSlot).filter(Boolean) as ResolvedAssetSlot[]);
       const oldFilenames = new Set(pages.map((p) => p.filename));
       const newFilenames = new Set(nextPages.map((p) => p.filename));
       const layoutChanged =
@@ -316,6 +325,7 @@ export default function ManualFlow({
         [...oldFilenames].some((f) => !newFilenames.has(f));
 
       setPages(nextPages);
+      setResolvedSlots(nextResolvedSlots);
       setMarkdown(data.markdown);
       setAnchorPrompt(data.anchorPrompt ?? "");
 
@@ -417,40 +427,18 @@ export default function ManualFlow({
 
   const [pendingLegacyFiles, setPendingLegacyFiles] = useState<File[] | null>(null);
 
-  function getAuthoritativeResolvedSlots(): ResolvedAssetSlot[] {
-    return pages.map((p, idx) => ({
-      slotId: (p.canonicalFilename ?? p.filename).replace(/\.[^.]+$/, ""),
-      illustrationIndex: p.index ?? idx,
-      sceneId: p.role ?? "",
-      pageKind: (p.kind as any) ?? "story",
-      kind: (p.kind as any) ?? "story",
-      profileId: profileId,
-      layout: "single-page" as any,
-      assetKind: "illustration" as any,
-      filename: p.canonicalFilename ?? p.filename,
-      expectedFilename: p.canonicalFilename ?? p.filename,
-      legacyAliases: p.legacyAliases ?? [],
-      sourceSceneIndex: p.index ?? idx,
-      role: p.role,
-      roleSlug: p.role ?? "",
-      required: true,
-      physicalPages: p.physicalPages ?? [p.page],
-      textSide: "left" as any,
-      subjectSide: "right" as any,
-      destinationDimensions: { width: profile.canvasPx?.width ?? 3375, height: profile.canvasPx?.height ?? 2475 },
-      printDimensionsIn: { trimWidthIn: 11, trimHeightIn: 8, bleedIn: 0.125, spread: false },
-      targetCanvasAspect: "15:11",
-    })) as unknown as ResolvedAssetSlot[];
-  }
+  const currentResolvedSlots = useMemo<ResolvedAssetSlot[]>(() => {
+    if (resolvedSlots.length > 0) return resolvedSlots;
+    return pages.map((p) => p.resolvedSlot).filter(Boolean) as ResolvedAssetSlot[];
+  }, [resolvedSlots, pages]);
 
   /**
    * Applies the user's explicit legacy interpretation choice for ambiguous packages.
    */
   function onSelectLegacyInterpretation(interpretation: LegacyInterpretation, files: File[]) {
-    const slots = getAuthoritativeResolvedSlots();
     const report = matchImportedFiles(
       files.map((f) => f.name),
-      slots,
+      currentResolvedSlots,
       { legacyInterpretation: interpretation, bookId },
     );
     setImportReport(report);
@@ -499,10 +487,9 @@ export default function ManualFlow({
     if (!list) return;
     clearServerErrors();
     const files = Array.from(list).filter((f) => f.type.startsWith("image/"));
-    const slots = getAuthoritativeResolvedSlots();
     const report = matchImportedFiles(
       files.map((f) => f.name),
-      slots,
+      currentResolvedSlots,
       { confirmLegacyOffsetRecovery: false, bookId },
     );
     setImportReport(report);

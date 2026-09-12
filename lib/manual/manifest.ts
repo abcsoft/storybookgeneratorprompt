@@ -40,6 +40,7 @@ export interface ManualPage {
   /** Authoritative physical interior page numbers. Empty for covers. */
   physicalPages?: number[];
   legacyAliases?: string[];
+  resolvedSlot?: ResolvedAssetSlot;
 }
 
 /** Zero-padded 1-based filename for a page index, e.g. 0 -> "01.png". */
@@ -53,7 +54,7 @@ export function imageFilename(index: number): string {
  *   callers (no `profileId` passed) get byte-identical output to before the
  *   print-profile system existed.
  */
-import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection } from "../story/layoutPlan";
+import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection, type ResolvedAssetSlot } from "../story/layoutPlan";
 
 export function buildManifest(
   child: ChildProfile,
@@ -89,6 +90,7 @@ export function buildManifest(
       pageLayout: layout,
       aspect: slot.expectedSourceAspect,
       physicalPages: slot.physicalPages,
+      resolvedSlot: slot,
     };
   });
 }

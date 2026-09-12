@@ -10,6 +10,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildManifest, renderPromptsMarkdown } from "@/lib/manual/manifest";
 import { characterAnchorPrompt } from "@/lib/story/prompt/characterAnchor";
+import { getPrintProfile } from "@/lib/print/registry";
+import { resolveLayoutPlan } from "@/lib/story/layoutPlan";
 import type { ChildProfile } from "@/lib/story/types";
 
 export const runtime = "nodejs";
@@ -55,9 +57,30 @@ export async function POST(request: Request): Promise<Response> {
     ? (rawBody.customSpreads as any)
     : undefined;
 
+  const profile = getPrintProfile(profileId);
+  const plan = resolveLayoutPlan({ child, bookId: bookId ?? "dream-big", profileId: profile.id, mode, customSpreads });
+  const resolvedSlots = plan.assets.map((slot) => ({
+    slotId: slot.slotId,
+    illustrationIndex: slot.illustrationIndex,
+    pageKind: slot.pageKind,
+    assetKind: slot.assetKind,
+    profileId: slot.profileId,
+    layout: slot.layout,
+    expectedFilename: slot.expectedFilename,
+    legacyAliases: slot.legacyAliases,
+    role: slot.role ?? slot.sourceSceneRole,
+    roleSlug: slot.roleSlug,
+    required: slot.required,
+    physicalPages: slot.physicalPages,
+    destinationDimensions: slot.destinationDimensions,
+    expectedSourceAspect: slot.expectedSourceAspect,
+    textSide: slot.textSide,
+    subjectSide: slot.subjectSide,
+  }));
+
   const pages = buildManifest(child, bookId, profileId, mode, customSpreads);
   const markdown = renderPromptsMarkdown(child, bookId, profileId, mode, customSpreads);
   const anchorPrompt = characterAnchorPrompt(child);
 
-  return NextResponse.json({ pages, markdown, anchorPrompt });
+  return NextResponse.json({ pages, markdown, anchorPrompt, resolvedSlots });
 }

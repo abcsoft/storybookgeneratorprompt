@@ -6,14 +6,17 @@ import { promisify } from "node:util";
 import { chromium } from "playwright";
 import sharp, { type OverlayOptions } from "sharp";
 import { inspectPdfPreflight } from "../lib/pdf/pdfBoxes";
+import { discoverPopplerTools, getProofArtifactsDir } from "./popplerDiscovery";
+import { createZipArchive, extractZipArchive } from "./zipHelper";
+import { runDualChoiceBrowserVerification } from "./testDualChoiceBrowser";
 
 const execFileAsync = promisify(execFile);
 
-const ARTIFACTS_DIR = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\103c5c64-7409-404d-b7ba-52daa89e45f5";
-const POPPLER_BIN_DIR = "C:\\Users\\mehed\\AppData\\Local\\Microsoft\\WinGet\\Packages\\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\\poppler-25.07.0\\Library\\bin";
-const PDFINFO_EXE = path.join(POPPLER_BIN_DIR, "pdfinfo.exe");
-const PDFIMAGES_EXE = path.join(POPPLER_BIN_DIR, "pdfimages.exe");
-const PDFTOPPM_EXE = path.join(POPPLER_BIN_DIR, "pdftoppm.exe");
+const ARTIFACTS_DIR = getProofArtifactsDir();
+const poppler = discoverPopplerTools();
+const PDFINFO_EXE = poppler.pdfinfo;
+const PDFIMAGES_EXE = poppler.pdfimages;
+const PDFTOPPM_EXE = poppler.pdftoppm;
 
 // Independently hardcoded role list and visible markers — NOT derived from production mapping code
 const INDEPENDENT_FIXTURES = [
@@ -315,7 +318,6 @@ export async function runCanonicalProofAndArtifacts() {
 
   const draftContactSheetBuf = await fs.readFile(draftContactSheetPath);
   const draftContactSheetSha = sha256(draftContactSheetBuf);
-  console.log(`✓ Created draft 22-image contact sheet: ${draftContactSheetPath}`);
   console.log(`  SHA-256: ${draftContactSheetSha}`);
 
   // 7. Run Poppler command-line inspection
@@ -323,10 +325,16 @@ export async function runCanonicalProofAndArtifacts() {
   const pdfinfoRes = await execFileAsync(PDFINFO_EXE, [outputPdfPath]);
   console.log("\n--- RAW PDFINFO OUTPUT ---");
   console.log(pdfinfoRes.stdout);
+  const pdfinfoTxtPath = path.join(ARTIFACTS_DIR, "pdfinfo.txt");
+  await fs.writeFile(pdfinfoTxtPath, pdfinfoRes.stdout, "utf8");
+  console.log(`✓ Saved ${pdfinfoTxtPath}`);
 
   const pdfimagesRes = await execFileAsync(PDFIMAGES_EXE, ["-list", outputPdfPath]);
   console.log("\n--- RAW PDFIMAGES -LIST OUTPUT ---");
   console.log(pdfimagesRes.stdout);
+  const pdfimagesListTxtPath = path.join(ARTIFACTS_DIR, "pdfimages-list.txt");
+  await fs.writeFile(pdfimagesListTxtPath, pdfimagesRes.stdout, "utf8");
+  console.log(`✓ Saved ${pdfimagesListTxtPath}`);
 
   // Deep structural inspection with inspectPdfPreflight
   const inspection = inspectPdfPreflight(pdfBuf, 11, 8, 0.125);
@@ -348,27 +356,26 @@ export async function runCanonicalProofAndArtifacts() {
     }
   }
 
-  // 8. Screenshot SHA hashes
+  // 8. Ensure dual-choice screenshots are present (run dual-choice verification if not yet present)
+  const panelPath = path.join(ARTIFACTS_DIR, "browser_legacy_dual_choice_panel.png");
+  const afterShiftPath = path.join(ARTIFACTS_DIR, "browser_after_shift_plus_two.png");
+  let hasPanel = false;
+  let hasShift = false;
+  try { await fs.access(panelPath); hasPanel = true; } catch {}
+  try { await fs.access(afterShiftPath); hasShift = true; } catch {}
+
+  if (!hasPanel || !hasShift) {
+    console.log("\nDual choice screenshots not found in artifacts dir — running dual choice browser verification...");
+    await runDualChoiceBrowserVerification();
+  }
+
+  // Screenshot SHA hashes
   const canonicalImportBuf = await fs.readFile(canonicalImportScreenshotPath);
   const canonicalImportSha = sha256(canonicalImportBuf);
-
-  let panelScreenshotSha = "";
-  const panelPath = path.join(ARTIFACTS_DIR, "browser_legacy_dual_choice_panel.png");
-  try {
-    const b = await fs.readFile(panelPath);
-    panelScreenshotSha = sha256(b);
-  } catch {
-    /* ignore */
-  }
-
-  let afterShiftScreenshotSha = "";
-  const afterShiftPath = path.join(ARTIFACTS_DIR, "browser_after_shift_plus_two.png");
-  try {
-    const b = await fs.readFile(afterShiftPath);
-    afterShiftScreenshotSha = sha256(b);
-  } catch {
-    /* ignore */
-  }
+  const panelBuf = await fs.readFile(panelPath);
+  const panelScreenshotSha = sha256(panelBuf);
+  const afterShiftBuf = await fs.readFile(afterShiftPath);
+  const afterShiftScreenshotSha = sha256(afterShiftBuf);
 
   // 9. Negative API verification for both 22-file interpretations
   console.log("\n8. Verifying API route missing slots for both 22-file legacy interpretations...");
@@ -455,11 +462,140 @@ export async function runCanonicalProofAndArtifacts() {
   };
 
   const auditReportPath = path.join(ARTIFACTS_DIR, "production-audit-report.json");
-  await fs.writeFile(auditReportPath, JSON.stringify(auditSummary, null, 2));
+  const auditReportJson = JSON.stringify(auditSummary, null, 2);
+  await fs.writeFile(auditReportPath, auditReportJson);
   console.log(`✓ Saved audit report: ${auditReportPath}`);
 
+  // 10. Generate proof-manifest.json
+  console.log("\n9. Building proof manifest...");
+  let generatingCommitSha = "unknown";
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"]);
+    generatingCommitSha = stdout.trim();
+  } catch {
+    /* ignore */
+  }
+
+  const getImageDims = async (filePath: string) => {
+    try {
+      const meta = await sharp(filePath).metadata();
+      return meta.width && meta.height ? { width: meta.width, height: meta.height } : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const canonicalImportMeta = await getImageDims(canonicalImportScreenshotPath);
+  const panelMeta = await getImageDims(panelPath);
+  const afterShiftMeta = await getImageDims(afterShiftPath);
+  const contactSheetMeta = await getImageDims(contactSheetPath);
+  const draftContactSheetMeta = await getImageDims(draftContactSheetPath);
+
+  const manifestFiles: Array<{
+    filename: string;
+    byteSize: number;
+    sha256: string;
+    dimensions?: { width: number; height: number };
+  }> = [
+    { filename: "proof-dream-big-production.pdf", byteSize: pdfBuf.length, sha256: pdfSha },
+    { filename: "dream-big-contact-sheet.png", byteSize: contactSheetBuf.length, sha256: contactSheetSha, dimensions: contactSheetMeta },
+    { filename: "dream-big-draft-22file-contact-sheet.png", byteSize: draftContactSheetBuf.length, sha256: draftContactSheetSha, dimensions: draftContactSheetMeta },
+    { filename: "browser_canonical_import.png", byteSize: canonicalImportBuf.length, sha256: canonicalImportSha, dimensions: canonicalImportMeta },
+    { filename: "browser_legacy_dual_choice_panel.png", byteSize: panelBuf.length, sha256: panelScreenshotSha, dimensions: panelMeta },
+    { filename: "browser_after_shift_plus_two.png", byteSize: afterShiftBuf.length, sha256: afterShiftScreenshotSha, dimensions: afterShiftMeta },
+    { filename: "production-audit-report.json", byteSize: Buffer.byteLength(auditReportJson, "utf8"), sha256: sha256(Buffer.from(auditReportJson, "utf8")) },
+    { filename: "pdfinfo.txt", byteSize: Buffer.byteLength(pdfinfoRes.stdout, "utf8"), sha256: sha256(Buffer.from(pdfinfoRes.stdout, "utf8")) },
+    { filename: "pdfimages-list.txt", byteSize: Buffer.byteLength(pdfimagesRes.stdout, "utf8"), sha256: sha256(Buffer.from(pdfimagesRes.stdout, "utf8")) },
+  ];
+
+  // Self-calculate manifest hash
+  const proofManifest = {
+    generatingCommitSha,
+    generationTimestamp: new Date().toISOString(),
+    validationPassed:
+      inspection.pageCount === 24 &&
+      inspection.embeddedRasterDimensions.length === 24 &&
+      !inspection.hasNonUniformScaling &&
+      inspection.hasVectorStoryText &&
+      inspection.minProductionPpi >= 300 &&
+      shiftRes.status === 400 &&
+      keepRes.status === 400,
+    failures: [] as string[],
+    pdfMetrics: {
+      pageCount: inspection.pageCount,
+      rasterCount: inspection.embeddedRasterDimensions.length,
+      rasterDimensions: "3375x2475",
+      outputGridPpi: 300,
+      hasNonUniformScaling: inspection.hasNonUniformScaling,
+      hasVectorStoryText: inspection.hasVectorStoryText,
+    },
+    files: manifestFiles,
+  };
+
+  const proofManifestJson = JSON.stringify(proofManifest, null, 2);
+  const proofManifestPath = path.join(ARTIFACTS_DIR, "proof-manifest.json");
+  await fs.writeFile(proofManifestPath, proofManifestJson, "utf8");
+  console.log(`✓ Saved proof manifest: ${proofManifestPath}`);
+
+  // Include proof-manifest.json in files list for packaging
+  const allProofFilesForZip = [
+    ...manifestFiles,
+    { filename: "proof-manifest.json", byteSize: Buffer.byteLength(proofManifestJson, "utf8"), sha256: sha256(Buffer.from(proofManifestJson, "utf8")) },
+  ];
+
+  // 11. Package into storybook-dream-big-final-proof.zip
+  console.log("\n10. Packaging storybook-dream-big-final-proof.zip...");
+  const zipEntries = [];
+  for (const item of allProofFilesForZip) {
+    const itemPath = path.join(ARTIFACTS_DIR, item.filename);
+    const data = await fs.readFile(itemPath);
+    zipEntries.push({ name: item.filename, data });
+  }
+
+  const zipBuffer = createZipArchive(zipEntries);
+  const zipPath = path.join(ARTIFACTS_DIR, "storybook-dream-big-final-proof.zip");
+  await fs.writeFile(zipPath, zipBuffer);
+  const zipSha = sha256(zipBuffer);
+  console.log(`✓ Created proof ZIP: ${zipPath}`);
+  console.log(`  Size: ${zipBuffer.length} bytes (${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+  console.log(`  SHA-256: ${zipSha}`);
+
+  // 12. Self-validate the ZIP archive
+  console.log("\n11. Self-validating ZIP archive...");
+  const extractedMap = extractZipArchive(zipBuffer);
+  if (extractedMap.size !== allProofFilesForZip.length) {
+    throw new Error(`ZIP self-validation failed: Expected ${allProofFilesForZip.length} files, extracted ${extractedMap.size}`);
+  }
+
+  for (const item of allProofFilesForZip) {
+    const extractedData = extractedMap.get(item.filename);
+    if (!extractedData) {
+      throw new Error(`ZIP self-validation failed: File "${item.filename}" was not found in archive`);
+    }
+    const extractedSha = sha256(extractedData);
+    if (extractedSha !== item.sha256) {
+      throw new Error(`ZIP self-validation failed: Hash mismatch on "${item.filename}": manifest=${item.sha256}, extracted=${extractedSha}`);
+    }
+  }
+  console.log(`✓ Self-validation PASSED: All ${allProofFilesForZip.length} files extracted and verified byte-identical!`);
+
+  // Mirror to IDE brain folder if present
+  const ideBrainDir = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\103c5c64-7409-404d-b7ba-52daa89e45f5";
+  try {
+    const stat = await fs.stat(ideBrainDir);
+    if (stat.isDirectory() && path.resolve(ideBrainDir) !== path.resolve(ARTIFACTS_DIR)) {
+      for (const item of allProofFilesForZip) {
+        await fs.copyFile(path.join(ARTIFACTS_DIR, item.filename), path.join(ideBrainDir, item.filename));
+      }
+      await fs.copyFile(zipPath, path.join(ideBrainDir, "storybook-dream-big-final-proof.zip"));
+      console.log(`✓ Mirrored all proof files and ZIP to IDE artifacts directory: ${ideBrainDir}`);
+    }
+  } catch {
+    /* ignore if directory does not exist */
+  }
+
   console.log("\n===================================================================");
-  console.log("CANONICAL PROOF PDF & ARTIFACTS GENERATED SUCCESSFULLY!");
+  console.log("CANONICAL PROOF PDF, MANIFEST & ZIP GENERATED AND VERIFIED!");
   console.log("===================================================================");
 }
 

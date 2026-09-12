@@ -3,7 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-const ARTIFACTS_DIR = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\103c5c64-7409-404d-b7ba-52daa89e45f5";
+import { getProofArtifactsDir } from "./popplerDiscovery";
+
+const ARTIFACTS_DIR = getProofArtifactsDir();
 const FIXTURES_DIR = path.join(process.cwd(), "scratch", "dual_choice_fixtures");
 
 async function create22Fixtures() {

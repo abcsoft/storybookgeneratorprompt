@@ -39,6 +39,9 @@ export function listBooks(): StoryTemplate[] {
 
 /** Resolve a book by id, falling back to the default if unknown. */
 export function getBook(id: string = DEFAULT_BOOK_ID): StoryTemplate {
+  if (id === "starlit-dream") {
+    return bedtimeDreamBook;
+  }
   return STORY_BOOKS.find((b) => b.id === id) ?? STORY_BOOKS[0];
 }
 

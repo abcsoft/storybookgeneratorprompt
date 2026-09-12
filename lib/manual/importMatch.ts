@@ -11,7 +11,36 @@
  */
 
 import { indexFromFilename, parseFilename } from "./filenameMatch";
-import type { ResolvedAssetSlot } from "../story/layoutPlan";
+import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection, type ResolvedAssetSlot } from "../story/layoutPlan";
+import type { ChildProfile } from "../story/types";
+
+export interface LegacyAdapterContext {
+  bookId: string;
+  profileId: string;
+  mode?: LayoutMode;
+  customSpreads?: CustomSpreadSelection[];
+  child?: ChildProfile;
+}
+
+/**
+ * Explicit legacy compatibility adapter: resolves real layout plan assets using
+ * real profile and layout metadata.
+ * Never silently assumes Classic Landscape or single-page layout.
+ */
+export function adaptLegacyFilenamesToResolvedSlots(
+  requiredFilenames: string[],
+  context: LegacyAdapterContext,
+): ResolvedAssetSlot[] {
+  const child = context.child ?? { name: "Alex", age: 4, gender: "boy" as const };
+  const plan = resolveLayoutPlan({
+    child,
+    bookId: context.bookId,
+    profileId: context.profileId,
+    mode: context.mode,
+    customSpreads: context.customSpreads,
+  });
+  return plan.assets;
+}
 
 export interface ImportMissingSlot {
   slotId: string;
@@ -45,7 +74,9 @@ export interface LegacyRecoveryChoice {
 }
 
 export interface ImportMatchReport {
+  /** Total required illustrations for this storybook. */
   required: number;
+  /** Number of unique required pages that matched a provided file. */
   matched: number;
   assignedCount: number;
   /** Required filenames with no provided file. */
@@ -86,6 +117,8 @@ export interface MatchImportedFilesOptions {
   legacyInterpretation?: LegacyInterpretation;
   bookId?: string;
   manifest?: ManifestItem[];
+  /** Explicit legacy adapter context when only filenames are available */
+  legacyAdapterContext?: LegacyAdapterContext;
 }
 
 const DREAM_BIG_CAREER_ROLES = [
@@ -192,34 +225,8 @@ export function matchImportedFiles(
     if (options.resolvedSlots) resolvedSlots = options.resolvedSlots;
   }
 
-  if (!resolvedSlots && requiredFilenames.length >= 24) {
-    resolvedSlots = requiredFilenames.map((fn, idx) => {
-      const slotId = fn.replace(/\.[^.]+$/, "");
-      const roleMatch = slotId.replace(/^\d+[-_]?/, "");
-      return {
-        slotId,
-        illustrationIndex: idx,
-        sceneId: roleMatch || slotId,
-        pageKind: "story" as any,
-        kind: "story" as any,
-        profileId: "classic-landscape-11x8",
-        layout: "single-page" as any,
-        assetKind: "illustration" as any,
-        filename: fn,
-        expectedFilename: fn,
-        legacyAliases: [],
-        sourceSceneIndex: idx,
-        role: roleMatch,
-        roleSlug: roleMatch,
-        required: true,
-        physicalPages: [idx + 1],
-        textSide: "left" as any,
-        subjectSide: "right" as any,
-        destinationDimensions: { width: 3375, height: 2475 },
-        printDimensionsIn: { trimWidthIn: 11, trimHeightIn: 8, bleedIn: 0.125, spread: false },
-        targetCanvasAspect: "15:11",
-      };
-    }) as unknown as ResolvedAssetSlot[];
+  if (!resolvedSlots && options.legacyAdapterContext) {
+    resolvedSlots = adaptLegacyFilenamesToResolvedSlots(requiredFilenames, options.legacyAdapterContext);
   }
 
   const byIndex = new Map<number, string>();
