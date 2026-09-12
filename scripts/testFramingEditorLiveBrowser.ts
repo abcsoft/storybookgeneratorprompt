@@ -85,7 +85,7 @@ async function run() {
 
     await new Promise((r) => setTimeout(r, 1500));
 
-    const artifactDir = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\8c74abe3-e347-45df-8713-44db1cef8c7c";
+    const artifactDir = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
 
     // Click "🖼️ Adjust framing" on first tile
     const adjustBtns = await page.$$("button");

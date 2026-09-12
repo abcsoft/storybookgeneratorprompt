@@ -24,7 +24,7 @@ import { buildIllustrationPrompt } from "../lib/story/prompt/buildIllustrationPr
 import { listBooks, getBook } from "../lib/story/registry";
 import type { ChildProfile } from "../lib/story/types";
 
-const ARTIFACTS_DIR = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\3efd930b-3760-461a-819d-a240555a66fb";
+const ARTIFACTS_DIR = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
 
 const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
 const profileId = "printify-hardcover-square-8x8";

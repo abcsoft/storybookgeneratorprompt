@@ -16,7 +16,7 @@ import { bedtimeDreamBook } from "../lib/story/bedtimeDreamTemplate";
 import type { ChildProfile, GeneratedPage } from "../lib/story/types";
 
 const execFileAsync = promisify(execFile);
-const ARTIFACTS_DIR = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\321691b5-e261-43f5-82f2-7f47b71a4d16";
+const ARTIFACTS_DIR = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
 const PROJECT_ARTIFACTS_DIR = path.resolve(process.cwd(), "artifacts");
 
 function sha256(buf: Buffer): string {

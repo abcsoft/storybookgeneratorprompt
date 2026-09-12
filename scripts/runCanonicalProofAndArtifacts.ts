@@ -469,11 +469,53 @@ export async function runCanonicalProofAndArtifacts() {
   // 10. Generate proof-manifest.json
   console.log("\n9. Building proof manifest...");
   let generatingCommitSha = "unknown";
+  let remoteBranchSha = "unknown";
+  let localRemoteShaMatch = false;
+  let gitWorkingTreeClean = false;
+  const failures: string[] = [];
+
   try {
     const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"]);
     generatingCommitSha = stdout.trim();
-  } catch {
-    /* ignore */
+  } catch (err) {
+    failures.push(`Failed to get HEAD commit SHA: ${String(err)}`);
+  }
+
+  try {
+    let remoteSha = "";
+    try {
+      const { stdout } = await execFileAsync("git", ["rev-parse", "@{u}"]);
+      remoteSha = stdout.trim();
+    } catch {
+      const { stdout: branchOut } = await execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+      const branchName = branchOut.trim();
+      const { stdout } = await execFileAsync("git", ["rev-parse", `origin/${branchName}`]);
+      remoteSha = stdout.trim();
+    }
+    remoteBranchSha = remoteSha;
+  } catch (err) {
+    failures.push(`Failed to get remote branch SHA: ${String(err)}`);
+  }
+
+  localRemoteShaMatch = generatingCommitSha === remoteBranchSha && generatingCommitSha !== "unknown";
+  if (!localRemoteShaMatch) {
+    failures.push(`Local HEAD (${generatingCommitSha}) does not match remote branch (${remoteBranchSha})`);
+  }
+
+  try {
+    const { stdout: statusOut } = await execFileAsync("git", ["status", "--porcelain"]);
+    const dirtyLines = statusOut
+      .trim()
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+      .filter((l) => !l.includes("artifacts/") && !l.includes("scratch/"));
+    gitWorkingTreeClean = dirtyLines.length === 0;
+    if (!gitWorkingTreeClean) {
+      failures.push(`Git working tree is not clean: ${dirtyLines.join(", ")}`);
+    }
+  } catch (err) {
+    failures.push(`Failed to inspect git status: ${String(err)}`);
   }
 
   const getImageDims = async (filePath: string) => {
@@ -508,19 +550,26 @@ export async function runCanonicalProofAndArtifacts() {
     { filename: "pdfimages-list.txt", byteSize: Buffer.byteLength(pdfimagesRes.stdout, "utf8"), sha256: sha256(Buffer.from(pdfimagesRes.stdout, "utf8")) },
   ];
 
-  // Self-calculate manifest hash
+  // Specific requirement validations
+  if (inspection.pageCount !== 24) failures.push(`Expected 24 PDF pages, got ${inspection.pageCount}`);
+  if (inspection.embeddedRasterDimensions.length !== 24) failures.push(`Expected 24 embedded rasters, got ${inspection.embeddedRasterDimensions.length}`);
+  if (inspection.hasNonUniformScaling) failures.push("PDF has non-uniform raster scaling");
+  if (!inspection.hasVectorStoryText) failures.push("PDF is missing vector story text");
+  if (inspection.minProductionPpi < 300) failures.push(`Min production PPI ${inspection.minProductionPpi} is < 300`);
+  if (shiftRes.status !== 400) failures.push(`SHIFT_PLUS_TWO status expected 400, got ${shiftRes.status}`);
+  if (keepRes.status !== 400) failures.push(`KEEP_NUMERIC_SLOTS status expected 400, got ${keepRes.status}`);
+
+  const validationPassed = failures.length === 0;
+
   const proofManifest = {
     generatingCommitSha,
+    remoteBranchSha,
+    localRemoteShaMatch,
+    gitWorkingTreeClean,
     generationTimestamp: new Date().toISOString(),
-    validationPassed:
-      inspection.pageCount === 24 &&
-      inspection.embeddedRasterDimensions.length === 24 &&
-      !inspection.hasNonUniformScaling &&
-      inspection.hasVectorStoryText &&
-      inspection.minProductionPpi >= 300 &&
-      shiftRes.status === 400 &&
-      keepRes.status === 400,
-    failures: [] as string[],
+    validatorVersion: "2.0.0",
+    validationPassed,
+    failures,
     pdfMetrics: {
       pageCount: inspection.pageCount,
       rasterCount: inspection.embeddedRasterDimensions.length,
@@ -537,11 +586,15 @@ export async function runCanonicalProofAndArtifacts() {
   await fs.writeFile(proofManifestPath, proofManifestJson, "utf8");
   console.log(`✓ Saved proof manifest: ${proofManifestPath}`);
 
-  // Include proof-manifest.json in files list for packaging
+  // Include proof-manifest.json in files list for packaging (exactly 10 declared entries)
   const allProofFilesForZip = [
     ...manifestFiles,
     { filename: "proof-manifest.json", byteSize: Buffer.byteLength(proofManifestJson, "utf8"), sha256: sha256(Buffer.from(proofManifestJson, "utf8")) },
   ];
+
+  if (allProofFilesForZip.length !== 10) {
+    throw new Error(`Expected exactly 10 declared files for ZIP package, got ${allProofFilesForZip.length}`);
+  }
 
   // 11. Package into storybook-dream-big-final-proof.zip
   console.log("\n10. Packaging storybook-dream-big-final-proof.zip...");
@@ -560,8 +613,8 @@ export async function runCanonicalProofAndArtifacts() {
   console.log(`  Size: ${zipBuffer.length} bytes (${(zipBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
   console.log(`  SHA-256: ${zipSha}`);
 
-  // 12. Self-validate the ZIP archive
-  console.log("\n11. Self-validating ZIP archive...");
+  // 12. Self-validate the ZIP archive (Custom in-memory extractor)
+  console.log("\n11a. Self-validating ZIP archive (custom extractor)...");
   const extractedMap = extractZipArchive(zipBuffer);
   if (extractedMap.size !== allProofFilesForZip.length) {
     throw new Error(`ZIP self-validation failed: Expected ${allProofFilesForZip.length} files, extracted ${extractedMap.size}`);
@@ -577,22 +630,61 @@ export async function runCanonicalProofAndArtifacts() {
       throw new Error(`ZIP self-validation failed: Hash mismatch on "${item.filename}": manifest=${item.sha256}, extracted=${extractedSha}`);
     }
   }
-  console.log(`✓ Self-validation PASSED: All ${allProofFilesForZip.length} files extracted and verified byte-identical!`);
+  console.log(`✓ Custom ZIP extractor PASSED: All ${allProofFilesForZip.length} files extracted and verified byte-identical!`);
 
-  // Mirror to IDE brain folder if present
-  const ideBrainDir = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\103c5c64-7409-404d-b7ba-52daa89e45f5";
+  // 13. Independent ZIP validation using native system tool (PowerShell on Windows, unzip on Unix)
+  console.log("\n11b. Validating with independent system ZIP tool...");
+  const tempExtractDir = path.join(process.cwd(), "scratch", `independent_zip_verify_${Date.now()}`);
+  await fs.mkdir(tempExtractDir, { recursive: true });
+
   try {
-    const stat = await fs.stat(ideBrainDir);
-    if (stat.isDirectory() && path.resolve(ideBrainDir) !== path.resolve(ARTIFACTS_DIR)) {
-      for (const item of allProofFilesForZip) {
-        await fs.copyFile(path.join(ARTIFACTS_DIR, item.filename), path.join(ideBrainDir, item.filename));
-      }
-      await fs.copyFile(zipPath, path.join(ideBrainDir, "storybook-dream-big-final-proof.zip"));
-      console.log(`✓ Mirrored all proof files and ZIP to IDE artifacts directory: ${ideBrainDir}`);
+    if (process.platform === "win32") {
+      await execFileAsync("powershell.exe", [
+        "-NoProfile",
+        "-Command",
+        `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${tempExtractDir}' -Force`,
+      ]);
+    } else {
+      await execFileAsync("unzip", ["-q", zipPath, "-d", tempExtractDir]);
     }
-  } catch {
-    /* ignore if directory does not exist */
+
+    const extractedDiskEntries = await fs.readdir(tempExtractDir);
+    console.log(`✓ Independent tool extracted ${extractedDiskEntries.length} files from archive`);
+
+    if (extractedDiskEntries.length !== allProofFilesForZip.length) {
+      throw new Error(`Independent ZIP tool extracted ${extractedDiskEntries.length} files, expected ${allProofFilesForZip.length}`);
+    }
+
+    for (const item of allProofFilesForZip) {
+      const diskFilePath = path.join(tempExtractDir, item.filename);
+      const diskBuf = await fs.readFile(diskFilePath);
+      const diskSha = sha256(diskBuf);
+      if (diskSha !== item.sha256) {
+        throw new Error(`Independent extraction hash mismatch on "${item.filename}": manifest=${item.sha256}, disk=${diskSha}`);
+      }
+    }
+    console.log(`✓ Independent ZIP validation PASSED: All ${allProofFilesForZip.length} files verified against manifest from disk!`);
+  } finally {
+    try {
+      await fs.rm(tempExtractDir, { recursive: true, force: true });
+    } catch {
+      /* ignore cleanup error */
+    }
   }
+
+  // Optional mirror directory via PROOF_MIRROR_DIR environment variable
+  if (process.env.PROOF_MIRROR_DIR) {
+    const mirrorDir = path.resolve(process.env.PROOF_MIRROR_DIR);
+    if (path.resolve(mirrorDir) !== path.resolve(ARTIFACTS_DIR)) {
+      await fs.mkdir(mirrorDir, { recursive: true });
+      for (const item of allProofFilesForZip) {
+        await fs.copyFile(path.join(ARTIFACTS_DIR, item.filename), path.join(mirrorDir, item.filename));
+      }
+      await fs.copyFile(zipPath, path.join(mirrorDir, "storybook-dream-big-final-proof.zip"));
+      console.log(`✓ Mirrored all proof files and ZIP to mirror directory: ${mirrorDir}`);
+    }
+  }
+
 
   console.log("\n===================================================================");
   console.log("CANONICAL PROOF PDF, MANIFEST & ZIP GENERATED AND VERIFIED!");

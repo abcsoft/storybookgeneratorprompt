@@ -7,13 +7,15 @@ import { chromium } from "playwright";
 import sharp, { type OverlayOptions } from "sharp";
 import { inspectPdfPreflight } from "../lib/pdf/pdfBoxes";
 
+import { getProofArtifactsDir, discoverPopplerTools } from "./popplerDiscovery";
+
 const execFileAsync = promisify(execFile);
 
-const ARTIFACTS_DIR = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\103c5c64-7409-404d-b7ba-52daa89e45f5";
-const POPPLER_BIN_DIR = "C:\\Users\\mehed\\AppData\\Local\\Microsoft\\WinGet\\Packages\\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\\poppler-25.07.0\\Library\\bin";
-const PDFINFO_EXE = path.join(POPPLER_BIN_DIR, "pdfinfo.exe");
-const PDFIMAGES_EXE = path.join(POPPLER_BIN_DIR, "pdfimages.exe");
-const PDFTOPPM_EXE = path.join(POPPLER_BIN_DIR, "pdftoppm.exe");
+const ARTIFACTS_DIR = getProofArtifactsDir();
+const poppler = discoverPopplerTools();
+const PDFINFO_EXE = poppler.pdfinfo;
+const PDFIMAGES_EXE = poppler.pdfimages;
+const PDFTOPPM_EXE = poppler.pdftoppm;
 
 // Independently hardcoded role list and visible markers — NOT derived from production mapping code
 const INDEPENDENT_FIXTURES = [

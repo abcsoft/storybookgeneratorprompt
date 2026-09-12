@@ -84,7 +84,7 @@ async function main() {
     console.log("✓ Step 5: Reached Review step");
 
     // Capture screenshot of review tiles for framing comparison
-    const artifactDir = path.join(__dirname, "../.gemini/antigravity-ide/brain/8c74abe3-e347-45df-8713-44db1cef8c7c");
+    const artifactDir = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
     await page.screenshot({ path: path.join(artifactDir, "part2_review_grid_framing.png") });
 
     // 6. Export Lulu Interior PDF

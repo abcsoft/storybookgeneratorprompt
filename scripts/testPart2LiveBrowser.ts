@@ -10,7 +10,7 @@ async function main() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
 
-  const artifactDir = "C:/Users/mehed/.gemini/antigravity-ide/brain/8c74abe3-e347-45df-8713-44db1cef8c7c";
+  const artifactDir = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
 
   try {
     // 1. Open app

@@ -87,7 +87,7 @@ async function main() {
     }
 
     // Capture screenshot of Cover Review Modal
-    const artifactDir = "C:/Users/mehed/.gemini/antigravity-ide/brain/8c74abe3-e347-45df-8713-44db1cef8c7c";
+    const artifactDir = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
     await page.screenshot({ path: path.join(artifactDir, "part3_cover_review_modal.png") });
 
     // Close Cover Wrap preview modal

@@ -23,7 +23,7 @@ async function run() {
   console.log("MANDATORY LIVE TEST — MAPPING & REAL ASSET INTEGRITY");
   console.log("==================================================");
 
-  const artifactDir = "C:\\Users\\mehed\\.gemini\\antigravity-ide\\brain\\8c74abe3-e347-45df-8713-44db1cef8c7c";
+  const artifactDir = process.env.PROOF_ARTIFACTS_DIR ?? path.resolve(process.cwd(), "artifacts");
   const edition = dreamBigPrintify24Edition;
 
   // ----------------------------------------------------
@@ -75,7 +75,7 @@ async function run() {
   // TEST B: REAL ORIGINAL DREAM BIG HEAVY GEMINI ASSET TEST
   // ----------------------------------------------------
   console.log("\n--- TEST B: REAL ORIGINAL DREAM BIG HEAVY ASSETS ACCEPTANCE ---");
-  const realSourceDir = "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\storybook-out\\mehedi";
+  const realSourceDir = path.join(process.cwd(), "storybook-out", "mehedi");
   const realImages = new Map<number, { buffer: Buffer; mimeType: string }>();
   const realRawFiles: { filename: string; buffer: Buffer }[] = [];
 
