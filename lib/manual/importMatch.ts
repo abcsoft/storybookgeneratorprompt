@@ -192,6 +192,36 @@ export function matchImportedFiles(
     if (options.resolvedSlots) resolvedSlots = options.resolvedSlots;
   }
 
+  if (!resolvedSlots && requiredFilenames.length >= 24) {
+    resolvedSlots = requiredFilenames.map((fn, idx) => {
+      const slotId = fn.replace(/\.[^.]+$/, "");
+      const roleMatch = slotId.replace(/^\d+[-_]?/, "");
+      return {
+        slotId,
+        illustrationIndex: idx,
+        sceneId: roleMatch || slotId,
+        pageKind: "story" as any,
+        kind: "story" as any,
+        profileId: "classic-landscape-11x8",
+        layout: "single-page" as any,
+        assetKind: "illustration" as any,
+        filename: fn,
+        expectedFilename: fn,
+        legacyAliases: [],
+        sourceSceneIndex: idx,
+        role: roleMatch,
+        roleSlug: roleMatch,
+        required: true,
+        physicalPages: [idx + 1],
+        textSide: "left" as any,
+        subjectSide: "right" as any,
+        destinationDimensions: { width: 3375, height: 2475 },
+        printDimensionsIn: { trimWidthIn: 11, trimHeightIn: 8, bleedIn: 0.125, spread: false },
+        targetCanvasAspect: "15:11",
+      };
+    }) as unknown as ResolvedAssetSlot[];
+  }
+
   const byIndex = new Map<number, string>();
   const bySlotId = new Map<string, string>();
   const duplicates: ImportDuplicateSlot[] = [];

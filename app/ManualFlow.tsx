@@ -7,7 +7,7 @@ import CorrectionPanel from "./CorrectionPanel";
 import BookReview from "./BookReview";
 import ConfirmDialog from "./ConfirmDialog";
 import SpreadConfigurator from "./SpreadConfigurator";
-import { matchImportedFiles, type ImportMatchReport } from "@/lib/manual/importMatch";
+import { matchImportedFiles, type ImportMatchReport, type LegacyInterpretation } from "@/lib/manual/importMatch";
 import { checkImportedImage } from "@/lib/manual/clientImageCheck";
 import { evaluateExportGate } from "@/lib/manual/exportGate";
 import { buildReviewSequence } from "@/lib/manual/reviewOrder";
@@ -25,7 +25,7 @@ import {
 import type { PrintProfile } from "@/lib/print/types";
 import { getEditionForProfile } from "@/lib/story/editions";
 import type { ArtworkTransform } from "@/lib/print/artworkTransform";
-import type { LayoutMode, CustomSpreadSelection } from "@/lib/story/layoutPlan";
+import type { LayoutMode, CustomSpreadSelection, ResolvedAssetSlot } from "@/lib/story/layoutPlan";
 import styles from "./page.module.css";
 
 export type { IllustrationEntry };
@@ -417,12 +417,41 @@ export default function ManualFlow({
 
   const [pendingLegacyFiles, setPendingLegacyFiles] = useState<File[] | null>(null);
 
-  function onConfirmLegacyRecovery(files: File[]) {
+  function getAuthoritativeResolvedSlots(): ResolvedAssetSlot[] {
+    return pages.map((p, idx) => ({
+      slotId: (p.canonicalFilename ?? p.filename).replace(/\.[^.]+$/, ""),
+      illustrationIndex: p.index ?? idx,
+      sceneId: p.role ?? "",
+      pageKind: (p.kind as any) ?? "story",
+      kind: (p.kind as any) ?? "story",
+      profileId: profileId,
+      layout: "single-page" as any,
+      assetKind: "illustration" as any,
+      filename: p.canonicalFilename ?? p.filename,
+      expectedFilename: p.canonicalFilename ?? p.filename,
+      legacyAliases: p.legacyAliases ?? [],
+      sourceSceneIndex: p.index ?? idx,
+      role: p.role,
+      roleSlug: p.role ?? "",
+      required: true,
+      physicalPages: p.physicalPages ?? [p.page],
+      textSide: "left" as any,
+      subjectSide: "right" as any,
+      destinationDimensions: { width: profile.canvasPx?.width ?? 3375, height: profile.canvasPx?.height ?? 2475 },
+      printDimensionsIn: { trimWidthIn: 11, trimHeightIn: 8, bleedIn: 0.125, spread: false },
+      targetCanvasAspect: "15:11",
+    })) as unknown as ResolvedAssetSlot[];
+  }
+
+  /**
+   * Applies the user's explicit legacy interpretation choice for ambiguous packages.
+   */
+  function onSelectLegacyInterpretation(interpretation: LegacyInterpretation, files: File[]) {
+    const slots = getAuthoritativeResolvedSlots();
     const report = matchImportedFiles(
       files.map((f) => f.name),
-      pages.map((p) => p.filename),
-      undefined,
-      { confirmLegacyOffsetRecovery: true, bookId },
+      slots,
+      { legacyInterpretation: interpretation, bookId },
     );
     setImportReport(report);
     setPendingLegacyFiles(null);
@@ -457,15 +486,23 @@ export default function ManualFlow({
     }
   }
 
+  /**
+   * @deprecated Use onSelectLegacyInterpretation with an explicit LegacyInterpretation instead.
+   */
+  function onConfirmLegacyRecovery(files: File[]) {
+    console.warn("onConfirmLegacyRecovery is deprecated. Use onSelectLegacyInterpretation instead.");
+    onSelectLegacyInterpretation("SHIFT_PLUS_TWO", files);
+  }
+
   /** Bulk import: match files against authoritative slots with guarded recovery. */
   function onBulkImport(list: FileList | null) {
     if (!list) return;
     clearServerErrors();
     const files = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    const slots = getAuthoritativeResolvedSlots();
     const report = matchImportedFiles(
       files.map((f) => f.name),
-      pages.map((p) => p.filename),
-      undefined,
+      slots,
       { confirmLegacyOffsetRecovery: false, bookId },
     );
     setImportReport(report);
@@ -689,7 +726,7 @@ export default function ManualFlow({
     const form = buildExportForm();
     if (!form) return;
     // Pass quality warning acknowledgement if user explicitly approved
-    if (overrideAcknowledgeQualityWarnings) {
+    if (overrideAcknowledgeQualityWarnings === true) {
       form.append("acknowledgeQualityWarnings", "true");
     }
     setBusy(true);
@@ -897,38 +934,172 @@ export default function ManualFlow({
       {importReport?.legacyRecoveryProposal && (
         <div
           className={styles.preflightBlockedPanel}
-          style={{ border: "2px solid #f59e0b", background: "rgba(245, 158, 11, 0.12)", marginBottom: "16px" }}
-          data-testid="legacy-recovery-proposal-banner"
+          style={{
+            border: "2px solid #f59e0b",
+            background: "rgba(245, 158, 11, 0.08)",
+            marginBottom: "20px",
+            padding: "20px",
+            borderRadius: "12px",
+          }}
+          data-testid="legacy-recovery-choice-panel"
         >
-          <div className={styles.preflightBlockedHeader} style={{ color: "#d97706" }}>
+          <div className={styles.preflightBlockedHeader} style={{ color: "#d97706", fontSize: "17px", fontWeight: 700 }}>
             <span>⚠️</span>
-            <span>Legacy Artwork Alignment Detected</span>
+            <span>Ambiguous 22-File Package Detected — Choose Interpretation</span>
           </div>
-          <p style={{ margin: "10px 0 14px", fontSize: "14px", color: "var(--ink)" }}>
+          <p style={{ margin: "10px 0 16px", fontSize: "14px", color: "var(--ink)" }}>
             {importReport.legacyRecoveryProposal}
           </p>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+
+          {importReport.legacyRecoveryChoices && importReport.legacyRecoveryChoices.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px", marginBottom: "20px" }}>
+              {importReport.legacyRecoveryChoices.map((choice) => (
+                <div
+                  key={choice.interpretation}
+                  data-testid={`legacy-choice-${choice.interpretation.toLowerCase().replace(/_/g, "-")}`}
+                  style={{
+                    background: "var(--card-bg, #ffffff)",
+                    border: "1px solid rgba(245, 158, 11, 0.35)",
+                    borderRadius: "8px",
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: "15px", color: "#b45309", marginBottom: "6px" }}>
+                    {choice.label}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--muted, #64748b)", marginBottom: "12px" }}>
+                    {choice.description}
+                  </div>
+
+                  <div
+                    style={{
+                      marginBottom: "12px",
+                      fontSize: "13px",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                    }}
+                  >
+                    <strong style={{ color: "#dc2626" }}>Resulting missing slots: </strong>
+                    <span style={{ color: "#991b1b" }}>
+                      {choice.resultingMissingSlots.map((s) => `${s.slotId} (Page ${s.physicalPages.join(", ")})`).join(", ")}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      border: "1px solid var(--border, #e2e8f0)",
+                      borderRadius: "6px",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <table
+                      data-testid={`table-legacy-${choice.interpretation.toLowerCase().replace(/_/g, "-")}`}
+                      style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", textAlign: "left" }}
+                    >
+                      <thead style={{ position: "sticky", top: 0, background: "#f8fafc", borderBottom: "1px solid #cbd5e1" }}>
+                        <tr>
+                          <th style={{ padding: "6px 8px", color: "#475569" }}>File</th>
+                          <th style={{ padding: "6px 8px", color: "#475569" }}>Slot</th>
+                          <th style={{ padding: "6px 8px", color: "#475569" }}>Role</th>
+                          <th style={{ padding: "6px 8px", color: "#475569" }}>Page</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {choice.mappingTable.map((row) => (
+                          <tr key={row.filename} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "6px 8px", fontFamily: "monospace" }}>{row.filename}</td>
+                            <td style={{ padding: "6px 8px", fontWeight: 600 }}>{row.proposedSlotId}</td>
+                            <td style={{ padding: "6px 8px" }}>{row.role}</td>
+                            <td style={{ padding: "6px 8px" }}>{row.physicalPages.join(", ")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div style={{ marginTop: "auto" }}>
+                    {choice.interpretation === "SHIFT_PLUS_TWO" ? (
+                      <button
+                        type="button"
+                        data-testid="btn-legacy-shift-plus-two"
+                        className={styles.button}
+                        style={{ width: "100%", background: "#f59e0b", color: "#1c1440", fontWeight: 700 }}
+                        onClick={() => {
+                          if (pendingLegacyFiles) {
+                            onSelectLegacyInterpretation("SHIFT_PLUS_TWO", pendingLegacyFiles);
+                          }
+                        }}
+                      >
+                        These files are Pilot through Back Cover
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        data-testid="btn-legacy-keep-numeric"
+                        className={styles.button}
+                        style={{ width: "100%", background: "#d97706", color: "#ffffff", fontWeight: 700 }}
+                        onClick={() => {
+                          if (pendingLegacyFiles) {
+                            onSelectLegacyInterpretation("KEEP_NUMERIC_SLOTS", pendingLegacyFiles);
+                          }
+                        }}
+                      >
+                        These files are Cover through Inventor
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
+              <button
+                type="button"
+                data-testid="btn-legacy-shift-plus-two"
+                className={styles.button}
+                style={{ background: "#f59e0b", color: "#1c1440", fontWeight: 700 }}
+                onClick={() => {
+                  if (pendingLegacyFiles) {
+                    onSelectLegacyInterpretation("SHIFT_PLUS_TWO", pendingLegacyFiles);
+                  }
+                }}
+              >
+                These files are Pilot through Back Cover
+              </button>
+              <button
+                type="button"
+                data-testid="btn-legacy-keep-numeric"
+                className={styles.button}
+                style={{ background: "#d97706", color: "#ffffff", fontWeight: 700 }}
+                onClick={() => {
+                  if (pendingLegacyFiles) {
+                    onSelectLegacyInterpretation("KEEP_NUMERIC_SLOTS", pendingLegacyFiles);
+                  }
+                }}
+              >
+                These files are Cover through Inventor
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="button"
-              className={styles.button}
-              style={{ background: "#f59e0b", color: "#1c1440", fontWeight: 700 }}
-              onClick={() => {
-                if (pendingLegacyFiles) {
-                  onConfirmLegacyRecovery(pendingLegacyFiles);
-                }
-              }}
-            >
-              Confirm & Map to Slots 3–24
-            </button>
-            <button
-              type="button"
+              data-testid="btn-legacy-cancel"
               className={styles.buttonSecondary}
               onClick={() => {
-                setImportReport((r) => (r ? { ...r, legacyRecoveryProposal: null } : null));
+                setImportReport(null);
                 setPendingLegacyFiles(null);
               }}
             >
-              Cancel / Dismiss
+              Cancel and rename files
             </button>
           </div>
         </div>
@@ -1008,7 +1179,22 @@ export default function ManualFlow({
 
       {/* Quality Warning Acknowledgement Dialog */}
       {pendingQualityWarnings && pendingQualityWarnings.length > 0 && (
-        <div className={styles.preflightWarningsPanel} data-testid="quality-warning-dialog" style={{ borderColor: "#f59e0b", background: "#fffbeb" }}>
+        <div
+          className={styles.preflightWarningsPanel}
+          data-testid="quality-warning-dialog"
+          style={{
+            position: "fixed",
+            top: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 9999,
+            maxWidth: "640px",
+            width: "90%",
+            boxShadow: "0 12px 30px rgba(0,0,0,0.35)",
+            borderColor: "#f59e0b",
+            background: "#fffbeb",
+          }}
+        >
           <div className={styles.preflightWarningsHeader}>
             <span>⚠️</span>
             <strong>Quality Warning — Acknowledgement Required</strong>
@@ -1238,7 +1424,7 @@ export default function ManualFlow({
           onBack={() => setStep("prompts")}
           busy={busy}
           exportLabel={exportMode === "printify-folder" ? "Export for Printify 📦" : "Build my PDF 📖"}
-          onExport={exportMode === "printify-folder" ? exportPrintify : buildPdf}
+          onExport={exportMode === "printify-folder" ? exportPrintify : () => void buildPdf()}
           onUpdateTransform={handleUpdateTransform}
           onApprovePage={onApprove}
           onMarkNeedsRegeneration={onMarkNeedsRegeneration}
