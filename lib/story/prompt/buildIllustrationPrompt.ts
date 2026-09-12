@@ -15,9 +15,12 @@ import { childNoun } from "../textHelpers";
 import type { ChildProfile, CompanionSpec, LayoutType, PageKind } from "../types";
 import { companionRules } from "./companionRules";
 import {
+  buildFramingBlock,
   buildTargetFormatBlock,
+  inferFramingMode,
   singlePageCompositionRules,
   spreadCompositionRules,
+  type FramingMode,
 } from "./compositionRules";
 import { identityRules } from "./identityRules";
 import { negativeRules } from "./negativeRules";
@@ -36,6 +39,12 @@ export interface BuildIllustrationPromptOptions {
   scene: string;
   kind?: PageKind;
   layout: LayoutType;
+  /** Explicit framing mode override if desired */
+  framing?: FramingMode;
+  /** Optional text side placement for spreads ("left" | "right" | "none"). */
+  textSide?: "left" | "right" | "none";
+  /** Optional subject side placement for spreads ("left" | "right" | "centered"). */
+  subjectSide?: "left" | "right" | "centered";
   /** Optional print profile ID to generate profile-specific target format guidance. */
   profileId?: string;
   /** Scene-specific composition guidance (e.g. "keep the pointing hand fully
@@ -48,6 +57,8 @@ export interface BuildIllustrationPromptOptions {
   outfitOverride?: string;
   /** Overrides `story.companion` for this page only; `null` = no companion here. */
   companionOverride?: CompanionSpec | null;
+  /** Optional override for the entire art style block (e.g. for sign text exceptions on back cover). */
+  styleOverride?: string;
 }
 
 /** "match the child's light" clause — the biggest lever against a pasted-on
@@ -64,44 +75,104 @@ function lightingClause(name: string, light: string): string {
 export function buildIllustrationPrompt(
   opts: BuildIllustrationPromptOptions,
 ): string {
-  const { child, story, scene, kind, layout, profileId, compositionNotes, light } = opts;
+  const { child, story, scene, kind, layout, textSide, profileId, compositionNotes, light, styleOverride } = opts;
 
-  const outfit = opts.outfitOverride ?? story.defaultOutfit;
   const companion =
     opts.companionOverride !== undefined
       ? opts.companionOverride
       : story.companion;
 
-  const continuity = [wardrobeRules(outfit), companionRules(companion)]
+  // 1. Identity / reference contract
+  const identityBlock = identityRules();
+
+  // 2. Exact resolved output contract
+  const targetFormatBlock = buildTargetFormatBlock(profileId, layout, kind ?? "scene");
+
+  // 3. Scene action and required objects
+  const sceneBlock = `This is ${child.name}, a ${child.age}-year-old ${childNoun(child.gender)}. ${scene}`;
+
+  // 6. One framing block
+  const framing = inferFramingMode(scene, kind, opts.framing);
+  const framingBlock = buildFramingBlock(framing);
+
+  let outfit = opts.outfitOverride ?? story.defaultOutfit;
+  if (
+    (framing === "sleeping/bed-covered" || framing === "bed-covered" || framing === "seated-in-bed") &&
+    outfit
+  ) {
+    if (/slippers|shoes|boots/i.test(outfit) && !/beside the bed|not worn|without/i.test(outfit)) {
+      outfit = outfit
+        .replace(/,?\s*and cozy slippers/gi, " (slippers are placed beside the bed on the floor and are not worn or visible under the covers)")
+        .replace(/,?\s*and slippers/gi, " (slippers are placed beside the bed on the floor and are not worn or visible under the covers)");
+    }
+  }
+
+  // 4. Outfit / prop state
+  const outfitBlock = wardrobeRules(outfit);
+
+  // 5. Companion state (entities)
+  const companionBlock = companionRules(companion);
+
+  // 7. One composition block (safe areas, margins, gutter, crop safety)
+  const compositionRulesBlock =
+    layout === "single-page"
+      ? singlePageCompositionRules(framing)
+      : spreadCompositionRules(layout, textSide, opts.subjectSide, framing);
+
+  const sanitizedNotes =
+    layout === "single-page" && compositionNotes
+      ? compositionNotes
+          .replace(/with nothing crossing the center gutter[;, —-]*/gi, "")
+          .replace(/, nothing crossing the center gutter if rendered as a[;, —-]*/gi, "")
+          .replace(/or the center gutter[;, —-]*/gi, "")
+          .replace(/the center gutter[;, —-]*/gi, "")
+          .trim()
+      : compositionNotes;
+
+  const compositionNotesBlock = sanitizedNotes
+    ? `SCENE-SPECIFIC COMPOSITION — ${sanitizedNotes}`
+    : "";
+
+  const compositionBlock = [compositionRulesBlock, compositionNotesBlock]
     .filter(Boolean)
     .join(" ");
 
-  const targetFormatBlock = buildTargetFormatBlock(profileId, layout, kind ?? "scene");
+  // 8. Visual style and lighting
+  const styleBlock = [
+    styleOverride ?? styleRules(),
+    light ? lightingClause(child.name, light) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const compositionRulesBlock =
-    layout === "single-page"
-      ? singlePageCompositionRules()
-      : spreadCompositionRules(layout);
+  // 9. One concise negative block (containing the single typography / no-text prohibition)
+  const hasCustomSignPolicy = Boolean(
+    styleOverride &&
+      (styleOverride.includes("TYPOGRAPHY EXCEPTION") ||
+        styleOverride.includes("SIGN ONLY") ||
+        styleOverride.includes("ABSOLUTELY NO TEXT IN THE ARTWORK")),
+  );
 
-  const sceneBlock =
-    `This is ${child.name}, a ${child.age}-year-old ${childNoun(child.gender)}. ` +
-    `${scene}` +
-    (light ? ` ${lightingClause(child.name, light)}` : "");
-
-  const compositionNotesBlock = compositionNotes
-    ? `SCENE-SPECIFIC COMPOSITION — ${compositionNotes}`
-    : "";
+  let negativeBlock = negativeRules(layout !== "single-page", framing);
+  if (hasCustomSignPolicy) {
+    negativeBlock = negativeBlock.replace(
+      /ABSOLUTELY NO TEXT IN THE IMAGE:[\s\S]*$/,
+      "",
+    ).trim();
+  }
 
   return [
-    identityRules(),
-    styleRules(),
-    continuity,
+    identityBlock,
     targetFormatBlock,
-    compositionRulesBlock,
     sceneBlock,
-    compositionNotesBlock,
-    negativeRules(),
+    outfitBlock,
+    companionBlock,
+    framingBlock,
+    compositionBlock,
+    styleBlock,
+    negativeBlock,
   ]
     .filter(Boolean)
     .join(" ");
 }
+

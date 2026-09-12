@@ -49,7 +49,19 @@ export interface PrintProfile {
   coverGeometryPx?: PxSize;
   /** Placeholder spine width. */
   spineWidthPx?: number;
-  /** Aspect ratio string for a single page, passed to the Gemini app. */
+  /** Physical trim aspect ratio for a single page, e.g. "11:8", "1:1". */
+  trimAspect?: string;
+  /** Full-bleed target canvas aspect ratio for a single page, e.g. "15:11", "1:1". */
+  targetCanvasAspect?: string;
+  /** Mathematically closest provider-requested aspect preset for a single page, e.g. "4:3", "1:1". */
+  providerPresetAspect?: string;
+  /** Physical trim aspect ratio for a spread, e.g. "11:4", "2:1". */
+  trimSpreadAspect?: string;
+  /** Full-bleed target canvas aspect ratio for a continuous spread master, e.g. "89:33", "2:1". */
+  targetCanvasSpreadAspect?: string;
+  /** Closest provider-requested aspect preset for a spread, e.g. "21:9", "16:9". */
+  providerPresetSpreadAspect?: string;
+  /** Aspect ratio string for a single page, passed to prompt / app. */
   singleAspect: string;
   /** Aspect ratio string for a two-page spread. */
   spreadAspect: string;

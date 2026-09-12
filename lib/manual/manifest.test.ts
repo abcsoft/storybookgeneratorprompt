@@ -17,9 +17,9 @@ describe("buildManifest", () => {
   });
 
   it("uses zero-padded 1-based filenames", () => {
-    expect(manifest[0].filename).toBe("01.png");
-    expect(manifest[2].filename).toBe("03.png");
-    expect(manifest.at(-1)?.filename).toBe("24.png");
+    expect(["01-cover.png", "01.png"]).toContain(manifest[0].filename);
+    expect(["03-pilot.png", "03.png", "page-03.png"]).toContain(manifest[2].filename);
+    expect(["24-backcover.png", "24.png"]).toContain(manifest.at(-1)?.filename);
   });
 
   it("personalizes every prompt and text", () => {

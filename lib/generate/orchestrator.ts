@@ -17,7 +17,9 @@ import {
 } from "../config";
 import { buildBook } from "../pdf/buildBook";
 import { characterAnchorPrompt } from "../story/prompt/characterAnchor";
-import { buildPages, DEFAULT_BOOK_ID } from "../story/registry";
+import { DEFAULT_BOOK_ID, getBook } from "../story/registry";
+import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection } from "../story/layoutPlan";
+import { normalizeProductionAsset } from "../print/artworkTransform";
 import type { ChildProfile, GeneratedPage, ReferencePhoto } from "../story/types";
 import { generateIllustration } from "../gemini/imageClient";
 import { updateJob } from "./jobStore";
@@ -30,6 +32,10 @@ interface GenerateOptions {
   generate?: IllustrationFn;
   onProgress?: (completed: number, total: number, failed: number) => void;
   bookId?: string;
+  profileId?: string;
+  mode?: LayoutMode;
+  customSpreads?: CustomSpreadSelection[];
+  useEditorialDefault?: boolean;
   /** Generate a character-reference portrait first and reuse it on every page
    *  for consistent likeness. Defaults to true. */
   anchor?: boolean;
@@ -52,7 +58,22 @@ export async function generateBook(
     onAnchor,
   } = options;
 
-  const pages = buildPages(child, bookId);
+  const plan = resolveLayoutPlan({
+    child,
+    bookId,
+    profileId: options.profileId ?? "classic-landscape-11x8",
+    mode: options.mode,
+    customSpreads: options.customSpreads,
+    useEditorialDefault: options.useEditorialDefault,
+  });
+
+  if (!plan.isValidForProfile) {
+    throw new Error(
+      `Cannot generate book: Layout plan is invalid for profile ${plan.profileId}: ${(plan.limitations || []).join("; ")}`,
+    );
+  }
+
+  const slots = plan.assets;
 
   // Generate a master "character reference" once and keep it as a strong
   // secondary reference. Likeness is driven REAL-PHOTO-FIRST: the real photos
@@ -77,7 +98,7 @@ export async function generateBook(
     }
   }
 
-  const results = new Array<GeneratedPage>(pages.length);
+  const results = new Array<GeneratedPage>(slots.length);
   let completed = 0;
   let failed = 0;
   let cursor = 0;
@@ -85,43 +106,51 @@ export async function generateBook(
   async function worker(): Promise<void> {
     while (true) {
       const i = cursor++;
-      if (i >= pages.length) return;
-      const page = pages[i];
-      const aspect = page.spread ? ASPECT_SPREAD : ASPECT_SINGLE;
+      if (i >= slots.length) return;
+      const slot = slots[i];
+      const isSpread = slot.assetKind === "spread";
+      const aspect = slot.providerPresetAspect ?? (isSpread ? ASPECT_SPREAD : ASPECT_SINGLE);
       try {
-        const image = await generate(page.prompt, refs, aspect);
+        const image = await generate(slot.prompt, refs, aspect);
+        let normalizedData = image.data;
+        try {
+          const norm = await normalizeProductionAsset(image.data, slot.destinationDimensions);
+          normalizedData = norm.data;
+        } catch {
+          // If image cannot be decoded (e.g. mock buffer in unit tests), keep image.data
+        }
         results[i] = {
-          index: page.index,
-          kind: page.kind,
-          role: page.role,
-          text: page.text,
-          image: image.data,
+          index: slot.sourceSceneIndex ?? i,
+          kind: slot.pageKind,
+          role: slot.sourceSceneRole,
+          text: slot.storyText,
+          image: normalizedData,
           imageMimeType: image.mimeType,
           failed: false,
-          spread: page.spread,
-          verseInk: page.ink,
+          spread: isSpread,
+          verseInk: undefined,
         };
       } catch (err) {
         failed++;
         results[i] = {
-          index: page.index,
-          kind: page.kind,
-          role: page.role,
-          text: page.text,
+          index: slot.sourceSceneIndex ?? i,
+          kind: slot.pageKind,
+          role: slot.sourceSceneRole,
+          text: slot.storyText,
           image: null,
           imageMimeType: "image/png",
           failed: true,
-          spread: page.spread,
+          spread: isSpread,
           error: err instanceof Error ? err.message : String(err),
         };
       } finally {
         completed++;
-        onProgress?.(completed, pages.length, failed);
+        onProgress?.(completed, slots.length, failed);
       }
     }
   }
 
-  const workerCount = Math.max(1, Math.min(concurrency, pages.length));
+  const workerCount = Math.max(1, Math.min(concurrency, slots.length));
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
   return results;
@@ -137,6 +166,9 @@ export async function runGenerationJob(
   child: ChildProfile,
   photos: ReferencePhoto[],
   bookId: string = DEFAULT_BOOK_ID,
+  profileId?: string,
+  mode?: LayoutMode,
+  customSpreads?: CustomSpreadSelection[],
 ): Promise<void> {
   try {
     updateJob(jobId, { status: "running" });
@@ -144,6 +176,9 @@ export async function runGenerationJob(
     let anchorImg: { data: Buffer; mimeType: string } | null = null;
     const pages = await generateBook(child, photos, {
       bookId,
+      profileId,
+      mode,
+      customSpreads,
       onProgress: (completed, total, failed) =>
         updateJob(jobId, { completed, total, failedPages: failed }),
       onAnchor: (img) => {

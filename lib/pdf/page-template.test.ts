@@ -75,4 +75,37 @@ describe("renderBookHtml (landscape)", () => {
     // Every verse carries the panel — including the verseInk:"light" page.
     expect(panelCount).toBe(verseCount);
   });
+
+  it("renders the dedicated rustic wooden sign overlay for Detective backcover", () => {
+    const detectivePages: GeneratedPage[] = [
+      page({ index: 0, kind: "cover", text: "Alex's Detective Story" }),
+      page({ index: 1, kind: "scene", text: "Investigating" }),
+      page({
+        index: 2,
+        kind: "backcover",
+        text: "CASE CLOSED!\nALEX'S DETECTIVE AGENCY",
+      }),
+    ];
+    const out = renderBookHtml(detectivePages, child);
+    expect(out).toContain('class="detective-sign-overlay"');
+    expect(out).toContain('class="detective-sign-headline"');
+    expect(out).toContain("CASE CLOSED!");
+    expect(out).toContain('class="detective-sign-agency"');
+    expect(out).toContain("ALEX'S DETECTIVE AGENCY");
+    expect(out).not.toContain('class="back-title"');
+
+    // Test auto-scaled font size for a long child name
+    const longNamePages: GeneratedPage[] = [
+      page({ index: 0, kind: "cover", text: "Long Name Story" }),
+      page({
+        index: 1,
+        kind: "backcover",
+        text: "CASE CLOSED!\nALEXANDER BARTHOLOMEW'S DETECTIVE AGENCY",
+      }),
+    ];
+    const longOut = renderBookHtml(longNamePages, { name: "Alexander Bartholomew", age: 5, gender: "boy" });
+    expect(longOut).toContain('class="detective-sign-overlay"');
+    expect(longOut).toContain("font-size: 13pt;");
+  });
 });
+

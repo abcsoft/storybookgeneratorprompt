@@ -196,6 +196,7 @@ describe("exportPrintifyBook", () => {
           bookId: "great-adventure",
           profileId: PROFILE_ID,
           images,
+          allowLowResolutionForTesting: true,
         });
 
         expect(result.ok).toBe(true);
@@ -269,6 +270,7 @@ describe("exportPrintifyBook", () => {
           bookId: "great-adventure",
           profileId: PROFILE_ID,
           images,
+          allowLowResolutionForTesting: true,
         });
 
         expect(result.ok).toBe(true);

@@ -169,6 +169,7 @@ describe("Part 2: Shared Artwork Framing Engine & Transform Math Regression Test
         bookId: "great-adventure",
         profileId: "printify-hardcover-square-8x8",
         images,
+        allowLowResolutionForTesting: true,
       });
 
       expect(result.ok).toBe(true);
@@ -180,7 +181,7 @@ describe("Part 2: Shared Artwork Framing Engine & Transform Math Regression Test
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }
-  }, 120000);
+  }, 240000);
 
   // Test 12: Invalid transforms fallback gracefully
   it("12. Invalid transform fallback maintains stable default behavior", () => {

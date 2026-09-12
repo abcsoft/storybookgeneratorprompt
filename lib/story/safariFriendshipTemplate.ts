@@ -30,6 +30,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -43,11 +44,17 @@ const CALF =
   "gentle ears, and a short curious trunk — always this same single calf, " +
   "never a different animal or age";
 
-/** The standard safari outfit, worn on every page. */
+/** The standard safari outfit, worn on daytime savanna pages. */
 const DEFAULT_OUTFIT =
   "a sage-green short-sleeve safari shirt with rolled cuffs, a canvas " +
   "wide-brimmed sun hat, khaki cargo shorts, light tan lace-up ankle boots, " +
   "and a small pair of binoculars on a strap across the chest";
+
+const SPECIAL_OUTFITS: Record<string, string> = {
+  pajamas:
+    "cozy soft cotton pajamas with a gentle savanna animal pattern — no sun " +
+    "hat, boots, cargo shorts, or binoculars",
+};
 
 const STORY_META = { defaultOutfit: DEFAULT_OUTFIT };
 
@@ -57,18 +64,33 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
+    outfitOverride?: string;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
+      outfitOverride: opts.outfitOverride,
     });
 }
 
@@ -80,18 +102,20 @@ interface Beat {
   ink?: "light" | "dark";
   light?: string;
   compositionNotes?: string;
+  outfitOverride?: string;
 }
 
 const STORY: Beat[] = [
   {
     scene:
-      "Sitting on a porch step at sunrise, carefully opening a worn leather " +
-      "field journal handed down with a small hand-drawn savanna map tucked " +
-      "inside, eyes bright with excitement.",
+      "Sitting on a wooden porch step at sunrise, carefully opening a worn " +
+      "brown leather field journal containing hand-drawn pencil sketches and " +
+      "a simple trail map (no readable lettering), eyes bright with " +
+      "excitement as the morning sun crests the horizon.",
     copy: (c) =>
       `On the porch at sunrise, ${c.name} opened a worn field journal — ` +
-      `inside, a hand-drawn map pointed straight into the golden grass ` +
-      `beyond the gate.`,
+      `inside, a hand-drawn map traced a trail straight into the golden ` +
+      `grass beyond the gate.`,
     light:
       "Warm early-morning sunrise light from the low sun; eye-level camera on the porch.",
   },
@@ -163,12 +187,14 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      `Kneeling beside ${CALF}, gently checking a trail of small round ` +
-      "footprints leading off through the grass, journal open to compare " +
-      "them with a sketch, the calf staying close and trusting.",
+      `Kneeling beside ${CALF} in the tall grass, gently inspecting a trail ` +
+      "of large, round adult elephant footprints stamped into the sandy soil " +
+      "leading toward the distant trees, comparing them with a sketch in " +
+      "the field journal; the small calf stands close and trusting.",
     copy: (c, p) =>
-      `${c.name} knelt beside the calf and found fresh footprints leading ` +
-      `onward. "Let's find your family together," ${p.subj} said gently.`,
+      `${c.name} knelt beside the calf and noticed a line of deep, giant ` +
+      `elephant tracks pressed into the sandy earth — the herd's trail! ` +
+      `"Look," ${p.subj} whispered warmly. "Your family went this way."`,
     light:
       "Warm late-afternoon light slanting across the grass; eye-level camera at kneeling height.",
   },
@@ -237,8 +263,13 @@ const safariFriendshipPages: PageSpec[] = [
         "real child in the reference photos, with their hair exactly as in " +
         "those photos.",
       {
+        kind: "cover",
         light:
           "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera in the savanna grass.",
+        compositionNotes:
+          "keep the lower portion calm and open — soft " +
+          "golden savanna scenery with no part of the child there — so a large " +
+          "title can sit in the lower area without covering the child.",
       },
     ),
     text: (c) => `${c.name}'s Safari Friendship`,
@@ -249,21 +280,23 @@ const safariFriendshipPages: PageSpec[] = [
     spread: true,
     layout: "text-left-subject-right",
     illustrationPrompt: illustration(
-      "On a wooden porch at sunrise, sitting cross-legged with a worn leather " +
-        "field journal open on their lap, a small hand-drawn map tucked " +
-        "inside, golden grassland stretching out beyond the porch railing.",
+      "Standing on a wooden savanna lodge porch at dawn, resting hands on " +
+        "the railing while looking out across the vast mist-covered golden " +
+        "grassland with eager sparkling eyes; distant acacia trees silhouetted " +
+        "against the early morning sky.",
       {
+        kind: "intro",
         spread: true,
         light:
-          "Warm early-morning sunrise light from the low sun; eye-level camera on the porch.",
+          "Warm early-morning dawn light across the misty grassland; eye-level camera on the porch.",
       },
     ),
     text: (c) => {
       const p = pronouns(c.gender);
       return (
-        `${c.name} had always loved watching the animals from the porch. ` +
-        `This morning, a field journal appeared with ${p.poss} name inside — ` +
-        `and a map leading straight into the golden grass.`
+        `${c.name} loved the wild rhythm of the savanna — the rustle of ` +
+        `golden grass, the morning calls of birds, the vast open sky. ` +
+        `Today was going to be a day of real discovery.`
       );
     },
   },
@@ -275,9 +308,11 @@ const safariFriendshipPages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
+        outfitOverride: b.outfitOverride,
       }),
       text: (c) => b.copy(c, pronouns(c.gender)),
     }),
@@ -289,13 +324,17 @@ const safariFriendshipPages: PageSpec[] = [
     layout: "text-left-subject-right",
     ink: "dark",
     illustrationPrompt: illustration(
-      "Tucked cozily in bed at night in a warm bedroom, the field journal " +
-        "open on the nightstand full of little sketches of giraffes, " +
-        "elephants, and zebras, soft moonlight and a peaceful, happy smile.",
+      "Tucked cozily in bed at night in a warm bedroom with hands resting " +
+        "peacefully on the quilt, the worn leather field journal resting open " +
+        "on the nightstand showing soft pencil sketches of giraffes, " +
+        "elephants, and zebras without readable words; soft cool blue " +
+        "moonlight through the window and a gentle, happy smile.",
       {
+        kind: "closing",
         spread: true,
         light:
           "Soft cool blue moonlight from the window; eye-level camera beside the bed.",
+        outfitOverride: SPECIAL_OUTFITS.pajamas,
       },
     ),
     text: (c) => {
@@ -316,6 +355,7 @@ const safariFriendshipPages: PageSpec[] = [
       "Waving cheerfully with a big joyful smile, holding the well-loved " +
         "field journal, against a soft simple pastel sky with gentle acacia " +
         "tree silhouettes in the far distance.",
+      { kind: "backcover" },
     ),
     text: (c) =>
       `The End…\n...but ${c.name}'s field journal still has plenty of blank pages left.`,
@@ -329,4 +369,5 @@ export const safariFriendshipBook: StoryTemplate = {
   subtitle: "A young explorer helps a lost elephant calf find its way home.",
   pages: safariFriendshipPages,
   defaultOutfit: DEFAULT_OUTFIT,
+  specialOutfits: SPECIAL_OUTFITS,
 };

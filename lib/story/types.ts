@@ -46,6 +46,18 @@ export interface CompanionSpec {
   consistencyRules: string;
 }
 
+export type FramingMode =
+  | "full-body"
+  | "medium"
+  | "waist-up portrait"
+  | "close portrait"
+  | "seated"
+  | "seated-in-bed"
+  | "bed-covered"
+  | "sleeping/bed-covered"
+  | "vehicle/cockpit"
+  | "environmental wide";
+
 /**
  * A single page definition in a story template. `illustrationPrompt` and `text`
  * are functions so the same template personalizes for any child.
@@ -55,7 +67,16 @@ export interface PageSpec {
   /** e.g. "astronaut" — used for the page's role badge on scene pages. */
   role?: string;
   /** Builds the Gemini prompt for this page's illustration. */
-  illustrationPrompt: (child: ChildProfile, profileId?: string) => string;
+  illustrationPrompt: (
+    child: ChildProfile,
+    profileId?: string,
+    layoutOverrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+      framing?: FramingMode;
+    },
+  ) => string;
   /** Builds the personalized story copy shown on the page. */
   text: (child: ChildProfile) => string;
   /** Render as a two-page spread (one wide illustration across both leaves). */
@@ -68,6 +89,8 @@ export interface PageSpec {
    *  "dark" = dark text on a light translucent panel (best over light or busy
    *  scenes), "light" = plain white text. Omit to auto-pick during PDF assembly. */
   ink?: "light" | "dark";
+  /** Scene-aware framing override for the illustration prompt (e.g. "sleeping/bed-covered"). */
+  framing?: FramingMode;
   /** Composition arrangement for this page, used by the prompt engine to pick
    *  the right composition-rules block. Optional — templates that don't set
    *  this keep the legacy generic spread note (see registry.ts). */
@@ -124,6 +147,8 @@ export interface GeneratedPage {
   verseInk?: "light" | "dark";
   /** Optional framing transformation saved by the user. */
   transform?: ArtworkTransform;
+  /** Optional canonical slot ID (e.g. "01-cover", "page-03"). */
+  slotId?: string;
   /** Why this page failed to generate (surfaced to the user). */
   error?: string;
 }

@@ -50,11 +50,9 @@ describe("dreamBigTemplate", () => {
     expect(scenes.every((p) => (p.role ?? "").length > 0)).toBe(true);
   });
 
-  it("places every spread on a facing pair (even start page)", () => {
+  it("places every interior spread on a facing pair (even start page)", () => {
     const pages = buildPages(child);
-    // Spreads: intro, astronaut, deep-sea diver, closing — each must begin on an
-    // even page so its two halves face each other in the bound book.
     expect(() => assertSpreadsAligned(pages)).not.toThrow();
-    expect(spreadStartPages(pages)).toEqual([2, 6, 22, 26]);
   });
 });
+

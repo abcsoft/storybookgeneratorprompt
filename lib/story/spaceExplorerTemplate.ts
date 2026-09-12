@@ -28,6 +28,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -46,18 +47,21 @@ const ORBIT: CompanionSpec = {
     "shape or color",
 };
 
-/** The standard kid-friendly spacesuit — deliberately open-collar/open-helmet
- *  so the child's face stays clearly visible in every scene, worn on every
- *  page unless a scene opts into the bedtime variant below. */
+/** The standard kid-friendly spacesuit with a crystal-clear transparent bubble
+ *  helmet so the child's face and hair remain fully visible and well-lit while
+ *  maintaining physical coherence in exposed space environments. */
 const DEFAULT_OUTFIT =
-  "a snug white-and-blue kid-size spacesuit with soft rounded shoulder pads " +
-  "and a small glowing chest control panel; the round helmet is fully " +
-  "transparent and worn open/back like a hood, or removed and tucked under " +
-  "one arm, so the child's whole face stays clearly visible and unobscured, " +
-  "with a small backpack-style life-support pack";
+  "a snug white-and-blue kid-size spacesuit with soft rounded shoulder pads, " +
+  "a glowing chest control panel, a crystal-clear fully transparent spherical " +
+  "bubble helmet that keeps the child's entire face and hair completely visible " +
+  "and well-lit from within, and a small backpack-style life-support pack";
 
 const SPECIAL_OUTFITS: Record<string, string> = {
   pajamas: "cozy pajamas with a small star-and-rocket pattern — no spacesuit or backpack",
+  cockpitSuit:
+    "a snug white-and-blue kid-size spacesuit with soft rounded shoulder pads " +
+    "and a glowing chest control panel, helmet removed so the child's face and hair " +
+    "are completely open, and a small backpack-style life-support pack",
 };
 
 const STORY_META = { defaultOutfit: DEFAULT_OUTFIT, companion: ORBIT };
@@ -68,18 +72,31 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     outfitOverride?: string;
     companionOverride?: CompanionSpec | null;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
       outfitOverride: opts.outfitOverride,
@@ -102,29 +119,32 @@ interface Beat {
 const STORY: Beat[] = [
   {
     scene:
-      "Standing at a bedroom window at dusk, looking through a small telescope " +
-      "as a glowing star map unfolds across the night sky like soft golden " +
-      "constellations, eyes wide with wonder; the telescope catching the last " +
-      "light.",
+      "Standing at a bedroom desk beside an open window at dusk, holding a " +
+      "pencil and drawing a glowing constellation pattern onto a paper star " +
+      "chart while looking through a small brass telescope at the twinkling " +
+      "night sky, eyes wide with wonder.",
     copy: (c) =>
       `Through the telescope, ${c.name} saw the stars begin to move — ` +
-      `tracing themselves into a glowing map, twinkling a path across the sky.`,
+      `tracing themselves into a glowing pattern across the sky. With quick ` +
+      `strokes, ${c.name} sketched the stellar path into a paper star chart.`,
     light:
-      "Soft golden-blue dusk light through the window mixing with the star map's glow; eye-level camera at the windowsill.",
+      "Soft golden-blue dusk light through the window mixing with the star chart's gentle glow; eye-level camera at the desk.",
     outfitOverride: SPECIAL_OUTFITS.pajamas,
     companionOverride: null,
   },
   {
     scene:
-      "Standing beside a small friendly rocket ship on a backyard launch pad " +
-      "at night, giving a thumbs-up while checking the glowing chest panel of " +
-      "the spacesuit, star map tucked under one arm; the rocket's windows " +
-      "glowing warmly.",
+      "Sitting securely inside the brightly lit cockpit of the small friendly " +
+      "rocket ship on a backyard launch pad, smiling warmly and giving a " +
+      "confident thumbs-up through the clear rocket window while checking " +
+      "glowing control dials; the sketched star chart rests beside the console.",
     copy: (c) =>
-      `${c.name} climbed into the little rocket, checked every glowing dial, ` +
-      `and gave a thumbs-up to the waiting stars. It was time to go.`,
+      `${c.name} climbed into the little rocket, tucked the star chart ` +
+      `safely by the console, checked every glowing dial, and gave a ` +
+      `thumbs-up to the waiting stars. It was time to go.`,
     light:
-      "Warm glow from the rocket's lights against a deep blue night sky; eye-level camera on the launch pad.",
+      "Warm interior glow from cockpit dials against a deep blue night sky; eye-level camera looking through the rocket window.",
+    outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
     companionOverride: null,
   },
   {
@@ -146,63 +166,69 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Floating gently inside a cozy, colorful spaceship cockpit, both hands " +
-      "on the window as the glowing blue Earth shrinks softly below, an " +
-      "expression of pure wonder; soft control-panel lights all around.",
+      "Floating gently inside a cozy, colorful spaceship cockpit without " +
+      "helmet, both hands resting lightly on the forward observation window " +
+      "as the glowing blue Earth shrinks softly below, an expression of " +
+      "pure wonder; soft control-panel lights all around.",
     copy: (c) =>
       `Inside the cockpit, ${c.name} pressed close to the window. Far below, ` +
       `Earth glowed like a soft blue marble, smaller and smaller.`,
     light:
       "Soft blue glow from Earth below mixing with warm cockpit control lights; eye-level camera inside the cockpit.",
+    outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
     companionOverride: null,
   },
   {
     scene:
-      "Bouncing gently across the pale grey Moon's surface in low gravity, " +
-      "arms out for balance, discovering Orbit sitting alone and still beside " +
-      "a small crater, one round eye-light flickering weakly.",
+      "Kneeling gently on the pale grey Moon in low gravity wearing the " +
+      "clear transparent bubble helmet, offering a small glowing solar power " +
+      "cell to Orbit; Orbit sits beside a small crater as its eye-lights " +
+      "flicker back to life with a grateful soft blue glow.",
     copy: (c) =>
-      `On the quiet Moon, ${c.name} bounced from crater to crater — until a ` +
-      `small, still robot came into view, one light flickering weakly, all ` +
-      `alone.`,
+      `On the quiet Moon, ${c.name} bounced from crater to crater until a ` +
+      `small, still robot came into view. ${c.name} shared a warm solar ` +
+      `battery from the ship, and Orbit's eye-lights blinked gratefully ` +
+      `back to life!`,
     light:
-      "Bright, stark, high-contrast sunlight against the grey lunar surface; eye-level camera on the Moon.",
+      "Bright stark sunlight across the grey lunar craters with soft blue reflections on the clear bubble helmet; eye-level camera on the Moon.",
   },
   {
     scene:
-      "Gliding gently through a calm asteroid field aboard the little " +
-      "spaceship, large slow-drifting asteroids visible at a safe distance " +
-      "through the window, Orbit's chest light now glowing steady and bright " +
-      "beside them.",
+      "Gliding gently through a calm asteroid field inside the cozy " +
+      "spaceship cockpit without helmets, large slow-drifting asteroids " +
+      "visible at a safe distance through the panoramic observation glass, " +
+      "Orbit's chest light now glowing steady and bright beside the child.",
     copy: (c) =>
-      `With Orbit's light glowing bright again, they glided together past ` +
+      `With Orbit's power humming strong again, they glided together past ` +
       `slow, tumbling asteroids, drifting like quiet giants in the dark.`,
     light:
-      "Cool starlight with soft warm highlights from Orbit's chest light; eye-level camera inside the ship.",
+      "Cool starlight with soft warm highlights from Orbit's chest light; eye-level camera inside the ship cockpit.",
     compositionNotes:
       "keep the asteroids calmly drifting in the background at a safe " +
       "distance — never crowding or looming toward the ship's window; the " +
       "child and Orbit stay the clear, comfortable foreground focus.",
+    outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
   },
   {
     scene:
       "Flying together through a swirling, colorful nebula full of soft " +
-      "pink, purple, and gold clouds of light, arms spread wide in delight, " +
-      "Orbit tumbling playfully alongside.",
+      "pink, purple, and gold clouds of light, wearing the clear bubble " +
+      "helmet with arms spread wide in delight, Orbit tumbling playfully " +
+      "alongside in the weightless glow.",
     copy: (c) =>
       `Next came a nebula of swirling color — soft pinks and golds like a ` +
       `painting brought to life. ${c.name} laughed as Orbit tumbled ` +
       `playfully through the light.`,
     ink: "dark",
     light:
-      "Soft, colorful glow from the surrounding nebula clouds, pink-gold-purple tones; eye-level camera among the clouds.",
+      "Soft, colorful glow from the surrounding nebula clouds, pink-gold-purple tones reflecting off the clear bubble helmet; eye-level camera among the clouds.",
   },
   {
     scene:
-      "Standing on a glittering crystal planet's surface, surrounded by " +
-      "tall, glowing crystal formations in every color, reaching out gently " +
-      "to touch one as it chimes softly, Orbit's chest light reflecting in " +
-      "the crystal facets.",
+      "Standing on a glittering crystal planet's surface wearing the clear " +
+      "bubble helmet, surrounded by tall glowing crystal spires in every color, " +
+      "reaching out gently to touch one as it chimes softly, Orbit's chest " +
+      "light reflecting in the sparkling crystal facets.",
     copy: (c) =>
       `The crystal planet chimed like tiny bells with every step. ${c.name} ` +
       `reached out and touched a glowing crystal — it rang a soft, sweet ` +
@@ -212,34 +238,37 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Kneeling beside Orbit, who points sadly at a small cracked star-shaped " +
-      "medallion on its chest panel, then watches hopefully as the child " +
-      "gently presses it back into place, both looking up together as it " +
-      "begins to glow like a tiny compass.",
+      "Kneeling beside Orbit on the crystal planet, holding Orbit's small " +
+      "star-shaped navigation compass as it clicks gently back into place " +
+      "on Orbit's chest panel, both watching with joy as a bright green " +
+      "homeward beam points toward the stars.",
     copy: (c) =>
-      `Orbit's little star-shaped compass had cracked — that was why it got ` +
-      `lost. With careful hands, ${c.name} pressed it gently back into ` +
-      `place, and it began to glow.`,
+      `Orbit was powered, but still needed to find home. On Orbit's chest, ` +
+      `a little star-shaped navigation compass had slipped loose. With ` +
+      `careful hands, ${c.name} clicked it into place, and it beamed a ` +
+      `bright green course toward home.`,
     light:
-      "Warm glow from the repaired compass mixing with cool planet light; eye-level camera at kneeling height.",
+      "Warm green beam from the repaired compass mixing with cool planet starlight; eye-level camera at kneeling height.",
   },
   {
     scene:
-      "The little spaceship soaring joyfully back toward a glowing blue " +
-      "Earth ahead, trailing a bright starlit path, the child at the " +
-      "controls with Orbit safely beside them, both smiling at the view " +
-      "growing closer.",
+      "Inside the spaceship cockpit looking forward, the child sits at the " +
+      "controls smiling warmly through the panoramic front viewport as the " +
+      "glowing blue Earth looms large and beautiful directly ahead; outside " +
+      "the side viewport, Orbit waves happily beside a flashing friendly " +
+      "star beacon, flying toward home.",
     copy: (c) =>
-      `With Orbit's compass glowing the way, the little ship turned toward ` +
-      `home. Earth grew brighter and closer with every star they passed.`,
+      `Near Earth, Orbit's compass signaled a friendly beacon from home. ` +
+      `With a joyful wave goodbye, Orbit turned toward its own constellation, ` +
+      `and ${c.name}'s little ship steered smoothly down toward the glowing blue Earth.`,
     spread: true,
     light:
-      "Warm glow from Earth ahead mixing with cool deep-space starlight; wide eye-level camera behind the ship.",
+      "Warm atmospheric blue glow from Earth ahead mixing with interior control console lights; eye-level camera inside the cockpit looking past the child.",
     compositionNotes:
-      "keep the ship at a readable scale against the vast starfield, Earth " +
-      "glowing softly ahead in the distance — the child at the controls " +
-      "stays the large, clear foreground focus, comfortably inside the safe " +
-      "region.",
+      "coherent cockpit view: the child at the controls is the clear " +
+      "foreground focus on the right side of the spread, looking forward at " +
+      "the magnificent glowing Earth filling the forward viewport.",
+    outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
   },
 ];
 
@@ -251,21 +280,23 @@ const spaceExplorerPages: PageSpec[] = [
     layout: "single-page",
     illustrationPrompt: illustration(
       "A wide cover hero scene: standing on the RIGHT side of the frame in a " +
-        "spacesuit with the helmet open/off so the whole face shows clearly, " +
-        "turned toward the viewer with a big joyful smile, holding a glowing " +
-        "star map, with Orbit at their side and a starry sky and distant " +
-        "planets softly visible beyond. Frame the child from about the waist " +
-        "up so the FACE IS LARGE, clear, and front-facing (or a gentle " +
-        "three-quarter angle) toward the camera — the face is the focal " +
-        "point and must unmistakably look like the real child in the " +
-        "reference photos, with their hair exactly as in those photos.",
+        "spacesuit with a crystal-clear transparent bubble helmet so the whole " +
+        "face shows clearly and well-lit from within, turned toward the viewer " +
+        "with a big joyful smile, holding a glowing star chart, with Orbit at " +
+        "their side and a starry sky and distant planets softly visible " +
+        "beyond. Frame the child from about the waist up so the FACE IS LARGE, " +
+        "clear, and front-facing (or a gentle three-quarter angle) toward the " +
+        "camera — the face is the focal point and must unmistakably look like " +
+        "the real child in the reference photos, with their hair exactly as in " +
+        "those photos.",
       {
+        kind: "cover",
         light:
           "Soft glowing starlight from above and around, gently lighting the child from the front; eye-level camera among the stars.",
         compositionNotes:
-          "keep the entire LEFT side and the lower-left calm and open — soft " +
+          "keep the lower portion calm and open — soft " +
           "starry sky with no part of the child there — so a large title can " +
-          "sit in the lower-left without covering the child.",
+          "sit in the lower area without covering the child.",
       },
     ),
     text: (c) => `${c.name}'s Journey to the Stars`,
@@ -276,13 +307,16 @@ const spaceExplorerPages: PageSpec[] = [
     spread: true,
     layout: "text-left-subject-right",
     illustrationPrompt: illustration(
-      "In a cozy bedroom at night, standing at an open window with a small " +
-        "telescope, a glowing star map unfolding softly across the night sky " +
-        "outside, pajamas on, pure wonder on their face.",
+      "In a cozy bedroom at night, standing at an open window beside a small " +
+        "telescope, sketching a glowing constellation path onto a paper star " +
+        "chart with a pencil as the night sky twinkles outside, pajamas on, " +
+        "pure wonder on their face.",
       {
+        kind: "intro",
         spread: true,
+        companionOverride: null,
         light:
-          "Soft cool moonlight through the window mixing with the star map's warm glow; eye-level camera at the windowsill.",
+          "Soft cool moonlight through the window mixing with the star chart's warm glow; eye-level camera at the windowsill.",
         outfitOverride: SPECIAL_OUTFITS.pajamas,
       },
     ),
@@ -290,7 +324,7 @@ const spaceExplorerPages: PageSpec[] = [
       const p = pronouns(c.gender);
       return (
         `Every night, ${c.name} counted the stars from the bedroom window. ` +
-        `Tonight, one small star map unfolded just for ${p.obj} — and a big ` +
+        `Tonight, a glowing star trail appeared just for ${p.obj} — and a big ` +
         `adventure was about to begin.`
       );
     },
@@ -303,6 +337,7 @@ const spaceExplorerPages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
@@ -324,6 +359,7 @@ const spaceExplorerPages: PageSpec[] = [
         "little brighter, a small toy rocket glowing softly on the " +
         "nightstand, peaceful happy smile.",
       {
+        kind: "closing",
         spread: true,
         light:
           "Soft cool blue moonlight from the window plus the toy rocket's warm glow; eye-level camera beside the bed.",
@@ -350,7 +386,7 @@ const spaceExplorerPages: PageSpec[] = [
       "Waving cheerfully with a big joyful smile, spacesuit helmet tucked " +
         "under one arm so the face shows clearly, against a soft simple " +
         "pastel night sky with a few gentle twinkling stars.",
-      { companionOverride: null },
+      { kind: "backcover", companionOverride: null },
     ),
     text: (c) =>
       `The End…\n...but ${c.name}'s star map is still glowing, ready for the next journey.`,

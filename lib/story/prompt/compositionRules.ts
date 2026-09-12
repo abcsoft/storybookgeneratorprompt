@@ -1,104 +1,326 @@
 import { getPrintProfile } from "../../print/registry";
 import type { LayoutType, PageKind } from "../types";
 
-export function buildTargetFormatBlock(
-  profileId: string = "classic-landscape",
-  layout: LayoutType = "single-page",
-  kind: PageKind = "scene",
-): string {
-  const profile = getPrintProfile(profileId);
-  const isSquare = profile.nominalSizeIn.width === profile.nominalSizeIn.height;
-  const isSpread = layout !== "single-page";
-  const isCover = kind === "cover";
+export type TextPlacementSide = "left" | "right" | "none";
+export type SubjectPlacementSide = "left" | "right" | "centered";
 
-  if (isCover) {
-    if (isSquare) {
-      return (
-        "TARGET ARTWORK FORMAT — Square 1:1 composition for the front cover. " +
-        "Keep the title-safe area clear in the top third of the frame. Do not create a widescreen landscape composition."
-      );
-    }
+export type { FramingMode } from "../types";
+import type { FramingMode } from "../types";
+
+export function buildFramingBlock(framing: FramingMode): string {
+  if (framing === "sleeping/bed-covered") {
     return (
-      "TARGET ARTWORK FORMAT — Landscape composition for the front cover. " +
-      "Keep the title-safe area clear in the top third of the frame."
+      "FRAMING (sleeping/bed-covered) — The child is tucked comfortably under soft blankets or bedcovers, resting peacefully or deeply asleep. " +
+      "Bedding covers the lower body naturally. " +
+      "Require natural visible anatomy only for body parts actually outside the bedding (face, hair, and any resting hand or arm above covers)."
     );
   }
-
-  if (isSpread) {
-    if (isSquare) {
-      return (
-        "TARGET ARTWORK FORMAT — Wide approximately 2:1 master spread. " +
-        "The image will be divided vertically into two square facing pages. Keep important subjects away from the exact center gutter."
-      );
-    }
+  if (framing === "bed-covered") {
     return (
-      "TARGET ARTWORK FORMAT — Wide approximately 2:1 / 21:9 master spread composition. " +
-      "The image will be divided vertically into two facing landscape pages. Keep important subjects away from the exact center gutter."
+      "FRAMING (bed-covered) — The child is cozy in bed under blankets or bedcovers. " +
+      "Bedding covers the lower body naturally. " +
+      "Require natural visible anatomy only for body parts actually outside the bedding (face, hair, and any resting hand or arm above covers)."
     );
   }
-
-  if (isSquare) {
+  if (framing === "seated-in-bed") {
     return (
-      "TARGET ARTWORK FORMAT — Square 1:1 composition. " +
-      "This artwork will be used on a square printed page. Do not create a widescreen landscape composition. " +
-      "Keep important subjects comfortably inside the central safe region. Keep approximately 8-10% visual safety from outside edges."
+      "FRAMING (seated-in-bed) — The child is sitting comfortably in bed in cozy sleepwear, partially covered by blankets. " +
+      "Lower body beneath bedding is naturally occluded. " +
+      "Ensure natural visible anatomy for head, torso, and any visible arms or hands above the covers."
     );
   }
-
+  if (framing === "waist-up portrait") {
+    return (
+      "FRAMING (waist-up portrait) — Frame naturally from the waist or chest up with ample headroom. " +
+      "The child's face and upper body are the clear focal point. " +
+      "Keep visible hands, arms, and head comfortably within safe margins without accidental edge amputations."
+    );
+  }
+  if (framing === "vehicle/cockpit") {
+    return (
+      "FRAMING (vehicle/cockpit) — The child is seated naturally inside the vehicle, craft, boat, or cockpit. " +
+      "Lower body portions seated behind consoles or railings are naturally occluded. " +
+      "Ensure natural anatomy for visible head, arms, and hands on controls, keeping them well inside safe margins."
+    );
+  }
+  if (framing === "seated") {
+    return (
+      "FRAMING (seated) — The child is sitting or kneeling comfortably within the scene. " +
+      "Frame with generous margins so the entire seated pose is visible without touching edges."
+    );
+  }
+  if (framing === "environmental wide") {
+    return (
+      "FRAMING (environmental wide) — Expansive, sweeping landscape or panoramic composition. " +
+      "The child is placed in the environment at natural scale with ample surrounding landscape."
+    );
+  }
+  if (framing === "close portrait") {
+    return (
+      "FRAMING (close portrait) — Head and shoulders portrait with generous headroom and clear focus on the child's likeness. " +
+      "Do not crop the top of hair or chin at the frame edge."
+    );
+  }
+  if (framing === "full-body") {
+    return (
+      "FRAMING (full-body) — Full-body shot showing the complete child from head to shoes with safety margins from all edges: " +
+      "no head touching the top, no feet touching the bottom, and no hands touching side edges."
+    );
+  }
   return (
-    "TARGET ARTWORK FORMAT — Landscape composition appropriate for the selected Lulu landscape page geometry. " +
-    "Keep important subjects comfortably inside the central safe region."
-  );
-}
-
-/** Full-bleed single landscape page (no gutter, no facing leaf). */
-export function singlePageCompositionRules(): string {
-  return (
-    "COMPOSITION (single page) — frame the whole scene well inside the page: " +
-    "keep about a 10% safety margin from every edge, with no head touching the " +
-    "top, no arm or hand touching the left or right edge, and no feet touching " +
-    "the bottom. NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE — " +
-    "if the composition would crop a hand, foot, ear, or tail, pull the camera " +
-    "back instead. Keep the lower-left corner calm and relatively open (soft " +
-    "background only) — a short line of story text is added there afterward by " +
-    "the layout software, not by you. Prefer a wider camera over an extreme " +
-    "close-up unless the scene explicitly calls for one."
+    "FRAMING (medium shot) — Natural medium composition showing head and torso comfortably inside safe margins without edge clipping."
   );
 }
 
 /**
- * Two-page spread. `layout` selects the arrangement description; everything
- * else about the safety rules (gutter, outer margin, no-partial-body-parts) is
- * identical regardless of which named layout is requested, since only the
- * text-left/subject-right arrangement is currently render-accurate.
+ * Automatically infer appropriate framing mode from scene context and page kind
+ * unless an explicit framing mode is supplied.
  */
-export function spreadCompositionRules(layout: LayoutType): string {
-  const arrangementNote =
-    layout === "text-left-subject-right"
-      ? ""
-      : " (Note: this book's page template currently only renders the " +
-        "text-left / subject-right arrangement correctly for two-page spreads — " +
-        "treat the LEFT/RIGHT zones below as fixed regardless of the requested layout.)";
+export function inferFramingMode(
+  scene: string,
+  kind?: string,
+  explicit?: FramingMode,
+): FramingMode {
+  if (explicit) return explicit;
+  if (kind === "cover") return "waist-up portrait";
+
+  const lower = scene.toLowerCase();
+
+  // Sleeping / bed-covered: child resting in bed under covers/blankets
+  if (
+    /\b(tucked cozily|tucked under|under (the |soft )?bedcovers|under (the |soft )?blankets?|under (the )?covers|fast asleep|sound asleep|drifted off to sleep)\b/i.test(lower) ||
+    (/\b(bed|bedtime)\b/i.test(lower) && /\b(sleep|asleep|blanket|bedcovers|pillow)\b/i.test(lower))
+  ) {
+    return "sleeping/bed-covered";
+  }
+
+  // Seated in bed
+  if (/\b(sitting up (gently )?in bed|sitting in bed)\b/i.test(lower)) {
+    return "seated-in-bed";
+  }
+
+  // Vehicle / cockpit: controls occlude lower body
+  if (
+    /\b(cockpit|spaceship controls|flight controls|instrument panel|steering wheel|driver'?s? seat)\b/i.test(lower)
+  ) {
+    return "vehicle/cockpit";
+  }
+
+  // Waist-up portrait
+  if (
+    /\b(waist-up|waist up|chest-up|chest up|bust portrait)\b/i.test(lower)
+  ) {
+    return "waist-up portrait";
+  }
+
+  // Close portrait
+  if (/\b(close-up|tight on the face|head and shoulders)\b/i.test(lower)) {
+    return "close portrait";
+  }
+
+  // Seated
+  if (/\b(sitting|seated|kneeling|cross-legged)\b/i.test(lower)) {
+    return "seated";
+  }
+
+  // Environmental wide
+  if (
+    /\b(panoramic|wide vista|aerial view|wide landscape|sweeping view)\b/i.test(lower)
+  ) {
+    return "environmental wide";
+  }
+
+  return "medium";
+}
+
+/**
+ * Build mathematically exact target format block separating:
+ * - trim aspect ratio (e.g. 11:8, 11:4, 1:1, 2:1)
+ * - full-bleed target-canvas aspect ratio (e.g. 15:11, 89:33, 1:1, 2:1)
+ * - provider-requested aspect-ratio preset (e.g. 4:3, 21:9, 1:1, 2:1)
+ * - normalized production asset dimensions (e.g. 3375×2475 px, 6675×2475 px)
+ * - deterministic non-stretch normalization transform contract
+ */
+export function buildTargetFormatBlock(
+  profileId: string = "classic-landscape-11x8",
+  layout: LayoutType = "single-page",
+  kind: PageKind = "scene",
+): string {
+  const profile = getPrintProfile(profileId);
+  const isCover = kind === "cover" || kind === "backcover";
+  const isSpread = layout !== "single-page";
+
+  const singleWidth = profile.canvasPx.width;
+  const singleHeight = profile.canvasPx.height;
+  const trimW = profile.nominalSizeIn.width;
+  const trimH = profile.nominalSizeIn.height;
+  const spreadTrimW = trimW * 2;
+  const spreadTrimH = trimH;
+  const bleed =
+    profile.bleedIn !== undefined
+      ? profile.bleedIn
+      : Math.max(0, (profile.canvasPx.width / profile.dpi - profile.nominalSizeIn.width) / 2);
+  const singleBleedW = trimW + bleed * 2;
+  const singleBleedH = trimH + bleed * 2;
+  const spreadBleedW = spreadTrimW + bleed * 2;
+  const spreadBleedH = spreadTrimH + bleed * 2;
+
+  const continuousSpreadWidth = Math.round(spreadBleedW * profile.dpi);
+  const continuousSpreadHeight = Math.round(spreadBleedH * profile.dpi);
+
+  const targetWidth = isSpread ? continuousSpreadWidth : singleWidth;
+  const targetHeight = isSpread ? continuousSpreadHeight : singleHeight;
+
+  // Aspect ratio separation
+  const trimAspect = isSpread
+    ? (profile.trimSpreadAspect ?? `${spreadTrimW}:${spreadTrimH}`)
+    : (profile.trimAspect ?? `${trimW}:${trimH}`);
+
+  const targetCanvasAspect = isSpread
+    ? (profile.targetCanvasSpreadAspect ?? (targetWidth === 6675 && targetHeight === 2475 ? "89:33" : `${targetWidth}:${targetHeight}`))
+    : (profile.targetCanvasAspect ?? (targetWidth === 3375 && targetHeight === 2475 ? "15:11" : `${targetWidth}:${targetHeight}`));
+
+  const providerPresetAspect = isSpread
+    ? (profile.providerPresetSpreadAspect ?? "21:9")
+    : (profile.providerPresetAspect ?? "4:3");
+
+  const mismatchPolicy =
+    "NORMALIZATION CONTRACT: Never stretch artwork horizontally or vertically. " +
+    "If raw provider output dimensions differ from the target canvas, normalize via proportional cover crop or proportional contain+backdrop without differential X/Y scaling.";
+
+  const isSquare = profile.nominalSizeIn.width === profile.nominalSizeIn.height;
+
+  if (isCover) {
+    const coverDescriptor = isSquare
+      ? "Square 1:1 composition for the front cover."
+      : "Landscape composition for the front cover.";
+    return (
+      `TARGET ARTWORK FORMAT — front cover: ${coverDescriptor} full-bleed target canvas ${targetWidth}×${targetHeight} px ` +
+      `(${targetCanvasAspect} aspect ratio at ${profile.dpi} DPI; ` +
+      `trim ${trimW}×${trimH} in [${trimAspect} trim ratio], full-bleed ${singleBleedW}×${singleBleedH} in [${targetCanvasAspect} canvas ratio]; ` +
+      `closest provider preset: ${providerPresetAspect}). ` +
+      `Generate a full-bleed composition filling the ${targetWidth}×${targetHeight} px canvas (${targetCanvasAspect} aspect ratio). ` +
+      `Keep the lower portion of the frame (roughly the lower 25–30%) calm, open, and uncluttered with soft background scenery ` +
+      `so the title can be overlaid cleanly by layout software without obscuring the child's face. ` +
+      `Do not apply gutter restrictions to the cover. ${mismatchPolicy}`
+    );
+  }
+
+  if (isSpread) {
+    const spreadPrefix = isSquare
+      ? `TARGET ARTWORK FORMAT — 2:1 continuous panoramic spread (${targetWidth}×${targetHeight} px target at ${profile.dpi} DPI): `
+      : "TARGET ARTWORK FORMAT — Continuous panoramic spread: ";
+    return (
+      `${spreadPrefix}full-bleed target canvas ${targetWidth}×${targetHeight} px ` +
+      `(${targetCanvasAspect} aspect ratio at ${profile.dpi} DPI; ` +
+      `trim ${spreadTrimW}×${spreadTrimH} in [${trimAspect} trim ratio] (trim is ${trimW}×${trimH} in per page, totaling ${spreadTrimW}×${spreadTrimH} in spread before bleed), ` +
+      `full-bleed spread ${spreadBleedW}×${spreadBleedH} in [${targetCanvasAspect} canvas ratio]; ` +
+      `closest provider preset: ${providerPresetAspect}). ` +
+      `Generate one uninterrupted panoramic scene across one wide canvas filling ${targetWidth}×${targetHeight} px target at ${profile.dpi} DPI (${targetCanvasAspect} aspect ratio). ` +
+      `The artwork will span across two physical facing pages side by side. Keep focal subjects safely away from the exact center gutter. ${mismatchPolicy}`
+    );
+  }
+
+  let singlePrefix = "TARGET ARTWORK FORMAT — Single page: ";
+  if (isSquare) {
+    singlePrefix = `TARGET ARTWORK FORMAT — 1:1 single page (${targetWidth}×${targetHeight} px target at ${profile.dpi} DPI, 10% safety margin). Square 1:1 composition: `;
+  } else if (profile.id === "lulu-landscape-11x8.5") {
+    singlePrefix = "TARGET ARTWORK FORMAT — 4:3 single page: ";
+  }
 
   return (
-    "COMPOSITION (two-page spread) — this is one extra-wide illustration that " +
-    "will be printed across two facing pages and folded down the exact vertical " +
-    `center.${arrangementNote} ` +
-    "LEFT PAGE (left half of the image): calm environmental storytelling " +
-    "background with enough visual interest that it doesn't look empty, but " +
-    "ABSOLUTELY NO child body parts and NO companion body parts here — no stray " +
-    "hand, foot, head, or tail. Keep this area readable for a few lines of story " +
-    "text that will be added afterward by the layout software. " +
-    "CENTER GUTTER (the vertical strip straddling the fold): keep every important " +
-    "subject clear of this strip — no faces, no eyes, no hands, no feet, no " +
-    "companion, and no important prop may cross or sit on the fold line. " +
-    "RIGHT PAGE (right half of the image): place the complete main subject — the " +
-    "child, and the companion if present — safely and entirely inside this half, " +
-    "with roughly a 10-12% safety margin from the outer edge: no head touching " +
-    "the top, no arm touching the right edge, no feet touching the bottom, and " +
-    "no body part crossing any edge of the page. NO PARTIAL HUMAN OR ANIMAL BODY " +
-    "PART MAY ENTER FROM ANY EDGE — of the spread's outer edges or the center " +
-    "gutter. Use a wider camera composition rather than a close-up so the whole " +
-    "subject comfortably fits inside the safe region."
+    `${singlePrefix}full-bleed target canvas ${targetWidth}×${targetHeight} px ` +
+    `(${targetCanvasAspect} aspect ratio at ${profile.dpi} DPI; ` +
+    `trim ${trimW}×${trimH} in [${trimAspect} trim ratio], full-bleed ${singleBleedW}×${singleBleedH} in [${targetCanvasAspect} canvas ratio]; ` +
+    `closest provider preset: ${providerPresetAspect}). ` +
+    `Generate a full-bleed composition filling the ${targetWidth}×${targetHeight} px canvas (${targetCanvasAspect} aspect ratio). ${mismatchPolicy}`
+  );
+}
+
+/**
+ * Single-page composition contract with explicit scene-aware framing mode.
+ *
+ * Tailors headroom, body visibility, and anatomy rules per scene framing.
+ * Deduplicates repeated no-text and edge rules.
+ */
+export function singlePageCompositionRules(framing: FramingMode = "medium"): string {
+  const partialBodyRule =
+    framing === "sleeping/bed-covered" ||
+    framing === "bed-covered" ||
+    framing === "seated-in-bed" ||
+    framing === "waist-up portrait" ||
+    framing === "vehicle/cockpit"
+      ? "Prohibit accidental edge amputations of parts that should be visible (never crop visible hands, ears, or heads at outer boundaries)."
+      : "NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE — prohibit accidental edge amputations of parts that should be visible.";
+
+  return (
+    `COMPOSITION (single page) — Maintain roughly an 8–10% safety margin from all outer edges. ${partialBodyRule} ` +
+    "TRANSFORMATION CROP SAFETY: When generated via provider presets (e.g. 4:3), proportional normalization removes approximately 28 px (1.1%) from top and bottom edges; " +
+    "reserve at least 10–12% headroom and base margins so all facial features, hair, and limbs remain safely inside the target canvas after normalization. " +
+    "Keep the lower portion calm and relatively open (soft background scenery) for story text to be added by layout software."
+  );
+}
+
+/**
+ * Two-page spread composition contract with explicit scene-aware framing mode.
+ *
+ * Enforces one continuous, uninterrupted panoramic scene across one wide canvas.
+ * Never describes a left or right panel, vertical seam, fold, split, or collage.
+ * Generates dynamic side-specific instructions for Text Left, Text Right, or No Text.
+ */
+export function spreadCompositionRules(
+  layout: LayoutType = "text-left-subject-right",
+  textSideOverride?: TextPlacementSide,
+  subjectSideOverride?: SubjectPlacementSide,
+  framing: FramingMode = "medium",
+): string {
+  let textSide: TextPlacementSide = textSideOverride ?? "left";
+  if (!textSideOverride) {
+    if (layout === "subject-left-text-right") textSide = "right";
+    else if (layout === "full-art-no-text") textSide = "none";
+    else textSide = "left";
+  }
+
+  const subjectSide: SubjectPlacementSide =
+    subjectSideOverride ?? (textSide === "left" ? "right" : textSide === "right" ? "left" : "centered");
+
+  let sideSpecificInstruction = "";
+  if (textSide === "left") {
+    const inwardNote = subjectSide === "right" ? ", looking inward toward the left when natural" : "";
+    sideSpecificInstruction =
+      "Reserve the LEFT-HAND region as calm, low-detail environmental space for story text that the layout software will add later. " +
+      `Place the complete child safely within the ${subjectSide.toUpperCase()}-HAND subject-side region${inwardNote}.`;
+  } else if (textSide === "right") {
+    const inwardNote = subjectSide === "left" ? ", looking inward toward the right when natural" : "";
+    sideSpecificInstruction =
+      "Reserve the RIGHT-HAND region as calm, low-detail environmental space for story text that the layout software will add later. " +
+      `Place the complete child safely within the ${subjectSide.toUpperCase()}-HAND subject-side region${inwardNote}.`;
+  } else {
+    sideSpecificInstruction =
+      "This is a full-art spread with no story text. Create a balanced composition and balanced panoramic artwork across the canvas, " +
+      "while keeping focal subjects safely inside the outer regions and away from the center gutter.";
+  }
+
+  const spreadPartialBodyRule =
+    framing === "sleeping/bed-covered" ||
+    framing === "bed-covered" ||
+    framing === "seated-in-bed" ||
+    framing === "waist-up portrait" ||
+    framing === "vehicle/cockpit"
+      ? "Prohibit accidental edge amputations of parts that should be visible."
+      : "NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE.";
+
+  return (
+    "COMPOSITION (two-page continuous spread) — Create one uninterrupted panoramic scene across one wide canvas. " +
+    "This is not a diptych, split-screen, collage, book mockup, or two separate panels. " +
+    "The environment, horizon, lighting, shadows, colors, and visual texture must continue naturally across the exact center. " +
+    "Do not draw a fold, line, border, seam, page edge, or lighting transition at the midpoint. " +
+    "Do not generate a photographed open book, curved or curled pages, 3D book mockup, fake seam or binding line, crease, gutter shadow, or duplicated left/right scenes. " +
+    `${sideSpecificInstruction} ` +
+    "TRANSFORMATION CROP SAFETY: When generated via panoramic provider presets (e.g. 21:9), proportional normalization removes approximately 193 px (6.7%) from the top and 193 px (6.7%) from the bottom; " +
+    "reserve at least 15–18% safety clearance from top and bottom boundaries so faces, hair, hands, companion faces, and essential props remain safely inside the final target safe region after crop normalization. " +
+    "Keep the central gutter-safe zone free of faces, eyes, hands, feet, text, and important props. " +
+    "Background sky, landscape, floor, water, or room architecture should continue through this zone naturally. " +
+    `Maintain roughly a 10–12% safety margin from all outer edges. ${spreadPartialBodyRule}`
   );
 }

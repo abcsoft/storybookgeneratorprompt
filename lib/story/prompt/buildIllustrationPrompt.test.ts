@@ -20,7 +20,7 @@ describe("buildIllustrationPrompt", () => {
     expect(prompt).toContain("Riding a bicycle down a rainbow hill.");
   });
 
-  it("assembles blocks in identity -> continuity -> style -> composition -> scene -> negative order", () => {
+  it("assembles blocks in identity -> format -> scene -> composition -> style -> negative order", () => {
     const prompt = buildIllustrationPrompt({
       child,
       story: { defaultOutfit: "a red cape", companion },
@@ -28,18 +28,22 @@ describe("buildIllustrationPrompt", () => {
       layout: "single-page",
     });
     const identityIdx = prompt.indexOf("IDENTITY FIRST");
+    const formatIdx = prompt.indexOf("TARGET ARTWORK FORMAT");
+    const sceneIdx = prompt.indexOf("UNIQUE_SCENE_MARKER");
     const wardrobeIdx = prompt.indexOf("WARDROBE CONTINUITY");
     const companionIdx = prompt.indexOf("COMPANION CONTINUITY");
     const compositionIdx = prompt.indexOf("COMPOSITION (single page)");
-    const sceneIdx = prompt.indexOf("UNIQUE_SCENE_MARKER");
+    const styleIdx = prompt.indexOf("A high-end children's storybook picture");
     const negativeIdx = prompt.indexOf("DO NOT:");
 
     expect(identityIdx).toBeGreaterThanOrEqual(0);
-    expect(wardrobeIdx).toBeGreaterThan(identityIdx);
+    expect(formatIdx).toBeGreaterThan(identityIdx);
+    expect(sceneIdx).toBeGreaterThan(formatIdx);
+    expect(wardrobeIdx).toBeGreaterThan(sceneIdx);
     expect(companionIdx).toBeGreaterThan(wardrobeIdx);
     expect(compositionIdx).toBeGreaterThan(companionIdx);
-    expect(sceneIdx).toBeGreaterThan(compositionIdx);
-    expect(negativeIdx).toBeGreaterThan(sceneIdx);
+    expect(styleIdx).toBeGreaterThan(compositionIdx);
+    expect(negativeIdx).toBeGreaterThan(styleIdx);
   });
 
   it("omits wardrobe/companion blocks entirely when a story has neither", () => {
@@ -87,7 +91,8 @@ describe("buildIllustrationPrompt", () => {
     expect(prompt).toContain(
       "NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE",
     );
-    expect(prompt).toContain("CENTER GUTTER");
+    expect(prompt).toContain("central gutter-safe zone");
+    expect(prompt).toContain("uninterrupted panoramic scene");
   });
 
   it("appends scene-specific composition notes after the scene", () => {

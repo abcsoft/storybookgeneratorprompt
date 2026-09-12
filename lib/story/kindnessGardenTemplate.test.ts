@@ -98,7 +98,7 @@ describe("kindnessGardenTemplate", () => {
   it("gives spread scenes the strong gutter/edge-safety composition rules instead of the legacy note", () => {
     const pages = buildPages(child, BOOK_ID);
     const meadow = pages.find((p) => p.prompt.includes("wildflower meadow"));
-    expect(meadow?.prompt).toContain("CENTER GUTTER");
+    expect(meadow?.prompt).toContain("central gutter-safe zone");
     expect(meadow?.prompt).toContain(
       "NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE",
     );

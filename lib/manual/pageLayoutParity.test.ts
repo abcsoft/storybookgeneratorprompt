@@ -5,52 +5,52 @@ import type { ChildProfile } from "../story/types";
 import { DEFAULT_BOOK_ID } from "../story/registry";
 import { getPrintProfile } from "../print/registry";
 
-describe("Authoritative Page Layout Model (02, 05, 10, 20, 23)", () => {
+describe("Authoritative Page Layout Model (Dream Big default plan)", () => {
   const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
   const manifest = buildManifest(child, DEFAULT_BOOK_ID, "printify-square-8x8");
   const reviewSeq = buildReviewSequence(manifest);
 
-  it("never infers layout from source image aspect — pageLayout is authoritative", () => {
-    // 02.png (Illustration 2, index 1)
+  it("never infers layout from source image aspect — resolved layout plan is authoritative", () => {
+    // 02.png / page-01.png (Illustration 2, index 1) — Intro scene: single right-hand page 1
     const illo2 = manifest.find((m) => m.index === 1)!;
-    expect(illo2.pageLayout).toBe("spread");
-    expect(illo2.spread).toBe(true);
+    expect(illo2.pageLayout).toBe("single");
+    expect(illo2.spread).toBe(false);
 
-    // 05.png (Illustration 5, index 4)
+    // 05.png / page-04.png (Illustration 5, index 4) — Astronaut: single page in default plan
     const illo5 = manifest.find((m) => m.index === 4)!;
-    expect(illo5.pageLayout).toBe("spread");
-    expect(illo5.spread).toBe(true);
+    expect(illo5.pageLayout).toBe("single");
+    expect(illo5.spread).toBe(false);
 
-    // 10.png (Illustration 10, index 9) — MUST BE SINGLE PAGE EVEN IF SOURCE IMAGE IS WIDE
-    const illo10 = manifest.find((m) => m.index === 9)!;
-    expect(illo10.pageLayout).toBe("single");
-    expect(illo10.spread).toBe(false);
+    // 11.png / page-10.png (Illustration 11, index 10) — Deep-sea Diver: single page in default plan
+    const illo11 = manifest.find((m) => m.index === 10)!;
+    expect(illo11.pageLayout).toBe("single");
+    expect(illo11.spread).toBe(false);
 
-    // 20.png (Illustration 20, index 19)
-    const illo20 = manifest.find((m) => m.index === 19)!;
-    expect(illo20.pageLayout).toBe("spread");
-    expect(illo20.spread).toBe(true);
-
-    // 23.png (Illustration 23, index 22)
+    // 23.png / spread-22-23.png (Illustration 23, index 22) — Closing spread: physical pages 22-23
     const illo23 = manifest.find((m) => m.index === 22)!;
     expect(illo23.pageLayout).toBe("spread");
     expect(illo23.spread).toBe(true);
+
+    // 24.png / page-24.png (Illustration 24, index 23) — Final Dream Big page: single page 24
+    const illo24 = manifest.find((m) => m.index === 23)!;
+    expect(illo24.pageLayout).toBe("single");
+    expect(illo24.spread).toBe(false);
   });
 
   it("maps single vs spread physical pages consistently for review and PDF export", () => {
-    // Illustration 10 (single page) maps to exactly ONE physical page
-    const rev10 = reviewSeq.find((r) => r.manifestIndex === 9)!;
-    expect(rev10.layout).toBe("single");
-    if (rev10.layout === "single") {
-      expect(rev10.page).toBeDefined();
+    // Illustration 2 (Intro) maps to physical page 1
+    const rev2 = reviewSeq.find((r) => r.manifestIndex === 1)!;
+    expect(rev2.layout).toBe("single");
+    if (rev2.layout === "single") {
+      expect(rev2.page).toBe(1);
     }
 
-    // Illustration 02 (spread) maps to TWO facing physical pages
-    const rev2 = reviewSeq.find((r) => r.manifestIndex === 1)!;
-    expect(rev2.layout).toBe("spread");
-    if (rev2.layout === "spread") {
-      expect(rev2.startPage).toBe(2);
-      expect(rev2.endPage).toBe(3);
+    // Illustration 23 (Closing spread) maps to facing pages 22-23
+    const rev23 = reviewSeq.find((r) => r.manifestIndex === 22)!;
+    expect(rev23.layout).toBe("spread");
+    if (rev23.layout === "spread") {
+      expect(rev23.startPage).toBe(22);
+      expect(rev23.endPage).toBe(23);
     }
   });
 });

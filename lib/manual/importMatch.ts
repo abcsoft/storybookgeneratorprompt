@@ -1,67 +1,575 @@
 /**
- * Smart bulk-import matching (item 2). Pure and dependency-light (only
- * `indexFromFilename`, which has zero server-only deps) so it runs instantly
- * client-side the moment files are selected — no round trip needed just to
- * see what's missing.
+ * Smart bulk-import matching with authoritative slot identity and guarded legacy recovery.
+ *
+ * Matching Priority:
+ * 1. manifest asset ID / slotId
+ * 2. exact canonical filename
+ * 3. validated legacy numeric filename / aliases
+ *
+ * Never assigns uploaded files merely by sorted array position.
+ * Rejects duplicate slot assignments and unknown assets.
  */
 
-import { indexFromFilename } from "./filenameMatch";
+import { indexFromFilename, parseFilename } from "./filenameMatch";
+import type { ResolvedAssetSlot } from "../story/layoutPlan";
+
+export interface ImportMissingSlot {
+  slotId: string;
+  physicalPages: number[];
+  role?: string;
+  expectedFilename: string;
+}
+
+export interface ImportDuplicateSlot {
+  filename: string;
+  slotId?: string;
+  index: number;
+  claimedBy: string;
+}
+
+export interface LegacyRecoveryProposalTableEntry {
+  filename: string;
+  proposedSlotId: string;
+  role: string;
+  physicalPages: number[];
+}
 
 export interface ImportMatchReport {
   required: number;
   matched: number;
+  assignedCount: number;
   /** Required filenames with no provided file. */
   missing: string[];
-  /** Extra files that resolve to a page another file already claimed. */
-  duplicates: { filename: string; index: number; claimedBy: string }[];
-  /** Provided filenames that don't parse to any page in this book. */
+  /** Slot IDs with no provided file. */
+  missingSlots: string[];
+  missingSlotDetails?: ImportMissingSlot[];
+  /** Extra files that resolve to a slot another file already claimed. */
+  duplicates: ImportDuplicateSlot[];
+  /** Provided filenames that don't match any slot. */
   unmatched: string[];
+  unexpected: string[];
   /** The file to use for each page index, after resolving matches/duplicates. */
   byIndex: Map<number, string>;
+  bySlotId: Map<string, string>;
+  matchedSlots: Map<string, string>;
+  /** Migration warnings when legacy numbered files are used instead of canonical names. */
+  migrationWarnings: string[];
+  legacyRecoveryProposal?: string | null;
+  legacyRecoveryTable?: LegacyRecoveryProposalTableEntry[];
+  legacyRecoveryApplied?: boolean;
+}
+
+export interface ManifestItem {
+  filename: string;
+  role?: string;
+  roleSlug?: string;
+  slotId?: string;
+  kind?: string;
+}
+
+export interface MatchImportedFilesOptions {
+  resolvedSlots?: ResolvedAssetSlot[];
+  confirmLegacyOffsetRecovery?: boolean;
+  bookId?: string;
+  manifest?: ManifestItem[];
+}
+
+const DREAM_BIG_CAREER_ROLES = [
+  "pilot",
+  "race-car-driver",
+  "astronaut",
+  "doctor",
+  "firefighter",
+  "scientist",
+  "army-officer",
+  "soccer-player",
+  "karate-master",
+  "detective",
+  "magician",
+  "chef",
+  "rockstar",
+  "artist",
+  "teacher",
+  "explorer",
+  "photographer",
+  "deep-sea-diver",
+  "veterinarian",
+  "inventor",
+  "closing",
+  "backcover",
+];
+
+/**
+ * Checks whether the uploaded 22 files match the career+closing+backcover sequence (pilot to backcover).
+ */
+function isDreamBig22LegacySequence(
+  filenames: string[],
+  slots?: ResolvedAssetSlot[],
+  manifest?: ManifestItem[],
+): boolean {
+  if (filenames.length !== 22) return false;
+
+  // 1. If manifest specifies 22 career roles without cover/intro
+  if (manifest && manifest.length === 22) {
+    const roles = manifest.map((m) => (m.roleSlug ?? m.role ?? "").toLowerCase());
+    const hasCover = roles.some((r) => r.includes("cover"));
+    const hasIntro = roles.some((r) => r.includes("intro"));
+    if (!hasCover && !hasIntro) return true;
+  }
+
+  // 2. Check role-based names matching pilot ... backcover
+  let careerMatches = 0;
+  for (const f of filenames) {
+    const low = f.toLowerCase();
+    if (DREAM_BIG_CAREER_ROLES.some((role) => low.includes(role.replace(/-/g, "")) || low.includes(role))) {
+      careerMatches++;
+    }
+  }
+  if (careerMatches >= 18) {
+    return true;
+  }
+
+  // 3. Check if filenames are numbered 01..22 or 1..22
+  const nums = filenames
+    .map((f) => {
+      const p = parseFilename(f);
+      return p.pageNumber ?? (indexFromFilename(f) !== null ? indexFromFilename(f)! + 1 : null);
+    })
+    .filter((n): n is number => n !== null)
+    .sort((a, b) => a - b);
+
+  if (nums.length === 22 && nums[0] === 1 && nums[21] === 22) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
- * @param providedFilenames every filename the user selected, in order, not deduped.
- * @param requiredFilenames the book's expected filenames, index i -> page i (e.g. buildManifest(...).map(m => m.filename)).
+ * Match uploaded files against authoritative resolved slots or expected filenames.
  */
 export function matchImportedFiles(
   providedFilenames: string[],
-  requiredFilenames: string[],
+  requiredFilenamesOrSlots: string[] | ResolvedAssetSlot[],
+  resolvedSlotsOrOptions?: ResolvedAssetSlot[] | MatchImportedFilesOptions | boolean,
+  optionsOrUndefined?: MatchImportedFilesOptions,
 ): ImportMatchReport {
+  let requiredFilenames: string[] = [];
+  let resolvedSlots: ResolvedAssetSlot[] | undefined;
+  let options: MatchImportedFilesOptions = {};
+
+  if (Array.isArray(requiredFilenamesOrSlots) && requiredFilenamesOrSlots.length > 0 && typeof (requiredFilenamesOrSlots[0] as any) !== "string") {
+    resolvedSlots = requiredFilenamesOrSlots as ResolvedAssetSlot[];
+    requiredFilenames = resolvedSlots.map((s) => s.expectedFilename ?? s.filename);
+  } else if (Array.isArray(requiredFilenamesOrSlots)) {
+    requiredFilenames = requiredFilenamesOrSlots as string[];
+  }
+
+  if (typeof resolvedSlotsOrOptions === "boolean") {
+    options = { confirmLegacyOffsetRecovery: resolvedSlotsOrOptions };
+  } else if (Array.isArray(resolvedSlotsOrOptions)) {
+    resolvedSlots = resolvedSlotsOrOptions;
+    if (optionsOrUndefined) options = optionsOrUndefined;
+  } else if (resolvedSlotsOrOptions && typeof resolvedSlotsOrOptions === "object") {
+    options = resolvedSlotsOrOptions;
+    if (options.resolvedSlots) resolvedSlots = options.resolvedSlots;
+  }
+
   const byIndex = new Map<number, string>();
-  const duplicates: ImportMatchReport["duplicates"] = [];
+  const bySlotId = new Map<string, string>();
+  const duplicates: ImportDuplicateSlot[] = [];
   const unmatched: string[] = [];
-  const seen = new Set<string>();
+  const migrationWarnings: string[] = [];
+  const seenFilenames = new Set<string>();
+
+  const totalSlots = resolvedSlots ? resolvedSlots.length : requiredFilenames.length;
+
+  // 1. Guarded Legacy Recovery Flow Check
+  // MUST RUN BEFORE ANY GENERIC NUMERIC ALIAS ASSIGNMENT
+  let legacyRecoveryProposal: string | null = null;
+  let legacyRecoveryApplied = false;
+
+  const isDreamBig = options.bookId === "dream-big" || totalSlots === 24;
+  const is22Legacy = isDreamBig && isDreamBig22LegacySequence(providedFilenames, resolvedSlots, options.manifest);
+
+  if (is22Legacy) {
+    if (!options.confirmLegacyOffsetRecovery) {
+      legacyRecoveryProposal = "Cover and intro appear to be missing. Map these 22 assets to slots 3–24?";
+    } else {
+      legacyRecoveryApplied = true;
+    }
+  }
+
+  // If 22 legacy assets detected without user confirmation:
+  // DO NOT assign 01.png to 01-cover or 02.png to 02-intro!
+  // Offer the guarded +2 recovery proposal table and keep slots 01-cover and 02-intro visibly missing.
+  if (is22Legacy && !options.confirmLegacyOffsetRecovery && resolvedSlots && resolvedSlots.length >= 24) {
+    const sortedFiles = [...providedFilenames].sort((a, b) => {
+      const na = indexFromFilename(a) ?? 0;
+      const nb = indexFromFilename(b) ?? 0;
+      return na - nb;
+    });
+
+    const legacyRecoveryTable: LegacyRecoveryProposalTableEntry[] = [];
+    for (let i = 0; i < sortedFiles.length; i++) {
+      const file = sortedFiles[i];
+      const targetSlot = resolvedSlots[i + 2];
+      if (targetSlot) {
+        legacyRecoveryTable.push({
+          filename: file,
+          proposedSlotId: targetSlot.slotId,
+          role: targetSlot.roleSlug,
+          physicalPages: targetSlot.physicalPages,
+        });
+      }
+    }
+
+    const missingSlots: string[] = [];
+    const missingSlotDetails: ImportMissingSlot[] = [];
+    const missing: string[] = [];
+
+    for (const s of resolvedSlots) {
+      missing.push(s.expectedFilename ?? s.filename);
+      missingSlots.push(s.slotId);
+      missingSlotDetails.push({
+        slotId: s.slotId,
+        physicalPages: s.physicalPages,
+        role: s.role,
+        expectedFilename: s.expectedFilename ?? s.filename,
+      });
+    }
+
+    return {
+      required: totalSlots,
+      matched: 0,
+      assignedCount: 0,
+      matchedSlots: bySlotId,
+      missing,
+      missingSlots,
+      missingSlotDetails,
+      duplicates,
+      unmatched: providedFilenames,
+      unexpected: [],
+      byIndex,
+      bySlotId,
+      migrationWarnings: [
+        "Legacy 22-asset offset detected: cover and intro are absent. Guarded +2 recovery offered; explicit confirmation required.",
+      ],
+      legacyRecoveryProposal,
+      legacyRecoveryTable,
+      legacyRecoveryApplied: false,
+    };
+  }
+
+  // If user explicitly confirmed legacy recovery: map the 22 assets to slots 3..24 (indices 2..23)
+  if (legacyRecoveryApplied && resolvedSlots && resolvedSlots.length >= 24) {
+    // Sort provided files naturally
+    const sortedFiles = [...providedFilenames].sort((a, b) => {
+      const na = indexFromFilename(a) ?? 0;
+      const nb = indexFromFilename(b) ?? 0;
+      return na - nb;
+    });
+
+    for (let i = 0; i < sortedFiles.length; i++) {
+      const file = sortedFiles[i];
+      const targetSlotIndex = i + 2; // map to slots 3..24 (0-based index 2..23)
+      if (targetSlotIndex < resolvedSlots.length) {
+        const slot = resolvedSlots[targetSlotIndex];
+        byIndex.set(targetSlotIndex, file);
+        bySlotId.set(slot.slotId, file);
+        migrationWarnings.push(
+          `Legacy recovery: "${file}" mapped to slot "${slot.slotId}" (Physical page ${slot.physicalPages.join(", ")}).`,
+        );
+      }
+    }
+
+    const missingSlots: string[] = [];
+    const missingSlotDetails: ImportMissingSlot[] = [];
+    const missing: string[] = [];
+
+    for (let i = 0; i < resolvedSlots.length; i++) {
+      if (!byIndex.has(i)) {
+        const s = resolvedSlots[i];
+        missing.push(s.expectedFilename ?? s.filename);
+        missingSlots.push(s.slotId);
+        missingSlotDetails.push({
+          slotId: s.slotId,
+          physicalPages: s.physicalPages,
+          role: s.role,
+          expectedFilename: s.expectedFilename ?? s.filename,
+        });
+      }
+    }
+
+    return {
+      required: totalSlots,
+      matched: bySlotId.size,
+      assignedCount: bySlotId.size,
+      matchedSlots: bySlotId,
+      missing,
+      missingSlots,
+      missingSlotDetails,
+      duplicates,
+      unmatched,
+      unexpected: unmatched,
+      byIndex,
+      bySlotId,
+      migrationWarnings,
+      legacyRecoveryProposal: null,
+      legacyRecoveryApplied: true,
+    };
+  }
+
+  // 2. Standard Authoritative Matching
+  if (resolvedSlots && resolvedSlots.length > 0) {
+    for (const filename of providedFilenames) {
+      if (seenFilenames.has(filename)) {
+        const idx = indexFromFilename(filename) ?? -1;
+        duplicates.push({ filename, slotId: "duplicate-file", index: idx, claimedBy: filename });
+        continue;
+      }
+      seenFilenames.add(filename);
+
+      const norm = filename.toLowerCase();
+      const base = norm.replace(/\.[^/.]+$/, "").trim();
+
+      let matchedSlot: ResolvedAssetSlot | null = null;
+
+      // Priority 1: manifest asset ID / slotId
+      matchedSlot =
+        resolvedSlots.find(
+          (s) => s.slotId.toLowerCase() === base || s.slotId.toLowerCase() === norm,
+        ) ?? null;
+
+      // Priority 2: exact canonical filename
+      if (!matchedSlot) {
+        matchedSlot =
+          resolvedSlots.find(
+            (s) =>
+              s.expectedFilename.toLowerCase() === norm ||
+              s.filename.toLowerCase() === norm ||
+              s.expectedFilename.toLowerCase().replace(/\.[^/.]+$/, "") === base,
+          ) ?? null;
+      }
+
+      // Priority 3: manifest role matching (when manifest is available, map by semantic role before generic numeric aliases)
+      if (!matchedSlot && options.manifest) {
+        const mItem = options.manifest.find(
+          (m) => m.filename.toLowerCase() === norm || m.filename.toLowerCase().replace(/\.[^/.]+$/, "") === base,
+        );
+        if (mItem) {
+          if (mItem.slotId) {
+            matchedSlot = resolvedSlots.find((s) => s.slotId.toLowerCase() === mItem.slotId!.toLowerCase()) ?? null;
+          }
+          if (!matchedSlot && (mItem.roleSlug || mItem.role)) {
+            const r = (mItem.roleSlug ?? mItem.role!).toLowerCase();
+            matchedSlot =
+              resolvedSlots.find(
+                (s) =>
+                  s.roleSlug.toLowerCase() === r ||
+                  s.role?.toLowerCase() === r ||
+                  s.sourceSceneRole?.toLowerCase() === r,
+              ) ?? null;
+          }
+        }
+      }
+
+      // Priority 4: validated legacy numeric filename / aliases
+      if (!matchedSlot) {
+        matchedSlot =
+          resolvedSlots.find((s) =>
+            s.legacyAliases.some(
+              (alias) =>
+                alias.toLowerCase() === norm ||
+                alias.toLowerCase().replace(/\.[^/.]+$/, "") === base,
+            ),
+          ) ?? null;
+      }
+
+      // Fallback structural parsing
+      if (!matchedSlot) {
+        const parsed = parseFilename(filename);
+        if (parsed.kind === "slot" && parsed.slotId) {
+          matchedSlot =
+            resolvedSlots.find(
+              (s) => s.slotId.toLowerCase() === parsed.slotId!.toLowerCase(),
+            ) ?? null;
+        } else if (parsed.kind === "front-cover") {
+          matchedSlot = resolvedSlots.find((s) => s.kind === "cover" || s.pageKind === "cover") ?? null;
+        } else if (parsed.kind === "back-cover") {
+          matchedSlot =
+            resolvedSlots.find((s) => s.kind === "backcover" || s.pageKind === "backcover") ?? null;
+        } else if (parsed.kind === "spread" && parsed.spreadPages) {
+          matchedSlot =
+            resolvedSlots.find(
+              (s) =>
+                s.assetKind === "spread" &&
+                s.physicalPages[0] === parsed.spreadPages![0] &&
+                s.physicalPages[1] === parsed.spreadPages![1],
+            ) ?? null;
+        } else if (parsed.kind === "page" && parsed.pageNumber !== undefined) {
+          matchedSlot =
+            resolvedSlots.find(
+              (s) => s.assetKind === "single-page" && s.physicalPages.includes(parsed.pageNumber!),
+            ) ?? null;
+        } else if (parsed.isLegacy && parsed.index !== undefined) {
+          // Guarded legacy numeric index: only map if within bounds and not intercepted by recovery proposal
+          if (!legacyRecoveryProposal && parsed.index >= 0 && parsed.index < resolvedSlots.length) {
+            matchedSlot = resolvedSlots[parsed.index];
+            migrationWarnings.push(
+              `Legacy filename "${filename}" was mapped to slot "${matchedSlot.slotId}".`,
+            );
+          }
+        }
+      }
+
+      if (!matchedSlot) {
+        unmatched.push(filename);
+        continue;
+      }
+
+      const targetIndex = resolvedSlots.findIndex((s) => s.slotId === matchedSlot!.slotId);
+      const existing = bySlotId.get(matchedSlot.slotId);
+      if (existing) {
+        duplicates.push({
+          filename,
+          slotId: matchedSlot.slotId,
+          index: targetIndex,
+          claimedBy: existing,
+        });
+        continue;
+      }
+
+      byIndex.set(targetIndex, filename);
+      bySlotId.set(matchedSlot.slotId, filename);
+    }
+
+    const missingSlots: string[] = [];
+    const missingSlotDetails: ImportMissingSlot[] = [];
+    const missing: string[] = [];
+
+    for (let i = 0; i < resolvedSlots.length; i++) {
+      const s = resolvedSlots[i];
+      if (!bySlotId.has(s.slotId)) {
+        missing.push(s.expectedFilename ?? s.filename);
+        missingSlots.push(s.slotId);
+        missingSlotDetails.push({
+          slotId: s.slotId,
+          physicalPages: s.physicalPages,
+          role: s.role,
+          expectedFilename: s.expectedFilename ?? s.filename,
+        });
+      }
+    }
+
+    return {
+      required: totalSlots,
+      matched: bySlotId.size,
+      assignedCount: bySlotId.size,
+      matchedSlots: bySlotId,
+      missing,
+      missingSlots,
+      missingSlotDetails,
+      duplicates,
+      unmatched,
+      unexpected: unmatched,
+      byIndex,
+      bySlotId,
+      migrationWarnings,
+      legacyRecoveryProposal,
+      legacyRecoveryApplied: false,
+    };
+  }
+
+  // Fallback if resolvedSlots was not provided (legacy filename list path)
+  const reqLowerMap = new Map<string, number>();
+  requiredFilenames.forEach((req, idx) => {
+    reqLowerMap.set(req.toLowerCase(), idx);
+    reqLowerMap.set(req.replace(/\.[^/.]+$/, "").toLowerCase(), idx);
+  });
 
   for (const filename of providedFilenames) {
-    const index = indexFromFilename(filename);
+    const norm = filename.toLowerCase();
+    const base = norm.replace(/\.[^/.]+$/, "");
 
-    if (seen.has(filename)) {
-      duplicates.push({ filename, index: index ?? -1, claimedBy: filename });
+    if (seenFilenames.has(filename)) {
+      const idx = indexFromFilename(filename) ?? -1;
+      duplicates.push({ filename, index: idx, claimedBy: filename });
       continue;
     }
-    seen.add(filename);
+    seenFilenames.add(filename);
 
-    if (index === null || index < 0 || index >= requiredFilenames.length) {
+    let targetIndex: number | null = null;
+    if (reqLowerMap.has(norm)) {
+      targetIndex = reqLowerMap.get(norm)!;
+    } else if (reqLowerMap.has(base)) {
+      targetIndex = reqLowerMap.get(base)!;
+    } else {
+      const parsed = parseFilename(filename);
+      if (parsed.kind === "front-cover") {
+        targetIndex = 0;
+      } else if (parsed.kind === "back-cover") {
+        targetIndex = requiredFilenames.length - 1;
+      } else if (parsed.kind === "spread" && parsed.spreadPages) {
+        const p1Str = String(parsed.spreadPages[0]).padStart(2, "0");
+        const p2Str = String(parsed.spreadPages[1]).padStart(2, "0");
+        const spreadKey = `spread-${p1Str}-${p2Str}`;
+        const found = requiredFilenames.findIndex((r) => r.toLowerCase().includes(spreadKey));
+        if (found !== -1) targetIndex = found;
+      } else if (parsed.kind === "page" && parsed.pageNumber !== undefined) {
+        const pStr = String(parsed.pageNumber).padStart(2, "0");
+        const pageKey = `page-${pStr}`;
+        const found = requiredFilenames.findIndex((r) => r.toLowerCase().includes(pageKey));
+        if (found !== -1) {
+          targetIndex = found;
+        } else if (parsed.pageNumber >= 1 && parsed.pageNumber <= requiredFilenames.length) {
+          targetIndex = parsed.pageNumber - 1;
+        }
+      } else if (parsed.isLegacy && parsed.index !== undefined) {
+        if (!legacyRecoveryProposal && parsed.index >= 0 && parsed.index < requiredFilenames.length) {
+          targetIndex = parsed.index;
+        }
+      }
+    }
+
+    if (targetIndex === null || targetIndex < 0 || targetIndex >= requiredFilenames.length) {
       unmatched.push(filename);
       continue;
     }
-    const existing = byIndex.get(index);
+
+    const existing = byIndex.get(targetIndex);
     if (existing) {
-      duplicates.push({ filename, index, claimedBy: existing });
+      duplicates.push({ filename, index: targetIndex, claimedBy: existing });
       continue;
     }
-    byIndex.set(index, filename);
+
+    byIndex.set(targetIndex, filename);
+    bySlotId.set(`slot-${targetIndex}`, filename);
   }
 
   const missing = requiredFilenames.filter((_, i) => !byIndex.has(i));
+  const missingSlots: string[] = missing.map((_, i) => `slot-${i}`);
+  const missingSlotDetails: ImportMissingSlot[] = missing.map((f, i) => ({
+    slotId: `slot-${i}`,
+    physicalPages: [i + 1],
+    expectedFilename: f,
+  }));
 
   return {
     required: requiredFilenames.length,
     matched: byIndex.size,
+    assignedCount: byIndex.size,
+    matchedSlots: bySlotId,
     missing,
+    missingSlots,
+    missingSlotDetails,
     duplicates,
     unmatched,
+    unexpected: unmatched,
     byIndex,
+    bySlotId,
+    migrationWarnings,
+    legacyRecoveryProposal,
+    legacyRecoveryApplied: false,
   };
 }

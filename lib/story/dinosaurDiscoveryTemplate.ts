@@ -29,6 +29,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -66,18 +67,31 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     outfitOverride?: string;
     companionOverride?: CompanionSpec | null;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
       outfitOverride: opts.outfitOverride,
@@ -100,28 +114,31 @@ interface Beat {
 const STORY: Beat[] = [
   {
     scene:
-      "Kneeling in a sunny backyard garden, brushing soil away from a smooth, " +
-      "fossil-shaped stone that glows faintly, eyes wide with wonder; a garden " +
-      "trowel resting nearby.",
+      "Kneeling in a sunny backyard garden, brushing soil away from a smooth " +
+      "stone embossed with a distinct three-toed dinosaur footprint fossil " +
+      "that glows faintly with warm golden light, eyes wide with wonder; a " +
+      "garden trowel resting nearby on the soil.",
     copy: (c) =>
       `Half-buried by the old garden wall, ${c.name} found a smooth stone ` +
-      `shaped like a footprint. It felt warm — and for just a moment, it ` +
-      `seemed to glow.`,
+      `embossed with an ancient three-toed footprint. It felt warm — and ` +
+      `for just a moment, it seemed to glow with a gentle golden light.`,
     light:
       "Warm mid-morning sunlight from the upper right, clear and gentle; eye-level camera at kneeling height in the garden.",
+    companionOverride: null,
   },
   {
     scene:
-      "Following the glowing stone's soft light toward a gap behind a mossy " +
-      "old rockery, where a hidden path now stands open, misty green light " +
-      "spilling out; one hand holding the stone up, the other pushing aside a " +
-      "curtain of ivy.",
+      "Following the glowing three-toed fossil stone's soft light toward a " +
+      "gap behind a mossy old rockery, where a hidden path now stands open, " +
+      "misty green light spilling out; one hand holding the stone up, the " +
+      "other pushing aside a curtain of ivy.",
     copy: (c, p) =>
       `The glow led ${p.obj} straight to the garden wall — where a path ` +
       `${p.subj} had never noticed before now stood open, curling away into ` +
       `misty green light.`,
     light:
       "Soft, cool, misty green-tinted light glowing from the hidden path ahead; eye-level camera at the garden wall.",
+    companionOverride: null,
   },
   {
     scene:
@@ -141,6 +158,7 @@ const STORY: Beat[] = [
       "wide establishing shot — keep the whole child comfortably inside the " +
       "safe region with nothing crossing the center gutter; the valley scale " +
       "should feel vast without shrinking the child to a speck.",
+    companionOverride: null,
   },
   {
     scene:
@@ -197,15 +215,17 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Following a trail of ancient fossil footprints pressed into a long flat " +
-      "stone path, Sprout hopping happily from print to print, arriving " +
-      "together at a tall rock wall etched with a carved marking that matches " +
-      "the shape of the glowing stone from home, tracing it with one finger; " +
-      "Sprout looking up at the same marking with recognition.",
+      "Standing together before a tall mossy rock wall at the end of an " +
+      "ancient stone path, gently tracing an etched three-toed footprint " +
+      "marking on the rock surface with one finger while holding the " +
+      "matching glowing fossil stone in the other hand; Sprout stands " +
+      "quietly beside the child, looking up at the wall carving with " +
+      "recognized delight. The stone trail winds away into the background.",
     copy: (c) =>
-      `Now brave again, Sprout hopped from footprint to footprint along an ` +
-      `old stone trail — straight to a wall carved with the very same shape ` +
-      `as ${c.name}'s glowing fossil. This was the way home.`,
+      `Now brave again, Sprout hopped along an old stone trail — straight ` +
+      `to a wall carved with the very same three-toed footprint as ` +
+      `${c.name}'s glowing fossil stone. This was the secret gateway to ` +
+      `Sprout's family nesting ground.`,
     light:
       "Warm, dusty late-afternoon light slanting across the stone trail and wall; eye-level camera on the path.",
   },
@@ -228,14 +248,16 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Standing on a high ridge at sunset overlooking the whole valley, " +
-      "silhouettes of peaceful long-neck dinosaurs grazing far below against " +
-      "a glowing golden-orange sky, Sprout beside them nuzzling their hand in " +
-      "thanks before returning to its family.",
+      "Standing on a high ridge at sunset overlooking the whole golden " +
+      "valley, waving a fond farewell as Sprout nuzzles the child's hand " +
+      "in thanks before rejoining its dinosaur family below; the child holds " +
+      "the glowing three-toed fossil stone, ready to follow the path back " +
+      "toward the garden gate.",
     copy: (c, p) =>
-      `From the ridge, ${c.name} looked out over the whole golden valley one ` +
-      `last time. The real treasure, ${p.subj} realized, wasn't gold at all ` +
-      `— it was the friend standing right beside them.`,
+      `From the ridge at sunset, ${c.name} waved a fond farewell to Sprout ` +
+      `and the gentle herd. Following the fossil stone's warm glow back ` +
+      `through the secret path to the garden gate, ${p.subj} knew the real ` +
+      `treasure was the friendship they had shared.`,
     spread: true,
     ink: "dark",
     light:
@@ -257,7 +279,7 @@ const dinosaurDiscoveryPages: PageSpec[] = [
     illustrationPrompt: illustration(
       "A wide cover hero scene at golden hour: standing on the RIGHT side of the " +
         "frame at the misty entrance to a prehistoric valley, turned toward the " +
-        "viewer with a big joyful smile, holding up a glowing fossil stone, " +
+        "viewer with a big joyful smile, holding up a glowing three-toed fossil stone, " +
         "with Sprout at their side and giant ferns and distant waterfalls " +
         "softly visible beyond. Frame the child from about the waist up so the " +
         "FACE IS LARGE, clear, and front-facing (or a gentle three-quarter " +
@@ -265,12 +287,13 @@ const dinosaurDiscoveryPages: PageSpec[] = [
         "unmistakably look like the real child in the reference photos, with " +
         "their hair exactly as in those photos.",
       {
+        kind: "cover",
         light:
           "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera at the valley entrance.",
         compositionNotes:
-          "keep the entire LEFT side and the lower-left calm and open — soft " +
+          "keep the lower portion calm and open — soft " +
           "misty valley scenery with no part of the child there — so a large " +
-          "title can sit in the lower-left without covering the child.",
+          "title can sit in the lower area without covering the child.",
       },
     ),
     text: (c) => `${c.name}'s Dinosaur Discovery`,
@@ -281,11 +304,14 @@ const dinosaurDiscoveryPages: PageSpec[] = [
     spread: true,
     layout: "text-left-subject-right",
     illustrationPrompt: illustration(
-      "In a sunny backyard, kneeling beside a garden wall with a small trowel " +
-        "and a glowing fossil-shaped stone held up to the light, a look of " +
-        "pure curiosity; a garden gate and flower beds in the background.",
+      "In a sunny backyard, kneeling on the green lawn beside an old stone garden " +
+        "wall with a small trowel in hand, curiously inspecting leafy green plants " +
+        "and peering under flowerbeds with lively wonder; a garden gate and flower " +
+        "beds in the soft background.",
       {
+        kind: "intro",
         spread: true,
+        companionOverride: null,
         light:
           "Warm midday sunlight from the upper right, clear and bright; eye-level camera at kneeling height in the garden.",
       },
@@ -295,7 +321,8 @@ const dinosaurDiscoveryPages: PageSpec[] = [
       return (
         `${c.name} always looked closer than everyone else — under rocks, ` +
         `behind bushes, into every curious corner. ${cap(p.subj)} never ` +
-        `expected to find a real, glowing piece of the past.`
+        `expected that a quiet afternoon in the garden would lead to a ` +
+        `real, glowing adventure from the past.`
       );
     },
   },
@@ -307,6 +334,7 @@ const dinosaurDiscoveryPages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
@@ -323,13 +351,16 @@ const dinosaurDiscoveryPages: PageSpec[] = [
     layout: "text-left-subject-right",
     ink: "dark",
     illustrationPrompt: illustration(
-      "Tucked cozily in bed at night in a warm bedroom, gently turning the " +
-        "small fossil stone over in one hand as it glows softly on the " +
-        "nightstand, a peaceful happy smile; soft moonlight through the window.",
+      "Tucked cozily in bed at night in a warm bedroom with hands resting " +
+        "peacefully on top of the folded quilt, smiling softly toward the " +
+        "wooden bedside table where the smooth three-toed fossil stone rests and " +
+        "glows with a gentle golden warmth; soft blue moonlight filters through " +
+        "the bedroom window.",
       {
+        kind: "closing",
         spread: true,
         light:
-          "Soft cool blue moonlight from the window plus the fossil stone's warm glow; eye-level camera beside the bed.",
+          "Soft cool blue moonlight from the window plus the fossil stone's warm glow on the nightstand; eye-level camera beside the bed.",
         outfitOverride: SPECIAL_OUTFITS.pajamas,
         companionOverride: null,
       },
@@ -338,7 +369,7 @@ const dinosaurDiscoveryPages: PageSpec[] = [
       const p = pronouns(c.gender);
       return (
         `${c.name} was home, safe and warm.\n\n` +
-        `On the nightstand, the little fossil stone glowed on, a quiet ` +
+        `On the nightstand, the little three-toed fossil stone glowed on, a quiet ` +
         `reminder of a hidden valley and a small green friend far away. ` +
         `With a smile, ${c.name} closed ${p.poss} eyes, already dreaming of ` +
         `the next great discovery.`
@@ -351,9 +382,9 @@ const dinosaurDiscoveryPages: PageSpec[] = [
     layout: "single-page",
     illustrationPrompt: illustration(
       "Waving cheerfully with a big joyful smile, holding up the small glowing " +
-        "fossil stone, against a soft simple pastel sky with the faint " +
+        "three-toed fossil stone, against a soft simple pastel sky with the faint " +
         "silhouette of gentle long-neck dinosaurs in the far distance.",
-      { companionOverride: null },
+      { kind: "backcover", companionOverride: null },
     ),
     text: (c) =>
       `The End…\n...but somewhere, a hidden valley remembers a friend named ${c.name}.`,

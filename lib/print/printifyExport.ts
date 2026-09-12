@@ -29,11 +29,12 @@ import {
   renderPrintifyPageHtml,
   renderPrintifyProofHtml,
 } from "./printifyPageTemplate";
-import { runPreflight, type PreflightResult } from "./preflight";
+import { runPreflight, type PreflightResult, type PreflightFile } from "./preflight";
 import { getPrintProfile } from "./registry";
 import type { PrintProfile, PxSize } from "./types";
 
 import { getEditionForProfile, resolvePhysicalPageText } from "../story/editions";
+import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection } from "../story/layoutPlan";
 
 export interface PrintifyExportOptions {
   child: ChildProfile;
@@ -43,6 +44,9 @@ export interface PrintifyExportOptions {
   images: Map<number, ProvidedImage>;
   /** Optional raw file list (for duplicate filename detection before Map assignment). */
   rawFiles?: { filename: string; buffer: Buffer }[];
+  allowLowResolutionForTesting?: boolean;
+  mode?: LayoutMode;
+  customSpreads?: CustomSpreadSelection[];
 }
 
 export interface PrintifyExportResult {
@@ -58,7 +62,7 @@ function dataUri(image: ProvidedImage): string {
 
 import { computeTransformGeometry, sanitizeTransform } from "./artworkTransform";
 
-async function splitSpread(
+export async function splitSpread(
   image: ProvidedImage,
   canvasPx: PxSize,
 ): Promise<[Buffer, Buffer]> {
@@ -205,7 +209,7 @@ async function screenshotPage(
   }
 }
 
-const SCREENSHOT_CONCURRENCY = 4;
+const SCREENSHOT_CONCURRENCY = 2;
 
 async function screenshotAll(
   browser: Browser,
@@ -328,31 +332,42 @@ export async function exportPrintifyBook(
     );
   }
 
+  const plan = resolveLayoutPlan({
+    child: opts.child,
+    bookId: opts.bookId ?? "dream-big",
+    profileId: profile.id,
+    mode: opts.mode,
+    customSpreads: opts.customSpreads,
+  });
+
   const filesForPreflight =
     opts.rawFiles && opts.rawFiles.length > 0
       ? opts.rawFiles
-      : [...opts.images.entries()].map(([index, img]) => ({
-          filename: imageFilename(index),
-          buffer: img.buffer,
-        }));
+      : plan.assets
+          .map((slot, index) => {
+            const img = opts.images.get(slot.sourceSceneIndex) ?? opts.images.get(index);
+            if (!img) return null;
+            return {
+              filename: slot.legacyAliases[0] ?? slot.filename,
+              buffer: img.buffer,
+            };
+          })
+          .filter((f): f is PreflightFile => f !== null);
 
   const preflight = await runPreflight({
     child: opts.child,
     bookId: opts.bookId,
     profileId: opts.profileId,
     files: filesForPreflight,
+    allowLowResolutionForTesting: opts.allowLowResolutionForTesting,
+    mode: opts.mode,
+    customSpreads: opts.customSpreads,
   });
   if (!preflight.ok) {
     return { ok: false, dir: null, files: [], preflight };
   }
 
-  const pages = buildPages(opts.child, opts.bookId);
   const book = getBook(opts.bookId);
-  const coverPage = pages.find((p) => p.kind === "cover");
-  const backCoverPage = pages.find((p) => p.kind === "backcover");
-  const interiorPages = pages.filter(
-    (p) => p.kind !== "cover" && p.kind !== "backcover",
-  );
 
   const dir = uniquePath(
     path.join(outputBaseDir(), slug(opts.child.name), profile.id),
@@ -367,9 +382,9 @@ export async function exportPrintifyBook(
 
   try {
     // Cover — composed from the front (cover) + back (backcover) page images.
-    const frontImg = coverPage ? opts.images.get(coverPage.index) : undefined;
+    const frontImg = opts.images.get(plan.coverAsset.sourceSceneIndex);
     if (frontImg) {
-      const backImg = backCoverPage ? opts.images.get(backCoverPage.index) : undefined;
+      const backImg = opts.images.get(plan.backCoverAsset.sourceSceneIndex);
       const coverPng = await composeCover(
         profile,
         {
@@ -382,91 +397,56 @@ export async function exportPrintifyBook(
       written.push("cover.png");
     }
 
-    const edition = getEditionForProfile(opts.bookId ?? "great-adventure", profile);
     const jobs: { name: string; html: string }[] = [];
+    const spreadSplits = new Map<string, [Buffer, Buffer]>();
 
-    if (edition) {
-      const spreadSplits = new Map<number, [Buffer, Buffer]>();
-      for (const p of edition.physicalPages) {
-        if ((p.side === "left" || p.side === "right") && !spreadSplits.has(p.illustrationIndex)) {
-          const provided = opts.images.get(p.illustrationIndex);
-          if (provided) {
-            const [left, right] = await splitSpread(provided, profile.canvasPx);
-            spreadSplits.set(p.illustrationIndex, [left, right]);
-          }
-        }
-      }
-
-      for (const p of edition.physicalPages) {
-        const provided = opts.images.get(p.illustrationIndex);
-        let pageDataUri: string | null = null;
-        let sourcePx: PxSize | undefined = undefined;
-
+    for (const slot of plan.interiorAssets) {
+      if (slot.assetKind === "spread") {
+        const provided = opts.images.get(slot.sourceSceneIndex);
         if (provided) {
-          if (p.side === "left") {
-            const split = spreadSplits.get(p.illustrationIndex);
-            if (split) pageDataUri = dataUri({ buffer: split[0], mimeType: "image/png" });
-          } else if (p.side === "right") {
-            const split = spreadSplits.get(p.illustrationIndex);
-            if (split) pageDataUri = dataUri({ buffer: split[1], mimeType: "image/png" });
-          } else {
-            pageDataUri = dataUri(provided);
-            try {
-              const meta = await sharp(provided.buffer).metadata();
-              if (meta.width && meta.height) {
-                sourcePx = { width: meta.width, height: meta.height };
-              }
-            } catch {
-              // ignore
+          const [left, right] = await splitSpread(provided, profile.canvasPx);
+          spreadSplits.set(slot.slotId, [left, right]);
+        }
+      }
+    }
+
+    for (let pNum = 1; pNum <= plan.interiorPageCount; pNum++) {
+      const mapping = plan.pageToAsset.get(pNum);
+      if (!mapping) continue;
+      const { asset: slot, leaf } = mapping;
+      const provided = opts.images.get(slot.sourceSceneIndex);
+      let pageDataUri: string | null = null;
+      let sourcePx: PxSize | undefined = undefined;
+
+      if (provided) {
+        if (slot.assetKind === "spread") {
+          const split = spreadSplits.get(slot.slotId);
+          if (split) {
+            const buf = leaf.leafSide === "left" ? split[0] : split[1];
+            pageDataUri = dataUri({ buffer: buf, mimeType: "image/png" });
+          }
+        } else {
+          pageDataUri = dataUri(provided);
+          try {
+            const meta = await sharp(provided.buffer).metadata();
+            if (meta.width && meta.height) {
+              sourcePx = { width: meta.width, height: meta.height };
             }
+          } catch {
+            // ignore
           }
         }
-
-        jobs.push({
-          name: `page-${String(p.physicalPageNumber).padStart(2, "0")}.png`,
-          html: renderPrintifyPageHtml(profile, {
-            imageDataUri: pageDataUri,
-            text: resolvePhysicalPageText(p, opts.child),
-            ink: p.ink,
-            transform: p.side === "full" ? provided?.transform : undefined,
-            sourcePx: p.side === "full" ? sourcePx : undefined,
-          }),
-        });
       }
-    } else {
-      let pageNumber = 1;
-      for (const p of interiorPages) {
-        const provided = opts.images.get(p.index);
 
-        if (p.spread && provided) {
-          const [left, right] = await splitSpread(provided, profile.canvasPx);
-          jobs.push({
-            name: `page-${String(pageNumber++).padStart(2, "0")}.png`,
-            html: renderPrintifyPageHtml(profile, {
-              imageDataUri: dataUri({ buffer: left, mimeType: "image/png" }),
-              text: p.text,
-              ink: p.ink,
-            }),
-          });
-          jobs.push({
-            name: `page-${String(pageNumber++).padStart(2, "0")}.png`,
-            html: renderPrintifyPageHtml(profile, {
-              imageDataUri: dataUri({ buffer: right, mimeType: "image/png" }),
-              text: null,
-              ink: p.ink,
-            }),
-          });
-        } else {
-          jobs.push({
-            name: `page-${String(pageNumber++).padStart(2, "0")}.png`,
-            html: renderPrintifyPageHtml(profile, {
-              imageDataUri: provided ? dataUri(provided) : null,
-              text: p.text,
-              ink: p.ink,
-            }),
-          });
-        }
-      }
+      jobs.push({
+        name: `page-${String(pNum).padStart(2, "0")}.png`,
+        html: renderPrintifyPageHtml(profile, {
+          imageDataUri: pageDataUri,
+          text: leaf.text,
+          transform: slot.assetKind === "single-page" ? provided?.transform : undefined,
+          sourcePx: slot.assetKind === "single-page" ? sourcePx : undefined,
+        }),
+      });
     }
 
     const screenshots = await screenshotAll(browser, profile.canvasPx, jobs);

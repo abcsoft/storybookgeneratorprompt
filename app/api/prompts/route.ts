@@ -38,17 +38,25 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const child: ChildProfile = parsed.data;
-  const bookId =
-    typeof (body as { bookId?: unknown }).bookId === "string"
-      ? (body as { bookId: string }).bookId
-      : undefined;
-  const profileId =
-    typeof (body as { profileId?: unknown }).profileId === "string"
-      ? (body as { profileId: string }).profileId
-      : undefined;
+  const rawBody = body as {
+    bookId?: unknown;
+    profileId?: unknown;
+    mode?: unknown;
+    customSpreads?: unknown;
+  };
 
-  const pages = buildManifest(child, bookId, profileId);
-  const markdown = renderPromptsMarkdown(child, bookId, profileId);
+  const bookId = typeof rawBody.bookId === "string" ? rawBody.bookId : undefined;
+  const profileId = typeof rawBody.profileId === "string" ? rawBody.profileId : undefined;
+  const mode =
+    rawBody.mode === "custom-spreads" || rawBody.mode === "standard-single"
+      ? rawBody.mode
+      : undefined;
+  const customSpreads = Array.isArray(rawBody.customSpreads)
+    ? (rawBody.customSpreads as any)
+    : undefined;
+
+  const pages = buildManifest(child, bookId, profileId, mode, customSpreads);
+  const markdown = renderPromptsMarkdown(child, bookId, profileId, mode, customSpreads);
   const anchorPrompt = characterAnchorPrompt(child);
 
   return NextResponse.json({ pages, markdown, anchorPrompt });

@@ -37,13 +37,42 @@ describe("optimizePageImage", () => {
     const meta = await sharp(data).metadata();
 
     expect(mimeType).toBe("image/jpeg");
-    expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(2625);
+    expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(3375);
+    expect(meta.width).toBe(3375);
+    expect(meta.height).toBe(2475);
     expect(data.length).toBeLessThan(big.length);
   });
 });
 
 describe("buildBook (integration, launches Puppeteer)", () => {
-  it("emits a valid PDF from generated pages", async () => {
+  it("fails closed in production if any required artwork is missing", async () => {
+    const img = await solidPng({ r: 240, g: 180, b: 120 });
+    const pagesWithMissing: GeneratedPage[] = [
+      {
+        index: 0,
+        kind: "cover",
+        text: "Alex's Dream Big Adventure",
+        image: img,
+        imageMimeType: "image/png",
+        failed: false,
+      },
+      {
+        index: 1,
+        kind: "scene",
+        role: "PILOT",
+        text: "Up and away, Alex!",
+        image: null,
+        imageMimeType: "image/png",
+        failed: true,
+      },
+    ];
+
+    await expect(buildBook(pagesWithMissing, child)).rejects.toThrow(
+      /Production PDF assembly failed/,
+    );
+  });
+
+  it("emits a valid PDF in draft mode even when artwork is missing", async () => {
     const img = await solidPng({ r: 240, g: 180, b: 120 });
     const pages: GeneratedPage[] = [
       {
@@ -73,9 +102,44 @@ describe("buildBook (integration, launches Puppeteer)", () => {
       },
     ];
 
-    const pdf = await buildBook(pages, child);
+    const pdf = await buildBook(pages, child, undefined, { draft: true });
 
     // Valid PDF header and non-trivial size.
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    expect(pdf.length).toBeGreaterThan(1000);
+  });
+
+  it("emits a valid production PDF when all artwork is present", async () => {
+    const img = await solidPng({ r: 240, g: 180, b: 120 });
+    const pages: GeneratedPage[] = [
+      {
+        index: 0,
+        kind: "cover",
+        text: "Alex's Dream Big Adventure",
+        image: img,
+        imageMimeType: "image/png",
+        failed: false,
+      },
+      {
+        index: 1,
+        kind: "scene",
+        role: "PILOT",
+        text: "Up and away, Alex!",
+        image: img,
+        imageMimeType: "image/png",
+        failed: false,
+      },
+      {
+        index: 2,
+        kind: "backcover",
+        text: "Dream big.",
+        image: img,
+        imageMimeType: "image/png",
+        failed: false,
+      },
+    ];
+
+    const pdf = await buildBook(pages, child);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
   });

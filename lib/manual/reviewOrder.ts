@@ -12,16 +12,21 @@ export interface ReviewManifestEntry {
   index: number;
   kind: string;
   role?: string;
+  roleSlug?: string;
+  slotId?: string;
   filename: string;
   spread?: boolean;
   aspect: string;
+  physicalPages?: number[];
 }
 
-interface ReviewEntryBase {
+export interface ReviewEntryBase {
   manifestIndex: number;
   filename: string;
   pageKind: string;
   role?: string;
+  roleSlug?: string;
+  slotId?: string;
   aspect: string;
 }
 
@@ -29,9 +34,60 @@ export type ReviewEntry =
   | (ReviewEntryBase & { layout: "single"; page: number })
   | (ReviewEntryBase & { layout: "spread"; startPage: number; endPage: number });
 
+/**
+ * Generates unambiguous user-facing physical page labels.
+ * E.g. "Physical page 1 — Cover", "Physical page 2 — Intro", "Physical page 3 — Pilot".
+ * Never shows "Page 0".
+ */
+export function formatPhysicalPageLabel(entry: {
+  layout?: "single" | "spread" | "single-page" | string;
+  page?: number;
+  startPage?: number;
+  endPage?: number;
+  role?: string;
+  roleSlug?: string;
+  pageKind?: string;
+  physicalPages?: number[];
+}): string {
+  const normKind = (entry.pageKind ?? "").toLowerCase().trim();
+  const normRole = (entry.role ?? "").toLowerCase().trim();
+  const normSlug = (entry.roleSlug ?? "").toLowerCase().trim();
+
+  let roleName = "Scene";
+  if (normKind === "cover" || normSlug === "cover" || normRole === "cover") {
+    roleName = "Cover";
+  } else if (normKind === "backcover" || normSlug === "backcover" || normRole === "backcover" || normRole === "happy dreamer") {
+    roleName = "Back cover";
+  } else if (normKind === "intro" || normSlug === "intro" || normRole === "intro" || normRole === "cozy reader") {
+    roleName = "Intro";
+  } else if (normKind === "closing" || normSlug === "closing" || normRole === "closing" || normRole === "dreamer") {
+    roleName = "Closing";
+  } else if (entry.role && entry.role.trim()) {
+    roleName = entry.role.charAt(0).toUpperCase() + entry.role.slice(1);
+  }
+
+  const isSpread =
+    entry.layout === "spread" ||
+    (entry.physicalPages && entry.physicalPages.length === 2) ||
+    (entry.startPage !== undefined && entry.endPage !== undefined);
+
+  if (isSpread) {
+    const start = entry.startPage ?? entry.physicalPages?.[0] ?? 1;
+    const end = entry.endPage ?? entry.physicalPages?.[1] ?? start + 1;
+    return `Physical pages ${start}–${end} — ${roleName}`;
+  }
+
+  const pageNum =
+    entry.page !== undefined && entry.page > 0
+      ? entry.page
+      : (entry.physicalPages && entry.physicalPages.length > 0 ? entry.physicalPages[0] : 1);
+
+  return `Physical page ${pageNum} — ${roleName}`;
+}
+
 import type { PrintEdition } from "../story/editions";
 
-/** Order + physical page numbers for every manifest entry, cover = page 1. */
+/** Order + physical page numbers for every manifest entry. */
 export function buildReviewSequence(
   manifest: ReviewManifestEntry[],
 ): ReviewEntry[] {
@@ -45,8 +101,25 @@ export function buildReviewSequence(
       filename: m.filename,
       pageKind: m.kind,
       role: m.role,
+      roleSlug: m.roleSlug,
+      slotId: m.slotId,
       aspect: m.aspect,
     };
+
+    if (m.physicalPages !== undefined) {
+      if (m.physicalPages.length === 2 || m.spread) {
+        const startPage = m.physicalPages[0] ?? printPage;
+        const endPage = m.physicalPages[1] ?? startPage + 1;
+        entries.push({ ...base, layout: "spread", startPage, endPage });
+      } else if (m.physicalPages.length === 1) {
+        entries.push({ ...base, layout: "single", page: m.physicalPages[0] });
+      } else {
+        // Multi-part cover or wrap cover: display physical page 1 for cover and final physical page for back cover
+        const p = m.kind === "cover" ? 1 : manifest.length;
+        entries.push({ ...base, layout: "single", page: p });
+      }
+      continue;
+    }
 
     if (m.spread) {
       entries.push({ ...base, layout: "spread", startPage: printPage, endPage: printPage + 1 });

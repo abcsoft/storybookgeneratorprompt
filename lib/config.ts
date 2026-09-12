@@ -29,10 +29,31 @@ export const PAGE_HEIGHT_IN = 8;
 export const DPI = 300;
 /** Bleed added on every edge for print trimming. */
 export const BLEED_INCHES = 0.125;
-/** Aspect ratio for a single full-bleed landscape page. */
-export const ASPECT_SINGLE = "3:2";
-/** Aspect ratio for a two-page spread illustration (spans both leaves). */
-export const ASPECT_SPREAD = "21:9";
+
+// ---- Explicit Aspect Ratio Separation ----
+/** Physical trim aspect ratio for a single landscape page (11:8 = 1.375). */
+export const TRIM_ASPECT_SINGLE = "11:8";
+/** Physical trim aspect ratio for a two-page landscape spread (22:8 = 11:4 = 2.75). */
+export const TRIM_ASPECT_SPREAD = "11:4";
+
+/** Full-bleed target canvas aspect ratio for a single page (3375x2475 px = 15:11 approx 1.363636). */
+export const TARGET_CANVAS_ASPECT_SINGLE = "15:11";
+/** Full-bleed target canvas aspect ratio for a continuous spread master (6675x2475 px = 89:33 approx 2.696970). */
+export const TARGET_CANVAS_ASPECT_SPREAD = "89:33";
+
+/** Mathematically closest provider-requested aspect preset for a single landscape page.
+ *  Note: 4:3 (1.3333) differs from 15:11 (1.3636) by only 2.22%, whereas 3:2 (1.5000) differs by 10.0%. */
+export const PROVIDER_PRESET_ASPECT_SINGLE = "4:3";
+/** Closest provider-requested aspect preset for a continuous panoramic spread (21:9 = 2.3333). */
+export const PROVIDER_PRESET_ASPECT_SPREAD = "21:9";
+
+export type AspectRatioPreset = "1:1" | "3:2" | "4:3" | "16:9" | "21:9" | "3:4" | "2:3" | "9:16";
+
+/** Backward-compatible alias: legacy preset for single page. */
+export const ASPECT_SINGLE: AspectRatioPreset = "3:2";
+/** Backward-compatible alias: legacy preset for spread. */
+export const ASPECT_SPREAD: AspectRatioPreset = "21:9";
+
 /** Generated image size tier ("1K" | "2K" | "4K"). 2K balances quality vs cost. */
 export const IMAGE_SIZE = process.env.IMAGE_SIZE ?? "2K";
 

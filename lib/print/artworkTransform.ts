@@ -276,3 +276,220 @@ export function calculateCornerResize(
   const nextScale = Math.max(0.1, Math.min(5.0, initialScale * scaleFactor));
   return Number(nextScale.toFixed(3));
 }
+
+export interface NormalizationTransformTelemetry {
+  rawProviderDimensions: { width: number; height: number };
+  uniformScaleFactor: number;
+  scaledDimensions: { width: number; height: number };
+  cropRectangle: { left: number; top: number; width: number; height: number };
+  pixelsRemoved: {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+    totalVertical: number;
+    totalHorizontal: number;
+  };
+  targetDimensions: { width: number; height: number };
+  strategyUsed: "exact-match" | "proportional-cover-crop" | "proportional-contain-backdrop";
+  cropLossPct: {
+    verticalPct: number;
+    horizontalPct: number;
+  };
+  transformationUsed: "none" | "crop" | "contain-backdrop";
+}
+
+export interface NormalizationResult {
+  data: Buffer;
+  width: number;
+  height: number;
+  scaleX: number;
+  scaleY: number;
+  uniformScale: number;
+  cropBounds: { left: number; top: number; width: number; height: number };
+  strategy: "exact-match" | "proportional-cover-crop" | "proportional-contain-backdrop";
+  telemetry: NormalizationTransformTelemetry;
+}
+
+/**
+ * Calculates deterministic normalization transform parameters and telemetry
+ * without mutating image buffers.
+ */
+export function calculateNormalizationTransform(
+  rawDimensions: { width: number; height: number },
+  targetDimensions: { width: number; height: number },
+  strategy: "proportional-cover-crop" | "proportional-contain-backdrop" | "exact-match" = "proportional-cover-crop",
+): NormalizationTransformTelemetry {
+  const srcW = Math.max(1, rawDimensions.width);
+  const srcH = Math.max(1, rawDimensions.height);
+
+  if (srcW === targetDimensions.width && srcH === targetDimensions.height) {
+    return {
+      rawProviderDimensions: { width: srcW, height: srcH },
+      uniformScaleFactor: 1.0,
+      scaledDimensions: { width: srcW, height: srcH },
+      cropRectangle: { left: 0, top: 0, width: targetDimensions.width, height: targetDimensions.height },
+      pixelsRemoved: { top: 0, bottom: 0, left: 0, right: 0, totalVertical: 0, totalHorizontal: 0 },
+      targetDimensions,
+      strategyUsed: "exact-match",
+      transformationUsed: "none",
+      cropLossPct: { verticalPct: 0, horizontalPct: 0 },
+    };
+  }
+
+  if (strategy === "proportional-cover-crop" || strategy === "exact-match") {
+    const scale = Math.max(targetDimensions.width / srcW, targetDimensions.height / srcH);
+    const scaledW = Math.round(srcW * scale);
+    const scaledH = Math.round(srcH * scale);
+
+    const totalExcessW = Math.max(0, scaledW - targetDimensions.width);
+    const totalExcessH = Math.max(0, scaledH - targetDimensions.height);
+
+    const cropLeft = Math.floor(totalExcessW / 2);
+    const cropRight = totalExcessW - cropLeft;
+    const cropTop = Math.floor(totalExcessH / 2);
+    const cropBottom = totalExcessH - cropTop;
+
+    return {
+      rawProviderDimensions: { width: srcW, height: srcH },
+      uniformScaleFactor: scale,
+      scaledDimensions: { width: scaledW, height: scaledH },
+      cropRectangle: { left: cropLeft, top: cropTop, width: targetDimensions.width, height: targetDimensions.height },
+      pixelsRemoved: {
+        top: cropTop,
+        bottom: cropBottom,
+        left: cropLeft,
+        right: cropRight,
+        totalVertical: totalExcessH,
+        totalHorizontal: totalExcessW,
+      },
+      targetDimensions,
+      strategyUsed: "proportional-cover-crop",
+      transformationUsed: "crop",
+      cropLossPct: {
+        verticalPct: Number(((totalExcessH / scaledH) * 100).toFixed(2)),
+        horizontalPct: Number(((totalExcessW / scaledW) * 100).toFixed(2)),
+      },
+    };
+  }
+
+  // Contain + backdrop
+  const scale = Math.min(targetDimensions.width / srcW, targetDimensions.height / srcH);
+  const scaledW = Math.round(srcW * scale);
+  const scaledH = Math.round(srcH * scale);
+
+  return {
+    rawProviderDimensions: { width: srcW, height: srcH },
+    uniformScaleFactor: scale,
+    scaledDimensions: { width: scaledW, height: scaledH },
+    cropRectangle: { left: 0, top: 0, width: scaledW, height: scaledH },
+    pixelsRemoved: { top: 0, bottom: 0, left: 0, right: 0, totalVertical: 0, totalHorizontal: 0 },
+    targetDimensions,
+    strategyUsed: "proportional-contain-backdrop",
+    transformationUsed: "contain-backdrop",
+    cropLossPct: { verticalPct: 0, horizontalPct: 0 },
+  };
+}
+
+/**
+ * Normalizes raw provider output into exact production asset dimensions
+ * using deterministic, strictly proportional scaling (asserting scaleX === scaleY).
+ * Never performs independent X/Y stretching.
+ */
+export async function normalizeProductionAsset(
+  inputBuffer: Buffer,
+  targetDimensions: { width: number; height: number },
+  strategy: "proportional-cover-crop" | "proportional-contain-backdrop" | "exact-match" = "proportional-cover-crop",
+): Promise<NormalizationResult> {
+  const sharp = eval("require")("sharp");
+  const meta = await sharp(inputBuffer).metadata();
+  const srcW = meta.width ?? targetDimensions.width;
+  const srcH = meta.height ?? targetDimensions.height;
+
+  const telemetry = calculateNormalizationTransform({ width: srcW, height: srcH }, targetDimensions, strategy);
+
+  if (telemetry.strategyUsed === "exact-match") {
+    return {
+      data: inputBuffer,
+      width: targetDimensions.width,
+      height: targetDimensions.height,
+      scaleX: 1.0,
+      scaleY: 1.0,
+      uniformScale: 1.0,
+      cropBounds: telemetry.cropRectangle,
+      strategy: "exact-match",
+      telemetry,
+    };
+  }
+
+  // Cover crop strategy: proportional scaling matching max dimension
+  if (telemetry.strategyUsed === "proportional-cover-crop") {
+    const scale = telemetry.uniformScaleFactor;
+    const scaleX = scale;
+    const scaleY = scale;
+    if (Math.abs(scaleX - scaleY) > 1e-6) {
+      throw new Error("Normalization violation: non-uniform X/Y scaling detected.");
+    }
+
+    const { scaledDimensions, cropRectangle } = telemetry;
+
+    const resized = await sharp(inputBuffer)
+      .resize(scaledDimensions.width, scaledDimensions.height, { fit: "fill" })
+      .extract({
+        left: cropRectangle.left,
+        top: cropRectangle.top,
+        width: targetDimensions.width,
+        height: targetDimensions.height,
+      })
+      .png()
+      .toBuffer();
+
+    return {
+      data: resized,
+      width: targetDimensions.width,
+      height: targetDimensions.height,
+      scaleX,
+      scaleY,
+      uniformScale: scale,
+      cropBounds: cropRectangle,
+      strategy: "proportional-cover-crop",
+      telemetry,
+    };
+  }
+
+  // Contain + backdrop strategy
+  const scale = telemetry.uniformScaleFactor;
+  const scaleX = scale;
+  const scaleY = scale;
+  const scaledW = telemetry.scaledDimensions.width;
+  const scaledH = telemetry.scaledDimensions.height;
+  const destLeft = Math.round((targetDimensions.width - scaledW) / 2);
+  const destTop = Math.round((targetDimensions.height - scaledH) / 2);
+
+  const backdrop = await sharp(inputBuffer)
+    .resize(targetDimensions.width, targetDimensions.height, { fit: "cover" })
+    .blur(24)
+    .modulate({ brightness: 0.55 })
+    .toBuffer();
+
+  const scaledSubject = await sharp(inputBuffer)
+    .resize(scaledW, scaledH, { fit: "fill" })
+    .toBuffer();
+
+  const composed = await sharp(backdrop)
+    .composite([{ input: scaledSubject, left: destLeft, top: destTop }])
+    .png()
+    .toBuffer();
+
+  return {
+    data: composed,
+    width: targetDimensions.width,
+    height: targetDimensions.height,
+    scaleX,
+    scaleY,
+    uniformScale: scale,
+    cropBounds: { left: 0, top: 0, width: scaledW, height: scaledH },
+    strategy: "proportional-contain-backdrop",
+    telemetry,
+  };
+}

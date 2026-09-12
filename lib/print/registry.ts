@@ -27,5 +27,8 @@ export function listPrintProfiles(): PrintProfile[] {
 
 /** Resolve a profile by id, falling back to the default if unknown. */
 export function getPrintProfile(id?: string): PrintProfile {
+  if (id === "printify-square-8x8") {
+    return printifyHardcoverSquare8x8Profile;
+  }
   return PRINT_PROFILES.find((p) => p.id === id) ?? PRINT_PROFILES[0];
 }

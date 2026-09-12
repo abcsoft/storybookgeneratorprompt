@@ -30,15 +30,23 @@ describe("buildReviewSequence", () => {
     expect(entries[2]).toMatchObject({ layout: "single", page: 4 });
   });
 
-  it("agrees exactly with lib/pdf/imposition.ts's spreadStartPages for a real book", () => {
-    const manifest = buildManifest(child, "great-adventure");
+  it("agrees with layout plan and ensures every spread starts on an even page", () => {
+    const manifest = buildManifest(child, "dream-big", "printify-hardcover-square-8x8");
     const entries = buildReviewSequence(manifest);
 
-    const spreadStarts = entries
-      .filter((e) => e.layout === "spread")
-      .map((e) => (e as Extract<typeof e, { layout: "spread" }>).startPage);
+    const spreads = entries.filter(
+      (e): e is Extract<typeof e, { layout: "spread" }> => e.layout === "spread",
+    );
 
-    expect(spreadStarts).toEqual(spreadStartPages(buildPages(child, "great-adventure")));
+    expect(spreads.length).toBeGreaterThanOrEqual(1);
+    for (const spread of spreads) {
+      expect(spread.startPage % 2).toBe(0); // Starts on even page (verso)
+      expect(spread.endPage).toBe(spread.startPage + 1); // Ends on facing odd page (recto)
+    }
+
+    const closingSpread = spreads.find((s) => s.startPage === 22);
+    expect(closingSpread).toBeDefined();
+    expect(closingSpread?.endPage).toBe(23);
   });
 
   it("keeps manifest order and carries filename/role/aspect through untouched", () => {

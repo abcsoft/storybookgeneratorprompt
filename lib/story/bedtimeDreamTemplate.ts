@@ -26,7 +26,9 @@ import { cap, pronouns, type Pronouns } from "./textHelpers";
 import type {
   ChildProfile,
   CompanionSpec,
+  FramingMode,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -57,20 +59,39 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     companionOverride?: CompanionSpec | null;
+    framing?: FramingMode;
+    outfitOverride?: string;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+      framing?: FramingMode;
+      outfitOverride?: string;
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      framing: overrides?.framing ?? opts.framing,
+      profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
       companionOverride: opts.companionOverride,
+      outfitOverride: overrides?.outfitOverride ?? opts.outfitOverride,
     });
 }
 
@@ -81,6 +102,7 @@ interface Beat {
   spread?: boolean;
   ink?: "light" | "dark";
   light?: string;
+  framing?: FramingMode;
   compositionNotes?: string;
   companionOverride?: CompanionSpec | null;
 }
@@ -88,24 +110,25 @@ interface Beat {
 const STORY: Beat[] = [
   {
     scene:
-      "Sitting up gently in bed as one small glowing star drifts in through " +
-      "the open window, reaching out a curious hand toward the soft light, " +
-      "a warm sleepy smile.",
+      "Sitting up gently in bed in soft pajamas as a friendly silver guiding " +
+      "star drifts in through the open window, reaching out a curious hand " +
+      "toward the gentle light, a warm sleepy smile.",
     copy: (c) =>
-      `Just as ${c.name} was drifting off to sleep, one small star drifted ` +
-      `in through the window — soft, warm, and glowing gently.`,
+      `Just as ${c.name} was drifting off to sleep, a soft silver guiding ` +
+      `star drifted in through the window — glowing gently, like an ` +
+      `invitation to a dream.`,
     light:
-      "Soft warm golden glow from the little star mixing with cool moonlight; eye-level camera beside the bed.",
+      "Soft warm glow from the silver star mixing with cool moonlight; eye-level camera beside the bed.",
     companionOverride: null,
   },
   {
     scene:
-      "Floating gently out through the open window into a soft dream sky, " +
-      "calm and weightless, arms out like gentle wings, a peaceful smile, " +
-      "the bedroom glowing warmly behind them.",
+      "Floating gently out through the open window into a soft dream sky " +
+      "following the silver guiding star, calm and weightless, arms out like " +
+      "gentle wings, a peaceful smile, the bedroom glowing warmly behind them.",
     copy: (c) =>
-      `The star led the way, and ${c.name} floated softly out into the ` +
-      `night — calm and light as a held breath, never falling, only ` +
+      `The silver star led the way, and ${c.name} floated softly out into ` +
+      `the night — calm and light as a held breath, never falling, only ` +
       `drifting.`,
     light:
       "Soft cool blue night light with warm starlight, calm and even; eye-level camera drifting beside the window.",
@@ -113,12 +136,13 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Drifting gently along a wide, soft cloud path under an enormous, calm " +
-      "starry sky, resting comfortably on a cloud as if it were a cushion, " +
-      "utterly peaceful.",
+      "Drifting gently along a wide, soft cloud path led by the silver " +
+      "guiding star under an enormous, calm starry sky, resting comfortably " +
+      "on a cloud as if it were a cushion, utterly peaceful.",
     copy: (c) =>
       `A wide, soft cloud path stretched out beneath a sky full of stars. ` +
-      `${c.name} settled onto it as gently as settling onto a cushion.`,
+      `Following the silver star, ${c.name} settled onto it as gently as ` +
+      `settling onto a cushion.`,
     spread: true,
     ink: "dark",
     light:
@@ -128,15 +152,17 @@ const STORY: Beat[] = [
       "avoid any dramatic or steep perspective; keep the whole child " +
       "comfortably inside the safe region with nothing crossing the center " +
       "gutter.",
+    companionOverride: null,
   },
   {
     scene:
-      "Kneeling gently on a soft cloud beside Twinkle, a tiny lost star " +
-      "sitting alone and a little dim, offering a warm, comforting smile.",
+      "Kneeling gently on a soft cloud beside Twinkle, a tiny lost golden " +
+      "star sitting alone and glowing dim and tired, offering a warm, " +
+      "comforting smile as the silver guide star twinkles softly above.",
     copy: (c) =>
-      `Sitting alone on the cloud path was a tiny star, dimmer than the ` +
-      `rest. "I can't find my way home," it said softly. ${c.name} sat ` +
-      `down right beside it.`,
+      `There on the cloud path sat Twinkle, a tiny golden star, dimmer ` +
+      `than the rest. "I can't find my constellation family," it whispered. ` +
+      `${c.name} sat down right beside it with a comforting smile.`,
     light:
       "Soft warm glow from Twinkle mixing with cool starlight; eye-level camera on the cloud path.",
   },
@@ -144,7 +170,7 @@ const STORY: Beat[] = [
     scene:
       "Floating peacefully past a huge, gentle, smiling crescent moon, " +
       "listening as it hums a soft, sleepy tune, Twinkle glowing a little " +
-      "brighter nearby.",
+      "brighter with hope nearby.",
     copy: (c) =>
       `A great sleepy moon smiled as they passed, humming a slow, soft tune. ` +
       `"Follow the quiet path," it yawned, "and you'll find the way."`,
@@ -155,7 +181,8 @@ const STORY: Beat[] = [
     scene:
       "Drifting past a cluster of friendly night animals resting peacefully " +
       "on the cloud path — a soft owl, a gentle fox, and a few calm " +
-      "fireflies glowing quietly — waving hello without waking them.",
+      "fireflies glowing quietly — waving hello without waking them, Twinkle " +
+      "floating gently beside the child.",
     copy: (c) =>
       `Along the path, an owl blinked slowly, a fox curled up snug, and ` +
       `fireflies glowed like tiny lanterns. ${c.name} waved softly, careful ` +
@@ -170,18 +197,20 @@ const STORY: Beat[] = [
       "both glowing a little brighter in the peaceful hush.",
     copy: (c) =>
       `They reached a quiet garden where stars grew soft as flowers. ` +
-      `Twinkle glowed a little brighter just being there.`,
+      `Twinkle glowed brighter and warmer just being there.`,
     light:
       "Soft, even glow from the star-flowers all around, calm and gentle; eye-level camera in the star garden.",
   },
   {
     scene:
-      "Sitting together with Twinkle, gently tracing a pattern of five soft " +
-      "stars in the sky that matches Twinkle's own shape, both looking up " +
-      "with quiet, growing recognition.",
+      "Sitting together with Twinkle on a soft cloud, looking up as the " +
+      "child gently traces a constellation of four glowing stars in the sky " +
+      "that leaves one empty spot matching Twinkle; Twinkle looks up with " +
+      "quiet, joyful recognition.",
     copy: (c) =>
-      `${c.name} looked up and traced five soft stars in the sky — the same ` +
-      `shape as Twinkle. "That's your family," ${c.name} whispered gently.`,
+      `${c.name} looked up and traced four waiting stars in the sky with ` +
+      `one open spot — the exact match for Twinkle. "That's your family," ` +
+      `${c.name} whispered gently.`,
     light:
       "Soft warm starlight from the matching constellation above; eye-level camera looking upward.",
     compositionNotes:
@@ -190,24 +219,27 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Watching softly as Twinkle drifts up to nestle gently among four " +
-      "other soft glowing stars, completing the constellation, a warm quiet " +
-      "smile of happiness, no loud celebration, just peace.",
+      "Watching softly from a cloud as Twinkle drifts up to settle gently " +
+      "into the empty fifth position among the four waiting stars, completing " +
+      "the five-star constellation; all five stars glow warmly together in " +
+      "the sky while the child smiles in quiet peace below.",
     copy: (c) =>
-      `Twinkle drifted up, soft and slow, and settled gently among four ` +
-      `waiting stars. The little constellation glowed warm and whole again.`,
+      `Twinkle drifted up, soft and slow, and settled gently into the open ` +
+      `spot among the four waiting stars. Now five bright stars shone ` +
+      `together, and the little constellation glowed warm and whole again.`,
     ink: "dark",
     light:
-      "Soft warm glow from the now-complete constellation; eye-level camera looking upward.",
+      "Soft warm glow from the now-complete five-star constellation; eye-level camera looking upward.",
+    companionOverride: null,
   },
   {
     scene:
-      "Flying gently home together across the peaceful night sky, arms open " +
-      "in a calm, happy glide, Twinkle's whole constellation twinkling " +
-      "softly alongside as the bedroom window glows warmly ahead.",
+      "Flying gently home across the peaceful night sky, arms open in a calm, " +
+      "happy glide, while Twinkle's complete five-star constellation twinkles " +
+      "softly in the sky above; the bedroom window glows warmly ahead.",
     copy: (c) =>
-      `Home ${c.name} drifted, calm and happy, the little constellation ` +
-      `twinkling softly alongside all the way to the window.`,
+      `Home ${c.name} drifted, calm and happy, the little five-star ` +
+      `constellation twinkling softly in the sky above all the way to the window.`,
     spread: true,
     ink: "dark",
     light:
@@ -216,6 +248,7 @@ const STORY: Beat[] = [
       "keep this wide and calm — a gentle glide, not a dramatic swoop; " +
       "nothing crossing the center gutter, the child comfortably inside " +
       "the safe region.",
+    companionOverride: null,
   },
 ];
 
@@ -225,6 +258,7 @@ const bedtimeDreamPages: PageSpec[] = [
   {
     kind: "cover",
     layout: "single-page",
+    framing: "waist-up portrait",
     illustrationPrompt: illustration(
       "A wide, calm cover scene: sitting gently on a soft cloud on the RIGHT " +
         "side of the frame under a peaceful starry sky, turned toward the " +
@@ -235,12 +269,14 @@ const bedtimeDreamPages: PageSpec[] = [
         "unmistakably look like the real child in the reference photos, " +
         "with their hair exactly as in those photos.",
       {
+        kind: "cover",
+        framing: "waist-up portrait",
         light:
           "Soft warm starlight, calm and even, lighting the child gently from the front; eye-level camera among the clouds.",
         compositionNotes:
-          "keep the entire LEFT side and the lower-left calm and open — " +
+          "keep the lower portion calm and open — " +
           "soft night sky with no part of the child there — so a large " +
-          "title can sit in the lower-left without covering the child; " +
+          "title can sit in the lower area without covering the child; " +
           "avoid any dramatic or steep perspective.",
       },
     ),
@@ -251,22 +287,28 @@ const bedtimeDreamPages: PageSpec[] = [
     kind: "intro",
     spread: true,
     layout: "text-left-subject-right",
+    framing: "bed-covered",
     illustrationPrompt: illustration(
-      "In a cozy bedroom at night, sitting up gently in bed, reaching a " +
-        "curious hand toward one small glowing star drifting in through the " +
-        "open window, warm and sleepy.",
+      "In a cozy bedroom at night, tucked under soft bedcovers in blue " +
+        "pajamas, looking peacefully through the bedroom window at the quiet " +
+        "starry sky with sleepy, gentle eyes.",
       {
+        kind: "intro",
+        framing: "bed-covered",
         spread: true,
+        companionOverride: null,
+        outfitOverride:
+          "soft blue pajamas with a small star pattern (slippers are placed beside the bed on the floor and are not worn or visible under the covers)",
         light:
-          "Soft warm glow from the little star mixing with cool moonlight through the window; eye-level camera beside the bed.",
+          "Soft cool moonlight through the window; eye-level camera beside the bed.",
       },
     ),
     text: (c) => {
       const p = pronouns(c.gender);
       return (
-        `Every night, ${c.name} watched the stars from bed until ${p.poss} ` +
-        `eyes grew heavy. Tonight, one small star came to visit — and to ` +
-        `ask for a little help.`
+        `Every night, ${c.name} watched the quiet stars from bed until ` +
+        `${p.poss} eyes grew heavy. Tonight, the starlight had a magical ` +
+        `bedtime journey in store.`
       );
     },
   },
@@ -276,10 +318,13 @@ const bedtimeDreamPages: PageSpec[] = [
       kind: "scene",
       spread: b.spread,
       ink: b.ink,
+      framing: b.framing,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
+        framing: b.framing,
         compositionNotes: b.compositionNotes,
         companionOverride: b.companionOverride,
       }),
@@ -292,12 +337,18 @@ const bedtimeDreamPages: PageSpec[] = [
     spread: true,
     layout: "text-left-subject-right",
     ink: "dark",
+    framing: "sleeping/bed-covered",
     illustrationPrompt: illustration(
-      "Tucked cozily and deeply asleep in a warm bedroom, a peaceful smile, " +
-        "the little constellation glowing softly just outside the window, " +
-        "soft moonlight over the quiet room.",
+      "Tucked cozily and deeply asleep in a warm bedroom under soft " +
+        "bedcovers, a peaceful smile, while the five-star constellation " +
+        "twinkles softly outside in the quiet night sky; soft moonlight fills " +
+        "the quiet room.",
       {
+        kind: "closing",
+        framing: "sleeping/bed-covered",
         spread: true,
+        outfitOverride:
+          "soft blue pajamas with a small star pattern (slippers are placed beside the bed on the floor and are not worn or visible under the covers)",
         light:
           "Soft cool blue moonlight from the window mixing with the constellation's gentle glow; eye-level camera beside the bed.",
         companionOverride: null,
@@ -307,9 +358,9 @@ const bedtimeDreamPages: PageSpec[] = [
       const p = pronouns(c.gender);
       return (
         `${c.name} slept soundly, safe and warm.\n\n` +
-        `Outside the window, a little constellation twinkled on, whole and ` +
-        `happy again. And somewhere in ${p.poss} dreams, a tiny star was ` +
-        `still waving thank you.`
+        `Outside the window, a little five-star constellation twinkled on, ` +
+        `whole and happy again. And somewhere in ${p.poss} dreams, a tiny ` +
+        `star was still waving thank you.`
       );
     },
   },
@@ -317,10 +368,17 @@ const bedtimeDreamPages: PageSpec[] = [
   {
     kind: "backcover",
     layout: "single-page",
+    framing: "sleeping/bed-covered",
     illustrationPrompt: illustration(
       "Sleeping peacefully with a soft, contented smile, against a simple " +
         "pastel night sky with a few gentle twinkling stars, calm and quiet.",
-      { companionOverride: null },
+      {
+        kind: "backcover",
+        framing: "sleeping/bed-covered",
+        companionOverride: null,
+        outfitOverride:
+          "soft blue pajamas with a small star pattern (no footwear in bed)",
+      },
     ),
     text: (c) =>
       `The End…\n...sleep tight, ${c.name}. The stars are watching over you.`,

@@ -13,6 +13,12 @@ import {
   DPI,
   PAGE_HEIGHT_IN,
   PAGE_WIDTH_IN,
+  PROVIDER_PRESET_ASPECT_SINGLE,
+  PROVIDER_PRESET_ASPECT_SPREAD,
+  TARGET_CANVAS_ASPECT_SINGLE,
+  TARGET_CANVAS_ASPECT_SPREAD,
+  TRIM_ASPECT_SINGLE,
+  TRIM_ASPECT_SPREAD,
 } from "../../config";
 import type { PrintProfile } from "../types";
 
@@ -26,6 +32,17 @@ export const classicLandscapeProfile: PrintProfile = {
   product: "Landscape picture book",
   binding: "none",
   nominalSizeIn: { width: PAGE_WIDTH_IN, height: PAGE_HEIGHT_IN },
+  trimIn: { width: PAGE_WIDTH_IN, height: PAGE_HEIGHT_IN },
+  bleedIn: BLEED_INCHES,
+  finalPageIn: { width: fullBleedWidthIn, height: fullBleedHeightIn },
+  finalPagePx: {
+    width: Math.round(fullBleedWidthIn * DPI),
+    height: Math.round(fullBleedHeightIn * DPI),
+  },
+  pdfPagePt: {
+    width: Math.round(fullBleedWidthIn * 72),
+    height: Math.round(fullBleedHeightIn * 72),
+  },
   dpi: DPI,
   canvasPx: {
     width: Math.round(fullBleedWidthIn * DPI),
@@ -41,6 +58,12 @@ export const classicLandscapeProfile: PrintProfile = {
     width: Math.round((PAGE_WIDTH_IN - 1) * DPI),
     height: Math.round((PAGE_HEIGHT_IN - 1) * DPI),
   },
+  trimAspect: TRIM_ASPECT_SINGLE,
+  targetCanvasAspect: TARGET_CANVAS_ASPECT_SINGLE,
+  providerPresetAspect: PROVIDER_PRESET_ASPECT_SINGLE,
+  trimSpreadAspect: TRIM_ASPECT_SPREAD,
+  targetCanvasSpreadAspect: TARGET_CANVAS_ASPECT_SPREAD,
+  providerPresetSpreadAspect: PROVIDER_PRESET_ASPECT_SPREAD,
   singleAspect: ASPECT_SINGLE,
   spreadAspect: ASPECT_SPREAD,
   exportMode: "single-pdf",

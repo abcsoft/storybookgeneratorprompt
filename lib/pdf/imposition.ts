@@ -47,18 +47,76 @@ export function spreadStartPages(pages: ReadonlyArray<ImposablePage>): number[] 
  * offending spread and its odd start page so the page sequence can be fixed at
  * the source (no blank pages are ever inserted).
  */
-export function assertSpreadsAligned(pages: ReadonlyArray<ImposablePage>): void {
+export function assertSpreadsAligned(
+  pages: ReadonlyArray<ImposablePage>,
+  opts?: { physicalInterior?: boolean },
+): void {
+  const usePhysical =
+    opts?.physicalInterior ||
+    (pages[0]?.kind === "cover" && pages.some((p) => p.role === "FINAL DREAM BIG"));
+  const targetPages = usePhysical
+    ? pages.filter((p) => p.kind !== "cover" && p.kind !== "backcover")
+    : pages;
+
   let printPage = 1;
-  pages.forEach((page, index) => {
+  targetPages.forEach((page, index) => {
     if (page.spread && printPage % 2 !== 0) {
       const label = page.role ?? page.kind;
       throw new Error(
         `Spread "${label}" (page index ${index}) starts on print page ${printPage}, ` +
           `a right-hand page, so its two halves won't face each other. Spreads must ` +
-          `begin on an even page (cover = page 1) — adjust the page sequence by one ` +
-          `single page before it.`,
+          `begin on an even page — adjust the page sequence by one single page before it.`,
       );
     }
     printPage += leavesFor(page);
   });
 }
+
+
+/**
+ * Check whether a physical page pair forms a valid interior facing spread.
+ *
+ * Page 1 is a single right-hand page (recto).
+ * Page maxPages is a single left-hand page (verso).
+ * Valid facing pairs are strictly (2,3), (4,5), (6,7) ... (maxPages-2, maxPages-1).
+ * Under no circumstances may a spread begin on page 1 or any odd-numbered page,
+ * nor may a spread span across 1-2 or across (maxPages-1)-maxPages.
+ */
+export function isValidFacingPair(startPage: number, endPage: number, maxPages: number = 24): boolean {
+  if (startPage < 2 || endPage > maxPages - 1) return false;
+  if (endPage !== startPage + 1) return false;
+  if (startPage % 2 !== 0) return false; // must start on an even page (verso)
+  return true;
+}
+
+/**
+ * Throw a descriptive error if the given physical page range does not form a valid facing pair.
+ */
+export function assertValidFacingPair(startPage: number, endPage: number, maxPages: number = 24): void {
+  if (startPage === 1 && endPage === 2) {
+    throw new Error(
+      `Invalid spread across physical pages 1–2: Page 1 is a single right-hand page (recto) facing the inside cover. Spreads cannot begin on page 1.`,
+    );
+  }
+  if (startPage === maxPages - 1 && endPage === maxPages) {
+    throw new Error(
+      `Invalid spread across physical pages ${startPage}–${endPage}: Page ${maxPages} is a single left-hand page (verso) facing the back cover. Spreads cannot end on page ${maxPages}.`,
+    );
+  }
+  if (startPage % 2 !== 0) {
+    throw new Error(
+      `Invalid spread starting on odd physical page ${startPage}. Two-page spreads must always begin on an even physical page (left-hand verso) and end on the facing odd page (right-hand recto).`,
+    );
+  }
+  if (endPage !== startPage + 1) {
+    throw new Error(
+      `Invalid spread span ${startPage}–${endPage}. A two-page spread must span exactly two consecutive facing pages [${startPage}, ${startPage + 1}].`,
+    );
+  }
+  if (startPage < 2 || endPage > maxPages - 1) {
+    throw new Error(
+      `Invalid spread pages [${startPage}, ${endPage}] for a ${maxPages}-page interior book. Valid facing pairs are (2,3), (4,5) ... (${maxPages - 2},${maxPages - 1}).`,
+    );
+  }
+}
+

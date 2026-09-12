@@ -39,11 +39,11 @@ describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regressi
   // Test 4: Illustration number != physical page number when appropriate
   it("4. Illustration number != physical page number when appropriate", () => {
     const edition = greatAdventurePrintify24Edition;
-    // Illus 4 (04.png) lands on physical interior page 8 because preceding spreads occupy 2 leaves each
+    // Illus 7 (07.png) lands on physical interior page 8 because preceding spreads occupy 2 leaves each
     const page8 = edition.physicalPages.find((p) => p.physicalPageNumber === 8);
     expect(page8).toBeDefined();
-    expect(page8?.illustrationNumber).toBe(4);
-    expect(page8?.filename).toBe("04.png");
+    expect(page8?.illustrationNumber).toBe(7);
+    expect(page8?.filename).toBe("07.png");
     expect(page8?.physicalPageNumber).toBe(8);
   });
 
@@ -62,10 +62,10 @@ describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regressi
       bookId: "great-adventure",
       profileId: "printify-hardcover-square-8x8",
       files: [
-        { filename: "02.png", buffer: badAspectBuffer }, // Illus 02 is a wide spread requiring 2:1
+        { filename: "05.png", buffer: badAspectBuffer }, // Illus 05 is a wide spread requiring 2:1
       ],
     });
-    expect(res.errors.some((e) => e.startsWith("Illustration 2 (02.png)"))).toBe(true);
+    expect(res.errors.some((e) => e.startsWith("Illustration 5 (05.png)"))).toBe(true);
   });
 
   // Test 6: Physical page mapping is stable
@@ -74,9 +74,9 @@ describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regressi
     expect(edition.physicalPages.map((p) => p.physicalPageNumber)).toEqual(
       Array.from({ length: 24 }, (_, i) => i + 1),
     );
-    // Spreads must land on even physical page numbers: Intro (2), Waterfall (4), Desert (6), Coral (12), Flying (20)
+    // Spreads must land on even physical page numbers: Waterfall (4), Desert (6), Coral (12), Whale (14), Flying (22)
     const spreadPages = edition.physicalPages.filter((p) => p.side === "left");
-    expect(spreadPages.map((p) => p.physicalPageNumber)).toEqual([2, 4, 6, 12, 20]);
+    expect(spreadPages.map((p) => p.physicalPageNumber)).toEqual([4, 6, 12, 14, 22]);
   });
 
   // Test 7: Duplicate input assets are detected before Map overwrite

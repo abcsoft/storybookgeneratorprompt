@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { matchImportedFiles } from "./importMatch";
+import { resolveLayoutPlan } from "../story/layoutPlan";
+import type { ChildProfile } from "../story/types";
 
 const required = Array.from({ length: 21 }, (_, i) => `${String(i + 1).padStart(2, "0")}.png`);
 
@@ -61,5 +63,113 @@ describe("matchImportedFiles", () => {
     expect(report.missing).toEqual(["20.png", "21.png"]);
     expect(report.duplicates.length).toBe(1);
     expect(report.unmatched).toEqual(["notes.png"]);
+  });
+
+  describe("Safe Legacy Import Order & Guarded +2 Recovery", () => {
+    const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
+    const dreamBigSlots = resolveLayoutPlan({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    }).assets;
+
+    const files22 = Array.from({ length: 22 }, (_, i) => `${String(i + 1).padStart(2, "0")}.png`);
+    const semanticRoles = [
+      "pilot", "racer", "astronaut", "doctor", "firefighter", "scientist", "army officer",
+      "soccer player", "karate master", "detective", "magician", "chef", "rockstar", "artist",
+      "teacher", "explorer", "photographer", "diver", "veterinarian", "inventor", "closing",
+      "back cover",
+    ];
+
+    it("requires explicit confirmation for 22 legacy files; does NOT assign 01.png to cover or 02.png to intro", () => {
+      // Input files 01.png through 22.png without confirmation
+      const report = matchImportedFiles(files22, dreamBigSlots, false);
+
+      // Must offer guarded +2 recovery
+      expect(report.legacyRecoveryProposal).toBeDefined();
+      expect(report.legacyRecoveryProposal).toContain("Cover and intro appear to be missing. Map these 22 assets to slots 3–24?");
+      expect(report.legacyRecoveryTable).toBeDefined();
+      expect(report.legacyRecoveryTable?.length).toBe(22);
+
+      // DO NOT assign 01.png to 01-cover
+      expect(report.bySlotId.get("01-cover")).toBeUndefined();
+      expect(report.byIndex.get(0)).toBeUndefined();
+
+      // DO NOT assign 02.png to 02-intro
+      expect(report.bySlotId.get("02-intro")).toBeUndefined();
+      expect(report.byIndex.get(1)).toBeUndefined();
+
+      // Slots 01-cover and 02-intro remain visibly missing
+      expect(report.missingSlots).toContain("01-cover");
+      expect(report.missingSlots).toContain("02-intro");
+      expect(report.assignedCount).toBe(0);
+    });
+
+    it("after explicit confirmation, maps 01.png..22.png to slots 03–24 and keeps 01-cover & 02-intro visibly missing", () => {
+      // Explicit confirmation provided
+      const report = matchImportedFiles(files22, dreamBigSlots, true);
+
+      expect(report.legacyRecoveryApplied).toBe(true);
+      expect(report.assignedCount).toBe(22);
+
+      // 01.png mapped to slot 03-pilot
+      expect(report.bySlotId.get("03-pilot")).toBe("01.png");
+      expect(report.byIndex.get(2)).toBe("01.png");
+
+      // 02.png mapped to slot 04-race-car-driver
+      expect(report.bySlotId.get("04-race-car-driver")).toBe("02.png");
+
+      // 22.png mapped to slot 24-backcover
+      expect(report.bySlotId.get("24-backcover")).toBe("22.png");
+      expect(report.byIndex.get(23)).toBe("22.png");
+
+      // 01-cover and 02-intro remain visibly missing
+      expect(report.missingSlots).toEqual(["01-cover", "02-intro"]);
+      expect(report.bySlotId.get("01-cover")).toBeUndefined();
+      expect(report.bySlotId.get("02-intro")).toBeUndefined();
+    });
+
+    it("uses manifest when available instead of inferring roles from filenames alone", () => {
+      const manifest = files22.map((filename, i) => ({
+        filename,
+        role: semanticRoles[i],
+      }));
+
+      // With manifest provided and explicit confirmation
+      const report = matchImportedFiles(files22, dreamBigSlots, {
+        confirmLegacyOffsetRecovery: true,
+        manifest,
+      });
+
+      expect(report.assignedCount).toBe(22);
+      expect(report.bySlotId.get("03-pilot")).toBe("01.png");
+      expect(report.bySlotId.get("24-backcover")).toBe("22.png");
+      expect(report.missingSlots).toEqual(["01-cover", "02-intro"]);
+    });
+
+    it("accepts a valid 24-file legacy set where 01.png really is cover and 02.png really is intro", () => {
+      const files24 = Array.from({ length: 24 }, (_, i) => `${String(i + 1).padStart(2, "0")}.png`);
+      const report = matchImportedFiles(files24, dreamBigSlots);
+
+      expect(report.required).toBe(24);
+      expect(report.matched).toBe(24);
+      expect(report.missingSlots).toEqual([]);
+      expect(report.legacyRecoveryProposal).toBeNull();
+
+      // 01.png really is cover
+      expect(report.bySlotId.get("01-cover")).toBe("01.png");
+      expect(report.byIndex.get(0)).toBe("01.png");
+
+      // 02.png really is intro
+      expect(report.bySlotId.get("02-intro")).toBe("02.png");
+      expect(report.byIndex.get(1)).toBe("02.png");
+
+      // 03.png is pilot
+      expect(report.bySlotId.get("03-pilot")).toBe("03.png");
+
+      // 24.png is back cover
+      expect(report.bySlotId.get("24-backcover")).toBe("24.png");
+    });
   });
 });

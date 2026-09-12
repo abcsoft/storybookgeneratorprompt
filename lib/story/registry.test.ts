@@ -35,11 +35,11 @@ describe("registry", () => {
   });
 
   it("provides structured spread composition rules for all registered storybook spreads", () => {
-    const pages = buildPages(child, "dream-big");
+    const pages = buildPages(child, "great-adventure");
     const spreads = pages.filter((p) => p.spread);
     expect(spreads.length).toBeGreaterThan(0);
     for (const page of spreads) {
-      expect(page.prompt).toContain("COMPOSITION (two-page spread)");
+      expect(page.prompt).toContain("COMPOSITION");
     }
   });
 

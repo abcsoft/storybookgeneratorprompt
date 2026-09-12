@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { assertSpreadsAligned, spreadStartPages } from "../pdf/imposition";
 import { buildPages } from "./registry";
-import { theGreatDetectiveBook } from "./theGreatDetectiveTemplate";
+import {
+  theGreatDetectiveBook,
+  isDetectiveSignText,
+  parseDetectiveSignText,
+} from "./theGreatDetectiveTemplate";
 import type { ChildProfile } from "./types";
 
 const BOOK_ID = "the-great-detective";
@@ -46,37 +50,31 @@ describe("theGreatDetectiveTemplate", () => {
     expect(blob.toLowerCase()).toContain("magnifying glass");
   });
 
-  it("pins the hero into one consistent outfit on every page", () => {
+  it("pins the hero into one consistent deterministic outfit on every page", () => {
     for (const page of buildPages(child, BOOK_ID)) {
       expect(page.prompt).toContain("denim jacket");
-      expect(page.prompt).toContain("floral skirt");
+      expect(page.prompt).toContain("dark rolled-cuff explorer shorts");
     }
   });
 
-  it("gives every page a non-empty prompt, and text on all but the image-only back cover", () => {
+  it("gives every page a non-empty prompt and text, with back cover sign text rendered in application", () => {
     for (const page of buildPages(child, BOOK_ID)) {
       expect(page.prompt.trim().length).toBeGreaterThan(0);
-      if (page.kind !== "backcover") {
-        expect(page.text.trim().length).toBeGreaterThan(0);
-      }
+      expect(page.text.trim().length).toBeGreaterThan(0);
     }
-    // The final page is image-only (the closing text is painted into the art).
-    expect(buildPages(child, BOOK_ID).at(-1)?.text).toBe("");
+    expect(buildPages(child, BOOK_ID).at(-1)?.text).toContain("CASE CLOSED!");
+    expect(buildPages(child, BOOK_ID).at(-1)?.text).toContain("ALEX'S DETECTIVE AGENCY");
   });
 
-  it("bakes a personalized 'case closed' sign into the back-cover art, no overlay", () => {
+  it("reserves clean blank placard in back-cover art for application typography overlay", () => {
     const pages = buildPages(child, BOOK_ID);
     const last = pages.at(-1);
     expect(last?.kind).toBe("backcover");
-    expect(last?.text).toBe("");
-    expect(last?.prompt).toContain("CASE CLOSED!");
-    expect(last?.prompt).toContain("ALEX'S DETECTIVE AGENCY");
-    // Only this page opts out of the global no-text ban so the sign can render…
-    expect(last?.prompt).not.toContain("ABSOLUTELY NO TEXT IN THE IMAGE");
-    expect(last?.prompt).toContain("TEXT POLICY FOR THIS PAGE ONLY");
-    // …every other page keeps the ban.
-    const scene = pages.find((p) => p.kind === "scene");
-    expect(scene?.prompt).toContain("ABSOLUTELY NO TEXT IN THE IMAGE");
+    expect(last?.text).toContain("CASE CLOSED!");
+    expect(last?.text).toContain("ALEX'S DETECTIVE AGENCY");
+    expect(last?.prompt).toContain("blank wooden placard face completely free of letters");
+    expect(last?.prompt).toContain("reserved for title overlay");
+    expect(last?.prompt).toContain("ABSOLUTELY NO TEXT IN THE IMAGE");
   });
 
   it("uses two-page spreads for several scenes", () => {
@@ -95,4 +93,23 @@ describe("theGreatDetectiveTemplate", () => {
     const totalLeaves = pages.reduce((n, p) => n + (p.spread ? 2 : 1), 0);
     expect(totalLeaves % 2).toBe(0);
   });
+
+  it("detects and parses detective sign typography correctly", () => {
+    const text = "CASE CLOSED!\nALEX'S DETECTIVE AGENCY";
+    expect(theGreatDetectiveBook.pages.at(-1)?.text(child)).toBe(text);
+    expect(isDetectiveSignText(text)).toBe(true);
+    expect(isDetectiveSignText("Dream Big Adventure")).toBe(false);
+    expect(isDetectiveSignText(null)).toBe(false);
+
+    const parsed = parseDetectiveSignText(text);
+    expect(parsed.headline).toBe("CASE CLOSED!");
+    expect(parsed.agency).toBe("ALEX'S DETECTIVE AGENCY");
+
+    const longNameChild: ChildProfile = { name: "Alexander Bartholomew", age: 5, gender: "boy" };
+    const longText = theGreatDetectiveBook.pages.at(-1)?.text(longNameChild)!;
+    const longParsed = parseDetectiveSignText(longText);
+    expect(longParsed.headline).toBe("CASE CLOSED!");
+    expect(longParsed.agency).toBe("ALEXANDER BARTHOLOMEW'S DETECTIVE AGENCY");
+  });
 });
+

@@ -83,10 +83,23 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const book = getBook((form.get("bookId") as string) || undefined);
+  const profileId = (form.get("profileId") as string) || undefined;
+  const rawMode = form.get("mode");
+  const mode = rawMode === "custom-spreads" || rawMode === "standard-single" ? rawMode : undefined;
+  let customSpreads;
+  const rawSpreads = form.get("customSpreads");
+  if (typeof rawSpreads === "string") {
+    try {
+      customSpreads = JSON.parse(rawSpreads);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   const job = createJob(child.name, book.id, book.pages.length);
 
   // Fire-and-forget: generation runs in the background; the client polls status.
-  void runGenerationJob(job.id, child, photos, book.id).catch(() => {
+  void runGenerationJob(job.id, child, photos, book.id, profileId, mode, customSpreads).catch(() => {
     /* runGenerationJob records its own errors on the job */
   });
 

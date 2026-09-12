@@ -33,9 +33,9 @@ const MAGNIFIER = "a child-sized brass magnifying glass";
  *  not their clothes, so the outfit must be pinned in the prompt). */
 const HERO_OUTFIT =
   "wearing the SAME outfit in every single illustration — an open light-blue " +
-  "denim jacket over a plain white t-shirt, a colourful floral skirt, white " +
-  "socks, and red canvas sneakers, with a small rainbow heart charm clipped to " +
-  "the jacket; keep this exact same outfit, unchanged, on every page";
+  "denim jacket over a plain white t-shirt, dark rolled-cuff explorer shorts, white " +
+  "socks, and red canvas sneakers, with a small brass magnifying-glass badge pinned " +
+  "to the jacket lapel; keep this exact same outfit, unchanged, on every page";
 
 /** Appended to standing two-shots so nobody gets cropped at the shins. The shared
  *  FRAMING note prefers a medium shot (to protect face likeness), which otherwise
@@ -50,20 +50,18 @@ const FULL_FIGURE =
  *  reference photos) — the other kids have no anchor, so their whole look and
  *  outfit must be fully described and locked here or they drift between pages. */
 const ROHAN =
-  "Rohan, exactly one cheerful young Indian boy with warm brown skin, dark brown " +
+  "Rohan, a cheerful young Indian boy with warm brown skin, dark brown " +
   "eyes, short dark hair, and a round friendly face, wearing the SAME outfit on " +
   "every page — a plain blue t-shirt, grey trousers, and grey-and-white sneakers — " +
-  "kept exactly the same and unchanged wherever he appears (a single boy only — no " +
-  "other boys in the scene)";
+  "kept exactly the same and unchanged wherever he appears (exactly one Rohan, " +
+  "never duplicated)";
 const MEERA =
-  "Meera, exactly one shy young Indian girl who looks CLEARLY DIFFERENT from the " +
-  "hero — the two girls must never look alike or like twins: Meera is a little " +
-  "younger and shorter, with a rounder face, warm brown skin, dark brown eyes, and " +
-  "hair in two short braided pigtails (NOT long loose hair). She wears the SAME " +
+  "Meera, a shy young Indian girl with warm brown skin, dark brown eyes, and " +
+  "hair in two short braided pigtails (NOT long loose hair), wearing the SAME " +
   "outfit on every page — a mustard-yellow t-shirt, teal shorts, and scuffed muddy " +
-  "white sneakers, kept exactly the same and unchanged wherever she appears — and " +
-  "must NOT wear the hero's denim jacket, floral skirt, or red sneakers (a single " +
-  "girl only — no other girls besides the hero)";
+  "white sneakers, kept exactly the same and unchanged wherever she appears — " +
+  "she looks clearly distinct from the detective protagonist, with her own unique face " +
+  "and braided pigtails (exactly one Meera, never duplicated)";
 const BALL = "a bright yellow bouncy ball";
 
 /** Lead with identity and reaffirm it after the style block. Nano Banana 2 keeps
@@ -90,49 +88,54 @@ const SIGN_TEXT_POLICY =
   "captions, gibberish, watermarks, signatures, logos, frames, or borders appear " +
   "anywhere else in the image. ";
 
+import { buildIllustrationPrompt } from "./prompt/buildIllustrationPrompt";
+import { styleRules } from "./prompt/styleRules";
+
 /** ART_STYLE with its blanket "no text in the image" ban swapped for the
  *  sign-only exception above, so the closing page can show a legible painted sign
- *  while every other page stays text-free. Falls back to appending the policy if
- *  the ban paragraph can't be located (e.g. config wording changed). */
-const ART_STYLE_WITH_SIGN = ((): string => {
-  const start = ART_STYLE.indexOf("ABSOLUTELY NO TEXT IN THE IMAGE:");
+ *  while every other page stays text-free. */
+const STYLE_RULES_WITH_SIGN = ((): string => {
+  const base = styleRules();
+  const start = base.indexOf("ABSOLUTELY NO TEXT IN THE IMAGE:");
   const endMark = "No watermarks, signatures, logos, frames, or borders. ";
-  const end = ART_STYLE.indexOf(endMark);
-  if (start === -1 || end === -1) return `${ART_STYLE} ${SIGN_TEXT_POLICY}`;
-  return ART_STYLE.slice(0, start) + SIGN_TEXT_POLICY + ART_STYLE.slice(end + endMark.length);
+  const end = base.indexOf(endMark);
+  if (start === -1 || end === -1) return `${base} ${SIGN_TEXT_POLICY}`;
+  return base.slice(0, start) + SIGN_TEXT_POLICY + base.slice(end + endMark.length);
 })();
 
-/** Build a full illustration prompt: identity-first header + shared art style +
- *  an identity-over-style reminder + the fixed outfit + the personalized scene.
- *  `light` (optional) describes the scene's own light + camera so the child can be
- *  matched to it — the single biggest lever against a "pasted-on" composite
- *  (mismatched light direction/temperature and camera angle are why composites
- *  read as fake). `style` overrides the art-style block (e.g. to allow sign text
- *  on the back cover). */
-import { buildTargetFormatBlock } from "./prompt/compositionRules";
+const ART_STYLE_WITH_SIGN = STYLE_RULES_WITH_SIGN;
 
 function illustration(
   scene: string,
   light?: string,
-  style: string = ART_STYLE,
+  styleOverride?: string,
   layout: LayoutType = "single-page",
   kind: PageKind = "scene",
+  compositionNotes?: string,
 ) {
-  return (c: ChildProfile, profileId?: string): string => {
-    const lighting = light
-      ? ` LIGHTING & CAMERA — match the child to the scene so the composite never ` +
-        `looks pasted-on: ${light} Light ${c.name} with exactly this light (same ` +
-        `direction, color temperature, and softness) and matching shadows, and frame ` +
-        `${c.name} at this same camera angle and horizon line.`
-      : "";
-    const targetFormat = buildTargetFormatBlock(profileId, layout, kind);
-    return (
-      `${IDENTITY_FIRST} ${style} ${IDENTITY_OVER_STYLE} ${targetFormat} This is ${c.name}, a ` +
-      `${c.age}-year-old ${childNoun(c.gender)}, a clever little detective solving ` +
-      `the mystery of a missing yellow ball, ${HERO_OUTFIT}. ${scene}${lighting} ` +
-      `Keep ${c.name} looking exactly like the attached character reference and ` +
-      `photos — same real face and hair.`
-    );
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string => {
+    const effectiveLayout = overrides?.layout ?? layout;
+    return buildIllustrationPrompt({
+      child: c,
+      story: { defaultOutfit: HERO_OUTFIT },
+      scene: `${scene} Keep ${c.name} looking exactly like the attached character reference and photos — same real face and hair.`,
+      kind,
+      layout: effectiveLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      profileId,
+      light,
+      styleOverride,
+      compositionNotes,
+    });
   };
 }
 
@@ -200,13 +203,11 @@ const STORY: Beat[] = [
   // 5 — search the sandbox and slide
   {
     scene:
-      "Peeking inside a sandy sandbox and then up into the mouth of a curvy tunnel " +
-      `slide with ${MAGNIFIER}, looking determined.`,
+      `Crouching beside the wooden edge of the sandbox, carefully examining the smooth sand with ${MAGNIFIER} held steady in one hand, looking determined and observant, as the playground slide stands in the background.`,
     copy: (c, p) =>
-      `Next ${p.subj} peeked inside the sandbox, then climbed up to look down the ` +
-      `slide. Still no ball — but ${c.name} did not give up.`,
+      `Next ${p.subj} checked the sandbox with ${p.poss} trusty glass. Still no ball — but ${c.name} did not give up.`,
     light:
-      "Bright midday sun from above, warm and clear; eye-level camera by the sandbox and slide.",
+      "Bright midday sun from above, warm and clear; eye-level camera by the sandbox.",
   },
   // 6 — Aha! the footprint clue (kid sneaker prints, wiggly tread)
   {
@@ -371,17 +372,17 @@ const STORY: Beat[] = [
     light:
       "Soft, gentle dappled willow light from above; eye-level camera at the children's height.",
   },
-  // 19 — the ball handed over (both girls standing)
+  // 19 — the ball handed over
   {
     scene:
-      `Both girls standing under the willow as ${MEERA} holds out ${BALL} and hands ` +
-      "it back to the young detective with a tiny hopeful smile, while the detective " +
-      "smiles warmly — the start of a new friendship. Both girls drawn well with " +
+      `The young detective and ${MEERA} standing under the willow as Meera holds out ${BALL} and hands ` +
+      "it to the detective with a tiny hopeful smile, while the detective " +
+      "smiles warmly — the start of a new friendship. Both children drawn well with " +
       "correct natural anatomy — exactly two arms and two legs each." +
       FULL_FIGURE,
     copy: (c, p) =>
-      `${c.name} understood. Being new is hard. "You don't have to take things to ` +
-      `make a friend," ${p.subj} said gently. "You can just say hello." Meera smiled ` +
+      `${c.name} understood. Being new is hard. "It's okay to feel shy," ${p.subj} ` +
+      `said gently. "If you want to play, you can always just say hello." Meera smiled ` +
       `a tiny smile and handed over the ball.`,
     light:
       "Soft dappled willow light warming as they step toward the edge of the shade; eye-level camera at child height.",
@@ -393,7 +394,9 @@ const STORY: Beat[] = [
       "under the willow's cool shadow toward the bright sunlight of the playground " +
       "ahead; both happy." +
       FULL_FIGURE,
-    copy: (c, p) => `"Yes!" said ${c.name}, holding out ${p.poss} hand.`,
+    copy: (c, p) =>
+      `"Will you come with me to return it?" asked Meera. "Yes!" said ` +
+      `${c.name}, taking ${p.poss} hand with a bright, welcoming smile.`,
     spread: true,
     light:
       "A bright, warm burst of golden sunshine from ahead as they leave the willow's cool shadow; eye-level camera facing the sunlit playground.",
@@ -402,8 +405,9 @@ const STORY: Beat[] = [
   {
     scene:
       `${ROHAN}'s face lighting up with pure joy as he sees his bright yellow ball ` +
-      "again, jumping up from the bench with a huge happy smile as the young " +
-      "detective hands it back to him in the sunny playground." +
+      `again, jumping up from the bench with a huge happy smile as the young ` +
+      `detective hands it back to him, with ${MEERA} standing close beside the ` +
+      `detective with a shy, happy smile; all three children visible.` +
       FULL_FIGURE,
     copy: () =>
       `Rohan was so happy to have his ball back — and even happier to meet Meera!`,
@@ -456,6 +460,10 @@ const theGreatDetectivePages: PageSpec[] = [
         "lower portion calmer and more open so a large title can sit across the " +
         "lower area without covering the face.",
       "Warm golden-hour side light from a low sun, cinematic and slightly dramatic, with soft rim light on the hair; eye-level close-up camera.",
+      undefined,
+      "single-page",
+      "cover",
+      "keep the lower portion calmer and more open so a large title can sit across the lower area without covering the face.",
     ),
     text: (c) => `${c.name}'s Great Detective`,
   },
@@ -467,13 +475,17 @@ const theGreatDetectivePages: PageSpec[] = [
         `${MAGNIFIER}, looking down thoughtfully at something on the ground with ` +
         "sharp, curious eyes.",
       "Bright, cheerful morning light from the upper right across the playground; eye-level camera.",
+      undefined,
+      "single-page",
+      "intro",
     ),
     text: (c) => {
       const p = pronouns(c.gender);
       return (
-        `${c.name} was not just a little ${childNoun(c.gender)}. ` +
+        `${c.name} was not just an ordinary ${childNoun(c.gender)}. ` +
         `${cap(p.subj)} was a detective! ${cap(p.subj)} noticed things that other ` +
-        `people missed. She didn't Use magic - she used her sharp eyes, her clever brain, and her favourite magnifying glass.`
+        `people missed. ${cap(p.subj)} didn't use magic — ${p.subj} used ${p.poss} ` +
+        `sharp eyes, ${p.poss} clever brain, and ${p.poss} favourite magnifying glass.`
       );
     },
   },
@@ -483,16 +495,21 @@ const theGreatDetectivePages: PageSpec[] = [
       kind: "scene",
       spread: b.spread,
       ink: b.ink,
-      illustrationPrompt: illustration(b.scene, b.light),
+      layout: b.spread ? "text-left-subject-right" : "single-page",
+      illustrationPrompt: illustration(
+        b.scene,
+        b.light,
+        undefined,
+        b.spread ? "text-left-subject-right" : "single-page",
+        "scene",
+      ),
       text: (c) => b.copy(c, pronouns(c.gender)),
     }),
   ),
-  // Closing / back cover — the "CASE CLOSED" sign is painted INTO the art (this
-  // one page opts out of the no-text rule via ART_STYLE_WITH_SIGN). Image-only:
-  // no overlaid verse/title.
+  // Closing / back cover — readable sign text rendered in the application with a reserved artwork region
   {
     kind: "backcover",
-    illustrationPrompt: (c) => {
+    illustrationPrompt: (c, profileId, overrides) => {
       const scene =
         "In a sunny playground dappled with light beneath leafy trees, standing " +
         `and smiling warmly while handing the bright yellow ball back to ${ROHAN}, ` +
@@ -500,23 +517,38 @@ const theGreatDetectivePages: PageSpec[] = [
         "a merry-go-round and a wooden bench softly behind, and a couple of children " +
         "playing in the distance; a cheerful, satisfying 'case solved' mood. In the " +
         "right-hand foreground — set fully inside the frame with a clear margin of " +
-        "open background between the sign and the right edge — a hand-painted wooden " +
-        "sign is posted in the ground with precise, clear, correctly-spelled text " +
-        `that reads: "CASE CLOSED! ${c.name.toUpperCase()}'S DETECTIVE AGENCY". ` +
-        "IMPORTANT COMPOSITION: keep the ENTIRE sign and all of its text within the " +
-        "central area of the picture, well away from all four edges (leave generous " +
-        "empty margins), because the outer edges are cropped when the book is printed." +
+        "open background between the sign and the right edge — a charming, rustic " +
+        "hand-painted wooden sign post is planted in the grass with a smooth, clean, " +
+        "blank wooden placard face completely free of letters, numbers, or text, " +
+        "reserved for title overlay. " +
+        "IMPORTANT COMPOSITION: keep the ENTIRE wooden placard within the " +
+        "central safe area of the picture, well away from all four edges, " +
+        "with an open, calm surface suitable for overlaid typography." +
         FULL_FIGURE;
       const light =
         "Warm and golden, with sunlight filtering through the dense green tree " +
         "leaves, casting dappled light and a subtle rainbow arch in the upper trees; " +
         "eye-level camera by the bench.";
-      return illustration(scene, light, ART_STYLE_WITH_SIGN)(c);
+      return illustration(scene, light, undefined, "single-page", "backcover")(c, profileId, overrides);
     },
-    // Image-only: the closing text lives on the painted sign in the illustration.
-    text: () => "",
+    // Application typography renders on the reserved blank placard:
+    text: (c) => `CASE CLOSED!\n${c.name.toUpperCase()}'S DETECTIVE AGENCY`,
   },
 ];
+
+/** Helpers for application typography rendering of the Detective Agency wooden placard */
+export function isDetectiveSignText(text: string | null): boolean {
+  if (!text) return false;
+  return text.includes("DETECTIVE AGENCY") || text.includes("CASE CLOSED!");
+}
+
+export function parseDetectiveSignText(text: string): { headline: string; agency: string } {
+  const parts = text.split("\n").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return { headline: parts[0], agency: parts.slice(1).join(" ") };
+  }
+  return { headline: "CASE CLOSED!", agency: text.trim() };
+}
 
 /** The "Great Detective" book, ready to register in `registry.ts`. */
 export const theGreatDetectiveBook: StoryTemplate = {
@@ -524,4 +556,5 @@ export const theGreatDetectiveBook: StoryTemplate = {
   title: "The Great Detective",
   subtitle: "A clever little detective cracks the case of the missing yellow ball.",
   pages: theGreatDetectivePages,
+  defaultOutfit: HERO_OUTFIT,
 };

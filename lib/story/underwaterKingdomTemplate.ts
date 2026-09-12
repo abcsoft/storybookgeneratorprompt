@@ -27,6 +27,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -63,18 +64,31 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     outfitOverride?: string;
     companionOverride?: CompanionSpec | null;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
       outfitOverride: opts.outfitOverride,
@@ -98,24 +112,26 @@ const STORY: Beat[] = [
   {
     scene:
       "Kneeling on warm golden sand at the tideline, brushing away wet sand " +
-      "from a smooth glowing shell, eyes wide with wonder as gentle waves " +
-      "roll in behind them.",
+      "from a smooth spiral conch shell that glows with warm golden light, " +
+      "eyes wide with wonder as gentle waves roll in behind them.",
     copy: (c) =>
-      `Half-buried at the tideline, ${c.name} found a shell that glowed ` +
-      `softly, warm as sunlight, even though it had come from the cool sea.`,
+      `Half-buried at the tideline, ${c.name} found a smooth spiral shell ` +
+      `that glowed softly, warm as sunlight, even though it had come from ` +
+      `the cool sea.`,
     light:
       "Bright warm midday sun over the beach, sparkling on the waves; eye-level camera at the tideline.",
     companionOverride: null,
   },
   {
     scene:
-      "Wading into the shallows holding the glowing shell up as it brightens, " +
-      "a soft shimmering magical glow beginning to wrap around them like a " +
-      "gentle bubble, feet lifting gently off the sandy bottom.",
+      "Wading into the shallows holding the glowing spiral shell up as it " +
+      "brightens, a soft shimmering magical bubble of light enveloping the " +
+      "child, allowing free breathing and swimming as feet lift gently off " +
+      "the sandy bottom.",
     copy: (c) =>
       `The shell glowed brighter with every step into the water — until a ` +
-      `soft, shimmering glow wrapped around ${c.name}, and the sea welcomed ` +
-      `${c.name} in.`,
+      `soft, shimmering bubble of light wrapped around ${c.name}, and the sea ` +
+      `welcomed ${c.name} in.`,
     light:
       "Cool turquoise light filtering down through the shallows mixing with the shell's warm glow; eye-level camera at the water's surface.",
     outfitOverride: SPECIAL_OUTFITS.underwater,
@@ -135,9 +151,10 @@ const STORY: Beat[] = [
       "Bright sunbeams streaming down through clear blue water, warm and sparkling; wide eye-level underwater camera at the reef.",
     compositionNotes:
       "wide establishing shot — keep the whole child comfortably inside the " +
-      "safe region with nothing crossing the center gutter; keep fins, " +
-      "hands, and feet fully inside the frame.",
+      "safe region with nothing crossing the center gutter; keep the child's " +
+      "hands and feet fully inside the frame.",
     outfitOverride: SPECIAL_OUTFITS.underwater,
+    companionOverride: null,
   },
   {
     scene:
@@ -181,12 +198,12 @@ const STORY: Beat[] = [
   {
     scene:
       "Floating before a grand coral archway at the kingdom's heart, " +
-      "noticing the usually-bright center is dim and grey, a look of gentle " +
-      "concern as Coral nudges closer, worried too.",
+      "noticing the central pedestal where the guiding pearl rests is empty " +
+      "and dim, a look of gentle concern as Coral nudges closer, worried too.",
     copy: (c) =>
-      `At the kingdom's heart stood a grand coral archway — but its center, ` +
-      `usually glowing bright, sat dim and grey. "The pearl is missing," ` +
-      `Coral seemed to say with a worried nudge.`,
+      `At the kingdom's heart stood a grand coral archway — but its central ` +
+      `pedestal sat empty and dark. "The guiding pearl is missing," Coral ` +
+      `seemed to say with a worried nudge.`,
     ink: "dark",
     light:
       "Cool, dim, slightly muted light around the darkened archway; eye-level underwater camera.",
@@ -203,32 +220,34 @@ const STORY: Beat[] = [
     light:
       "Warm glow from crystal-lit walls mixing with cool ambient blue water; eye-level underwater camera inside the grotto.",
     compositionNotes:
-      "keep the child's fins/limbs and Coral's tail fully inside the safe " +
-      "area — no cropping at the frame edges.",
+      "keep the child's limbs and Coral's tail fully inside the safe area " +
+      "— no cropping at the frame edges.",
     outfitOverride: SPECIAL_OUTFITS.underwater,
   },
   {
     scene:
-      "Kneeling gently before a shy, small glowing pearl guarded by a circle " +
-      "of tiny curious fish, offering an open, patient hand instead of " +
-      "reaching for it, earning the fish's trust.",
+      "Hovering gently in a low swim pose before a shy, luminous round " +
+      "pearl nestled in a soft anemone and guarded by a ring of tiny curious " +
+      "fish, offering an open, patient hand to earn the fish's trust.",
     copy: (c) =>
-      `The pearl glowed shyly, guarded by a ring of tiny curious fish. ` +
-      `${c.name} waited, patient and gentle, until the little fish trusted ` +
-      `them enough to let it go.`,
+      `The luminous pearl glowed shyly, guarded by a ring of tiny curious ` +
+      `fish. ${c.name} waited, patient and gentle, until the little fish ` +
+      `trusted ${c.name} enough to let it go.`,
     light:
       "Soft warm glow from the pearl itself, gentle against the blue water; eye-level underwater camera.",
     outfitOverride: SPECIAL_OUTFITS.underwater,
   },
   {
     scene:
-      "Placing the glowing pearl back into the heart of the coral archway as " +
-      "brilliant light floods outward across the whole reef, Coral leaping " +
-      "joyfully through the light, fish swirling in celebration all around.",
-    copy: (c) =>
-      `${c.name} placed the pearl gently back into place — and light flooded ` +
-      `the whole reef at once. Coral leapt for joy as the kingdom sparkled ` +
-      `back to life.`,
+      "Placing the luminous round pearl gently back onto the coral " +
+      "archway pedestal as radiant light floods outward across the entire " +
+      "reef, Coral leaping joyfully through the water, fish swirling in " +
+      "celebration all around.",
+    copy: (c, p) =>
+      `${c.name} placed the pearl gently back into the archway pedestal — ` +
+      `and brilliant light flooded the entire reef! Coral leapt with joy, ` +
+      `and the warm current guided ${c.name} safely up to the golden beach ` +
+      `as ${p.subj} waved a happy goodbye.`,
     spread: true,
     ink: "dark",
     light:
@@ -236,7 +255,7 @@ const STORY: Beat[] = [
     compositionNotes:
       "keep the child and Coral safely inside the frame with roughly a " +
       "10-12% margin from the outer edge — a wide celebratory shot; keep " +
-      "fins, tails, and limbs fully inside the safe area.",
+      "all limbs and Coral's fins fully inside the safe area.",
     outfitOverride: SPECIAL_OUTFITS.underwater,
   },
 ];
@@ -248,22 +267,23 @@ const underwaterKingdomPages: PageSpec[] = [
     kind: "cover",
     layout: "single-page",
     illustrationPrompt: illustration(
-      "A wide cover hero scene: standing on the RIGHT side of the frame " +
-        "mid-swim near a colorful coral reef entrance, wrapped in a soft " +
-        "shimmering magical glow, turned toward the viewer with a big " +
-        "joyful smile, holding the glowing shell, with Coral the dolphin at " +
-        "their side. Frame the child from about the waist up so the FACE IS " +
-        "LARGE, clear, and front-facing (or a gentle three-quarter angle) " +
-        "toward the camera — the face is the focal point and must " +
-        "unmistakably look like the real child in the reference photos, " +
-        "with their hair exactly as in those photos.",
+      "A wide cover hero scene: swimming gracefully on the RIGHT side of the " +
+        "frame near a colorful coral reef entrance, enveloped in a soft " +
+        "shimmering magical breathing bubble, turned toward the viewer with " +
+        "a big joyful smile, holding the glowing spiral shell, with Coral " +
+        "the dolphin swimming playfully at their side. Frame the child from " +
+        "about the waist up so the FACE IS LARGE, clear, and front-facing " +
+        "(or a gentle three-quarter angle) toward the camera — the face is " +
+        "the focal point and must unmistakably look like the real child in " +
+        "the reference photos, with their hair exactly as in those photos.",
       {
+        kind: "cover",
         light:
           "Bright sunbeams streaming down through clear blue water, warm and sparkling, lighting the child from the front; eye-level underwater camera.",
         compositionNotes:
-          "keep the entire LEFT side and the lower-left calm and open — soft " +
+          "keep the lower portion calm and open — soft " +
           "blue water with no part of the child there — so a large title " +
-          "can sit in the lower-left without covering the child.",
+          "can sit in the lower area without covering the child.",
         outfitOverride: SPECIAL_OUTFITS.underwater,
       },
     ),
@@ -275,21 +295,23 @@ const underwaterKingdomPages: PageSpec[] = [
     spread: true,
     layout: "text-left-subject-right",
     illustrationPrompt: illustration(
-      "On a sunny beach at the tideline, kneeling in the wet sand with a " +
-        "glowing shell held in both hands, gentle waves rolling in, a look " +
-        "of pure curiosity.",
+      "Walking along the edge of a sunny sandy beach barefoot, looking down " +
+        "at the sparkling water and colorful pebbles with bright, curious " +
+        "eyes, gentle turquoise waves lapping at the shore.",
       {
+        kind: "intro",
         spread: true,
+        companionOverride: null,
         light:
-          "Bright warm midday sun sparkling on the waves; eye-level camera at the tideline.",
+          "Bright warm midday sun sparkling on the ocean waves; eye-level camera at the beach.",
       },
     ),
     text: (c) => {
       const p = pronouns(c.gender);
       return (
-        `${c.name} always collected the best shells at the tideline. This ` +
-        `one felt different — warm, glowing, and humming with a secret ` +
-        `only ${p.subj} could hear.`
+        `${c.name} loved the rhythm of the ocean — running barefoot along ` +
+        `the warm tide and searching for ocean treasures. Today, the sea ` +
+        `had a secret waiting just for ${p.obj}.`
       );
     },
   },
@@ -301,6 +323,7 @@ const underwaterKingdomPages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
@@ -317,10 +340,13 @@ const underwaterKingdomPages: PageSpec[] = [
     layout: "text-left-subject-right",
     ink: "dark",
     illustrationPrompt: illustration(
-      "Sitting wrapped in a warm towel on the beach at sunset, the glowing " +
-        "shell now resting quietly in cupped hands with just a faint " +
-        "shimmer, a peaceful happy smile, gentle waves at dusk.",
+      "Sitting wrapped comfortably in a warm fluffy towel on the sandy " +
+        "beach at sunset, holding the smooth spiral shell quietly in cupped " +
+        "hands as it gives off a faint gentle shimmer, a peaceful happy " +
+        "smile, gentle dusk waves rolling onto the sand.",
       {
+        kind: "closing",
+        spread: true,
         light:
           "Soft warm sunset light over the beach mixing with the shell's faint glow; eye-level camera on the sand.",
         companionOverride: null,
@@ -342,9 +368,9 @@ const underwaterKingdomPages: PageSpec[] = [
     layout: "single-page",
     illustrationPrompt: illustration(
       "Waving cheerfully with a big joyful smile, holding the softly " +
-        "shimmering shell, against a soft simple pastel sky with the ocean " +
+        "shimmering spiral shell, against a soft simple pastel sky with the ocean " +
         "and a gentle dolphin fin silhouette in the far distance.",
-      { companionOverride: null },
+      { kind: "backcover", companionOverride: null },
     ),
     text: (c) =>
       `The End…\n...but somewhere under the waves, a kingdom still glows because of ${c.name}.`,

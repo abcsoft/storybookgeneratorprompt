@@ -98,14 +98,35 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const bookId = (form.get("bookId") as string) || undefined;
+  const rawMode = ((form.get("layoutMode") as string) || (form.get("mode") as string)) || null;
+  const mode = rawMode === "custom-spreads" || rawMode === "standard-single" ? rawMode : undefined;
+  let customSpreads: any = undefined;
+  const rawSpreads = form.get("customSpreads");
+  if (typeof rawSpreads === "string") {
+    try {
+      customSpreads = JSON.parse(rawSpreads);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
 
-  const result = await exportPrintifyBook({ child, bookId, profileId, images, rawFiles });
+  const result = await exportPrintifyBook({
+    child,
+    bookId,
+    profileId,
+    images,
+    rawFiles,
+    mode,
+    customSpreads,
+  });
 
   if (!result.ok) {
-    const issues = result.preflight.errors.map((err) => ({
-      type: "PREFLIGHT_ERROR",
-      message: err,
-    }));
+    const issues = result.preflight.issues && result.preflight.issues.length > 0
+      ? result.preflight.issues
+      : result.preflight.errors.map((err) => ({
+          type: "PREFLIGHT_ERROR",
+          message: err,
+        }));
     return NextResponse.json(
       {
         code: "PREFLIGHT_FAILED",

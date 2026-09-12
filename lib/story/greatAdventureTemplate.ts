@@ -26,6 +26,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -52,7 +53,9 @@ const SPECIAL_OUTFITS: Record<string, string> = {
   winter:
     "a warm padded winter coat, hat, and mittens over the same explorer shorts " +
     "and dark boots, with the same small brown explorer backpack",
-  underwater: "swim shorts and a snorkel mask — no vest or backpack",
+  underwater:
+    "swim shorts, water shoes, and a snug snorkel mask, surrounded by a soft " +
+    "shimmering magical air bubble that lets the child and Scout breathe and swim freely — no vest or backpack",
   pajamas: "cozy pajamas — no vest, backpack, or shoes",
 };
 
@@ -64,18 +67,30 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     outfitOverride?: string;
     companionOverride?: CompanionSpec | null;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile, profileId?: string): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
       profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
@@ -237,12 +252,13 @@ const STORY: Beat[] = [
   {
     scene:
       "Riding gently on the back of a huge friendly blue whale deep in the ocean, " +
-      "drifting past glowing jellyfish and a quiet ancient stone archway " +
-      "half-buried in the sand; soft beams of light and tiny bubbles in the deep " +
-      "blue water.",
+      "with Scout snuggled safely at their side, both protected by a gentle shimmering " +
+      "magical bubble of air that lets them breathe freely, drifting past glowing " +
+      "jellyfish and a quiet ancient stone archway half-buried in the sand; soft " +
+      "beams of light and tiny bubbles in the deep blue water.",
     copy: (c) =>
-      `When they needed rest, a gentle whale swam by and offered ${c.name} a ` +
-      `ride. Glowing jellyfish floated all around, lighting up the dark water ` +
+      `When they needed rest, a gentle whale swam by and offered ${c.name} and ` +
+      `Scout a ride. Glowing jellyfish floated all around, lighting up the dark water ` +
       `like little lanterns.`,
     ink: "dark",
     // Spread — keeps the spreads on even-page starts (see lib/pdf/imposition.ts).
@@ -250,22 +266,22 @@ const STORY: Beat[] = [
     light:
       "Dim, deep-blue underwater light from above with a soft glow from the jellyfish; wide eye-level underwater camera.",
     outfitOverride: SPECIAL_OUTFITS.underwater,
-    companionOverride: null, // Scout isn't part of this scene — a solo rest moment for the child.
     compositionNotes:
-      "show enough of the whale AND the child's complete body — never enlarge " +
+      "show enough of the whale AND the child's and Scout's complete bodies — never enlarge " +
       "the child so much that the rider crops at the frame edge; widen the shot " +
       "instead of zooming in.",
   },
   {
     scene:
-      "Holding tight to the mast of a small wooden boat in a splashy ocean storm, " +
-      "clutching the treasure map and looking determined and brave, with " +
-      "Scout sheltered under one arm; big rolling waves and dramatic clouds, but " +
+      "Aboard a small wooden boat in a splashy ocean storm, gripping the sturdy " +
+      "mast with one hand while the other arm shelters Scout securely against their " +
+      "side, the rolled treasure map safely tucked into the backpack pocket, " +
+      "looking determined and brave; big rolling waves and dramatic clouds, with " +
       "a hopeful break of golden light ahead.",
     copy: (c, p) =>
-      `But suddenly, they burst up to the surface to find a storm! The waves ` +
-      `splashed high, and the wind blew strong. ${c.name} held the map tight, ` +
-      `and Scout stayed by ${p.poss} side all along.`,
+      `Suddenly, they burst up to the surface to find a storm! The waves ` +
+      `splashed high, but the map was tucked safe and dry. ${c.name} held ` +
+      `fast to the mast, keeping brave Scout safe and sheltered by ${p.poss} side.`,
     light:
       "Dramatic stormy grey overcast light with a hopeful warm break of sun from the upper right; eye-level camera amid the waves.",
     compositionNotes:
@@ -275,13 +291,14 @@ const STORY: Beat[] = [
   {
     scene:
       "Arriving at a sunny tropical treasure island, stepping onto a sandy " +
-      "palm-lined cove and pointing excitedly at a tall X-shaped rock, with " +
+      "palm-lined cove and pointing excitedly at a tall rock formation " +
+      "naturally shaped like the ancient carved cross-marker on the map, with " +
       "Scout splashing happily in the shallows; turquoise water and swaying palms.",
     copy: (c) =>
       `Just as the storm cleared, they spotted land—a little island with tall, ` +
       `swaying palm trees. ${c.name} looked at the map, then up at a tall rock ` +
-      `shaped just like its big red X.\n` +
-      `"Look, Scout—X marks the spot!" shouted ${c.name}. Scout's tail wagged. ` +
+      `carved just like the secret marker.\n` +
+      `"Look, Scout—that marks the spot!" shouted ${c.name}. Scout's tail wagged. ` +
       `"We found it! Our treasure is waiting!"`,
     light:
       "Bright tropical midday sun from above, warm and clear over turquoise water; eye-level camera on the sandy cove.",
@@ -382,6 +399,7 @@ const greatAdventurePages: PageSpec[] = [
         "face is the focal point and must unmistakably look like the real child " +
         "in the reference photos, with their hair exactly as in those photos.",
       {
+        kind: "cover",
         light:
           "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera on the grassy clifftop.",
         compositionNotes:
@@ -403,6 +421,7 @@ const greatAdventurePages: PageSpec[] = [
         "them and Scout wagging happily nearby; warm golden morning light through " +
         "the window.",
       {
+        kind: "intro",
         spread: true,
         light:
           "Warm golden morning light streaming from the window on the right plus the map's soft glow; eye-level camera at floor height.",
@@ -426,6 +445,7 @@ const greatAdventurePages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
@@ -446,6 +466,7 @@ const greatAdventurePages: PageSpec[] = [
         "tiny glowing star resting on the windowsill and Scout asleep at the foot " +
         "of the bed; soft moonlight and a peaceful, happy smile.",
       {
+        kind: "closing",
         spread: true,
         light:
           "Soft cool blue moonlight from the window plus the tiny star's warm glow; eye-level camera beside the bed.",
@@ -472,6 +493,9 @@ const greatAdventurePages: PageSpec[] = [
       "Waving cheerfully with a big joyful smile and a little explorer's backpack, " +
         "with Scout beside them, against a soft simple pastel sky with a few " +
         "gentle stars.",
+      {
+        kind: "backcover",
+      },
     ),
     text: (c) =>
       `The End…\n...or maybe it's just the beginning of ${c.name}'s next adventure!`,
@@ -511,48 +535,48 @@ export const greatAdventurePrintify24Edition: PrintEdition = {
     recommendedAspect: p.spread ? "2:1" : "1:1",
   })),
   physicalPages: [
-    // Page 1: Sailboat (Illus 3, 03.png)
-    { physicalPageNumber: 1, illustrationIndex: 2, illustrationNumber: 3, filename: "03.png", side: "full", text: greatAdventurePages[2].text },
-    // Pages 2-3: Intro (Illus 2, 02.png, spread)
-    { physicalPageNumber: 2, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "left", text: greatAdventurePages[1].text },
-    { physicalPageNumber: 3, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "right", text: null },
-    // Pages 4-5: Waterfall (Illus 5, 05.png, spread)
+    // Page 1: Intro / Dedication (Illus 2, 02.png)
+    { physicalPageNumber: 1, illustrationIndex: 1, illustrationNumber: 2, filename: "02.png", side: "full", text: greatAdventurePages[1].text },
+    // Page 2: Sailboat Setting Out (Illus 3, 03.png)
+    { physicalPageNumber: 2, illustrationIndex: 2, illustrationNumber: 3, filename: "03.png", side: "full", text: greatAdventurePages[2].text },
+    // Page 3: Jungle Trail (Illus 4, 04.png)
+    { physicalPageNumber: 3, illustrationIndex: 3, illustrationNumber: 4, filename: "04.png", side: "full", text: greatAdventurePages[3].text, ink: "dark" },
+    // Pages 4-5: Rope Bridge Waterfall (Illus 5, 05.png, spread)
     { physicalPageNumber: 4, illustrationIndex: 4, illustrationNumber: 5, filename: "05.png", side: "left", text: greatAdventurePages[4].text, ink: "dark" },
     { physicalPageNumber: 5, illustrationIndex: 4, illustrationNumber: 5, filename: "05.png", side: "right", text: null, ink: "dark" },
     // Pages 6-7: Desert Camel (Illus 6, 06.png, spread)
     { physicalPageNumber: 6, illustrationIndex: 5, illustrationNumber: 6, filename: "06.png", side: "left", text: greatAdventurePages[5].text },
     { physicalPageNumber: 7, illustrationIndex: 5, illustrationNumber: 6, filename: "06.png", side: "right", text: null },
-    // Page 8: Jungle Trail (Illus 4, 04.png)
-    { physicalPageNumber: 8, illustrationIndex: 3, illustrationNumber: 4, filename: "04.png", side: "full", text: greatAdventurePages[3].text, ink: "dark" },
-    // Page 9: Ancient Ruins (Illus 7, 07.png)
-    { physicalPageNumber: 9, illustrationIndex: 6, illustrationNumber: 7, filename: "07.png", side: "full", text: greatAdventurePages[6].text },
-    // Page 10: Savanna (Illus 8, 08.png)
-    { physicalPageNumber: 10, illustrationIndex: 7, illustrationNumber: 8, filename: "08.png", side: "full", text: greatAdventurePages[7].text },
-    // Page 11: Snowy Mountain (Illus 9, 09.png)
-    { physicalPageNumber: 11, illustrationIndex: 8, illustrationNumber: 9, filename: "09.png", side: "full", text: greatAdventurePages[8].text },
+    // Page 8: Ancient Stone Ruins (Illus 7, 07.png)
+    { physicalPageNumber: 8, illustrationIndex: 6, illustrationNumber: 7, filename: "07.png", side: "full", text: greatAdventurePages[6].text },
+    // Page 9: Savanna Riverbank (Illus 8, 08.png)
+    { physicalPageNumber: 9, illustrationIndex: 7, illustrationNumber: 8, filename: "08.png", side: "full", text: greatAdventurePages[7].text },
+    // Page 10: Snowy Mountain Path (Illus 9, 09.png)
+    { physicalPageNumber: 10, illustrationIndex: 8, illustrationNumber: 9, filename: "09.png", side: "full", text: greatAdventurePages[8].text },
+    // Page 11: Arctic Polar Bears (Illus 10, 10.png)
+    { physicalPageNumber: 11, illustrationIndex: 9, illustrationNumber: 10, filename: "10.png", side: "full", text: greatAdventurePages[9].text },
     // Pages 12-13: Coral Reef (Illus 11, 11.png, spread)
     { physicalPageNumber: 12, illustrationIndex: 10, illustrationNumber: 11, filename: "11.png", side: "left", text: greatAdventurePages[10].text },
     { physicalPageNumber: 13, illustrationIndex: 10, illustrationNumber: 11, filename: "11.png", side: "right", text: null },
-    // Page 14: Polar Bears (Illus 10, 10.png)
-    { physicalPageNumber: 14, illustrationIndex: 9, illustrationNumber: 10, filename: "10.png", side: "full", text: greatAdventurePages[9].text },
-    // Page 15: Blue Whale (Illus 12, 12.png)
-    { physicalPageNumber: 15, illustrationIndex: 11, illustrationNumber: 12, filename: "12.png", side: "full", text: greatAdventurePages[11].text, ink: "dark" },
-    // Page 16: Stormy Boat (Illus 13, 13.png)
+    // Pages 14-15: Gentle Blue Whale (Illus 12, 12.png, spread)
+    { physicalPageNumber: 14, illustrationIndex: 11, illustrationNumber: 12, filename: "12.png", side: "left", text: greatAdventurePages[11].text, ink: "dark" },
+    { physicalPageNumber: 15, illustrationIndex: 11, illustrationNumber: 12, filename: "12.png", side: "right", text: null, ink: "dark" },
+    // Page 16: Ocean Storm (Illus 13, 13.png)
     { physicalPageNumber: 16, illustrationIndex: 12, illustrationNumber: 13, filename: "13.png", side: "full", text: greatAdventurePages[12].text },
-    // Page 17: Tropical Island X (Illus 14, 14.png)
+    // Page 17: Tropical Treasure Island (Illus 14, 14.png)
     { physicalPageNumber: 17, illustrationIndex: 13, illustrationNumber: 14, filename: "14.png", side: "full", text: greatAdventurePages[13].text },
-    // Page 18: Crystal Cave (Illus 15, 15.png)
+    // Page 18: Sparkling Crystal Cave (Illus 15, 15.png)
     { physicalPageNumber: 18, illustrationIndex: 14, illustrationNumber: 15, filename: "15.png", side: "full", text: greatAdventurePages[14].text, ink: "dark" },
-    // Page 19: Stone Chamber (Illus 16, 16.png)
+    // Page 19: Hidden Stone Chamber (Illus 16, 16.png)
     { physicalPageNumber: 19, illustrationIndex: 15, illustrationNumber: 16, filename: "16.png", side: "full", text: greatAdventurePages[15].text, ink: "dark" },
-    // Pages 20-21: Flying Home (Illus 19, 19.png, spread)
-    { physicalPageNumber: 20, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "left", text: greatAdventurePages[18].text },
-    { physicalPageNumber: 21, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "right", text: null },
-    // Page 22: Chest Open (Illus 17, 17.png)
-    { physicalPageNumber: 22, illustrationIndex: 16, illustrationNumber: 17, filename: "17.png", side: "full", text: greatAdventurePages[16].text, ink: "dark" },
-    // Page 23: Star Friend (Illus 18, 18.png)
-    { physicalPageNumber: 23, illustrationIndex: 17, illustrationNumber: 18, filename: "18.png", side: "full", text: greatAdventurePages[17].text, ink: "dark" },
-    // Page 24: Closing Bedtime (Illus 20, 20.png)
+    // Page 20: Chest Opening Magic (Illus 17, 17.png)
+    { physicalPageNumber: 20, illustrationIndex: 16, illustrationNumber: 17, filename: "17.png", side: "full", text: greatAdventurePages[16].text, ink: "dark" },
+    // Page 21: Little Star Friend (Illus 18, 18.png)
+    { physicalPageNumber: 21, illustrationIndex: 17, illustrationNumber: 18, filename: "18.png", side: "full", text: greatAdventurePages[17].text, ink: "dark" },
+    // Pages 22-23: Flying Home on Star Trail (Illus 19, 19.png, spread)
+    { physicalPageNumber: 22, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "left", text: greatAdventurePages[18].text },
+    { physicalPageNumber: 23, illustrationIndex: 18, illustrationNumber: 19, filename: "19.png", side: "right", text: null },
+    // Page 24: Home in Bed / Closing (Illus 20, 20.png)
     { physicalPageNumber: 24, illustrationIndex: 19, illustrationNumber: 20, filename: "20.png", side: "full", text: greatAdventurePages[19].text, ink: "dark" },
   ],
 };

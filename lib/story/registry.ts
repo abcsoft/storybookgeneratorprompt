@@ -69,14 +69,9 @@ export interface BuiltPage {
   ink?: "light" | "dark";
 }
 
-const SPREAD_NOTE =
-  " IMPORTANT COMPOSITION — this is an extra-wide illustration that will be " +
-  "printed across two facing pages and folded down the exact vertical center. " +
-  "Place the child, and especially the child's full face and head, entirely " +
-  "within the RIGHT half of the image and well clear of that center line, so the " +
-  "fold never crosses the face or body. Keep the whole LEFT half and the central " +
-  "strip as calm, open background scenery (sky, soft landscape) with no important " +
-  "subject, leaving the lower-left clear for a few lines of text.";
+import { spreadCompositionRules } from "./prompt/compositionRules";
+
+const SPREAD_NOTE = " " + spreadCompositionRules("text-left-subject-right");
 
 /**
  * Personalize an already-resolved book object for a child. Split out from
@@ -94,12 +89,16 @@ export function buildPagesFor(
   return book.pages.map((spec, index) => {
     const isSpread = spec.pageLayout ? spec.pageLayout === "spread" : (spec.spread ?? false);
     const layout: PageLayout = isSpread ? "spread" : "single";
-    const legacySpreadNote = spec.layout ? "" : isSpread ? SPREAD_NOTE : "";
+    const prompt = spec.illustrationPrompt(child, profileId);
+    const legacySpreadNote =
+      spec.layout || prompt.includes("SPREAD COMPOSITION") || !isSpread
+        ? ""
+        : SPREAD_NOTE;
     return {
       index,
       kind: spec.kind,
       role: spec.role,
-      prompt: spec.illustrationPrompt(child, profileId) + legacySpreadNote,
+      prompt: prompt + legacySpreadNote,
       text: spec.text(child),
       spread: isSpread,
       pageLayout: layout,

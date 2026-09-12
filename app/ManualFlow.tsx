@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ProfileFields, { type Gender } from "./ProfileFields";
 import IllustrationCard from "./IllustrationCard";
 import CorrectionPanel from "./CorrectionPanel";
 import BookReview from "./BookReview";
 import ConfirmDialog from "./ConfirmDialog";
+import SpreadConfigurator from "./SpreadConfigurator";
 import { matchImportedFiles, type ImportMatchReport } from "@/lib/manual/importMatch";
 import { checkImportedImage } from "@/lib/manual/clientImageCheck";
 import { evaluateExportGate } from "@/lib/manual/exportGate";
@@ -24,9 +25,20 @@ import {
 import type { PrintProfile } from "@/lib/print/types";
 import { getEditionForProfile } from "@/lib/story/editions";
 import type { ArtworkTransform } from "@/lib/print/artworkTransform";
+import type { LayoutMode, CustomSpreadSelection } from "@/lib/story/layoutPlan";
 import styles from "./page.module.css";
 
 export type { IllustrationEntry };
+
+export interface PreflightIssueDetail {
+  type?: string;
+  illustrationNumber?: number;
+  filename?: string;
+  expected?: string;
+  actual?: string;
+  recommendation?: string;
+  message: string;
+}
 
 import type { PageLayout } from "@/lib/story/types";
 
@@ -38,11 +50,14 @@ export interface ManualPage {
   kind: string;
   role?: string;
   filename: string;
+  canonicalFilename?: string;
+  legacyAliases?: string[];
   prompt: string;
   text: string;
   aspect: string;
   spread?: boolean;
   pageLayout?: PageLayout;
+  physicalPages?: number[];
 }
 
 type Step = "profile" | "prompts" | "review";
@@ -81,11 +96,60 @@ export default function ManualFlow({
   const [age, setAge] = useState("4");
   const [gender, setGender] = useState<Gender>("boy");
 
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`storybook_layout_mode_${bookId}`);
+      if (saved === "custom-spreads" || saved === "standard-single") return saved;
+    }
+    return "standard-single";
+  });
+
+  const [customSpreads, setCustomSpreads] = useState<CustomSpreadSelection[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`storybook_custom_spreads_${bookId}`);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (bookId === "dream-big") {
+      return [{ startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" }];
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`storybook_layout_mode_${bookId}`, layoutMode);
+      localStorage.setItem(`storybook_custom_spreads_${bookId}`, JSON.stringify(customSpreads));
+    }
+  }, [bookId, layoutMode, customSpreads]);
+
   const [pages, setPages] = useState<ManualPage[]>([]);
   const [markdown, setMarkdown] = useState("");
   const [anchorPrompt, setAnchorPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preflightIssues, setPreflightIssues] = useState<PreflightIssueDetail[]>([]);
+  const [preflightWarnings, setPreflightWarnings] = useState<string[]>([]);
+
+  const clearServerErrors = useCallback(() => {
+    setError(null);
+    setPreflightIssues([]);
+    setPreflightWarnings([]);
+  }, []);
+
+  useEffect(() => {
+    clearServerErrors();
+  }, [profileId, clearServerErrors]);
+
+  useEffect(() => {
+    clearServerErrors();
+  }, [layoutMode, clearServerErrors]);
+
   const [copied, setCopied] = useState<number | null>(null);
   const [printifyResult, setPrintifyResult] = useState<PrintifyExportSummary | null>(null);
 
@@ -154,6 +218,8 @@ export default function ManualFlow({
           gender,
           bookId: targetBookId,
           profileId: targetProfileId,
+          mode: layoutMode,
+          customSpreads,
         }),
       });
       const data = await res.json();
@@ -224,7 +290,15 @@ export default function ManualFlow({
       const res = await fetch("/api/prompts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), age, gender, bookId, profileId }),
+        body: JSON.stringify({
+          name: name.trim(),
+          age,
+          gender,
+          bookId,
+          profileId,
+          mode: layoutMode,
+          customSpreads,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -325,6 +399,7 @@ export default function ManualFlow({
   /** Assign or replace a file for a page — invalidates old transform metadata
    *  and clears regeneration flags, landing as "added". */
   function applyFile(index: number, file: File) {
+    clearServerErrors();
     const objectUrl = URL.createObjectURL(file);
     setEntry(index, {
       status: "added",
@@ -337,20 +412,65 @@ export default function ManualFlow({
     void runClientCheck(index, file, importGeneration.current());
   }
 
-  /** Bulk import (item 2): match every selected file against the expected
-   *  filenames and report exactly what matched, is missing, duplicated, or
-   *  unmatched — nothing is silently dropped. Every matched file is assigned
-   *  in ONE state update so the import report and the per-card status badges
-   *  never visibly disagree; the (slower, per-file) aspect-ratio check then
-   *  fills in warnings in the background. */
+  const [pendingLegacyFiles, setPendingLegacyFiles] = useState<File[] | null>(null);
+
+  function onConfirmLegacyRecovery(files: File[]) {
+    const report = matchImportedFiles(
+      files.map((f) => f.name),
+      pages.map((p) => p.filename),
+      undefined,
+      { confirmLegacyOffsetRecovery: true, bookId },
+    );
+    setImportReport(report);
+    setPendingLegacyFiles(null);
+
+    const byName = new Map(files.map((f) => [f.name, f]));
+    const matched: [number, File][] = [];
+    for (const [index, filename] of report.byIndex) {
+      const file = byName.get(filename);
+      if (file) matched.push([index, file]);
+    }
+
+    setIllustrations((cur) => {
+      const next = { ...cur };
+      for (const [index, file] of matched) {
+        const prev = next[index];
+        if (prev?.objectUrl) URL.revokeObjectURL(prev.objectUrl);
+        next[index] = {
+          status: "added",
+          needsRegeneration: false,
+          file,
+          objectUrl: URL.createObjectURL(file),
+          clientCheck: null,
+          transform: undefined,
+        };
+      }
+      return next;
+    });
+
+    const generation = importGeneration.current();
+    for (const [index, file] of matched) {
+      void runClientCheck(index, file, generation);
+    }
+  }
+
+  /** Bulk import: match files against authoritative slots with guarded recovery. */
   function onBulkImport(list: FileList | null) {
     if (!list) return;
+    clearServerErrors();
     const files = Array.from(list).filter((f) => f.type.startsWith("image/"));
     const report = matchImportedFiles(
       files.map((f) => f.name),
       pages.map((p) => p.filename),
+      undefined,
+      { confirmLegacyOffsetRecovery: false, bookId },
     );
     setImportReport(report);
+
+    if (report.legacyRecoveryProposal) {
+      setPendingLegacyFiles(files);
+      return;
+    }
 
     const byName = new Map(files.map((f) => [f.name, f]));
     const matched: [number, File][] = [];
@@ -383,6 +503,7 @@ export default function ManualFlow({
   }
 
   function onRemove(index: number) {
+    clearServerErrors();
     setEntry(index, emptyEntry());
   }
 
@@ -412,6 +533,7 @@ export default function ManualFlow({
   }
 
   function handleUpdateTransform(index: number, transform: ArtworkTransform) {
+    clearServerErrors();
     setIllustrations((cur) => {
       const entry = cur[index];
       if (!entry || entry.status === "missing") return cur;
@@ -446,7 +568,7 @@ export default function ManualFlow({
     setIllustrations((cur) => clearedIllustrations(cur));
     setImportReport(null);
     setPrintifyResult(null);
-    setError(null);
+    clearServerErrors();
     setCorrectionIndex(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -455,7 +577,7 @@ export default function ManualFlow({
    *  roll back to added. */
   function resetReview() {
     setIllustrations((cur) => reviewResetIllustrations(cur));
-    setError(null);
+    clearServerErrors();
   }
 
   /** Shared core of "Start new book" and "New child, same story" (item 4,
@@ -473,7 +595,7 @@ export default function ManualFlow({
     setAnchorPrompt("");
     setImportReport(null);
     setPrintifyResult(null);
-    setError(null);
+    clearServerErrors();
     setCorrectionIndex(null);
     setStrictMode(false);
     setCopied(null);
@@ -537,6 +659,10 @@ export default function ManualFlow({
     form.append("age", age);
     form.append("gender", gender);
     form.append("bookId", bookId);
+    form.append("profileId", profileId);
+    form.append("layoutMode", layoutMode);
+    form.append("mode", layoutMode);
+    form.append("customSpreads", JSON.stringify(customSpreads));
     for (const p of pages) {
       const file = illustrations[p.index]?.file;
       // Explicit filename override: a Replace upload may have an arbitrary
@@ -555,19 +681,53 @@ export default function ManualFlow({
     return form;
   }
 
-
-
   async function buildPdf() {
-    setError(null);
+    clearServerErrors();
     const form = buildExportForm();
     if (!form) return;
-    form.append("profileId", profileId);
     setBusy(true);
     try {
       const res = await fetch("/api/assemble", { method: "POST", body: form });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Could not build the PDF.");
+        const rawErrors: string[] = data.preflight?.errors ?? [];
+        const rawWarnings: string[] = data.preflight?.warnings ?? [];
+        const rawIssues: any[] = data.issues ?? data.preflight?.issues ?? [];
+
+        setPreflightWarnings(rawWarnings);
+
+        const structured: PreflightIssueDetail[] = [];
+        if (Array.isArray(rawIssues) && rawIssues.length > 0) {
+          for (const item of rawIssues) {
+            structured.push({
+              type: item.type,
+              illustrationNumber: item.illustrationNumber,
+              filename: item.filename,
+              expected: item.expected,
+              actual: item.actual,
+              recommendation: item.recommendation,
+              message: item.message ?? (typeof item === "string" ? item : ""),
+            });
+          }
+        } else if (rawErrors.length > 0) {
+          for (const err of rawErrors) {
+            const fileMatch = err.match(/"([^"]+\.(?:png|jpg|jpeg|webp))"/i);
+            const illoMatch = err.match(/Illustration\s+(\d+)/i);
+            structured.push({
+              illustrationNumber: illoMatch ? parseInt(illoMatch[1], 10) : undefined,
+              filename: fileMatch ? fileMatch[1] : undefined,
+              message: err,
+            });
+          }
+        }
+
+        if (structured.length > 0) {
+          setPreflightIssues(structured);
+          setError(null);
+        } else {
+          setPreflightIssues([]);
+          setError(data.error ?? "Preflight validation failed — production export blocked.");
+        }
         return;
       }
       const blob = await res.blob();
@@ -585,22 +745,52 @@ export default function ManualFlow({
   }
 
   async function exportPrintify() {
-    setError(null);
+    clearServerErrors();
     setPrintifyResult(null);
     const form = buildExportForm();
     if (!form) return;
-    form.append("profileId", profileId);
     setBusy(true);
     try {
       const res = await fetch("/api/assemble-printify", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const preflightErrors: string[] = data.preflight?.errors ?? [];
-        setError(
-          preflightErrors.length > 0
-            ? `Preflight failed:\n${preflightErrors.join("\n")}`
-            : (data.error ?? "Could not export for Printify."),
-        );
+        const rawErrors: string[] = data.preflight?.errors ?? [];
+        const rawWarnings: string[] = data.preflight?.warnings ?? data.warnings ?? [];
+        const rawIssues: any[] = data.issues ?? data.preflight?.issues ?? [];
+        setPreflightWarnings(rawWarnings);
+
+        const structured: PreflightIssueDetail[] = [];
+        if (Array.isArray(rawIssues) && rawIssues.length > 0) {
+          for (const item of rawIssues) {
+            structured.push({
+              type: item.type,
+              illustrationNumber: item.illustrationNumber,
+              filename: item.filename,
+              expected: item.expected,
+              actual: item.actual,
+              recommendation: item.recommendation,
+              message: item.message ?? (typeof item === "string" ? item : ""),
+            });
+          }
+        } else if (rawErrors.length > 0) {
+          for (const err of rawErrors) {
+            const fileMatch = err.match(/"([^"]+\.(?:png|jpg|jpeg|webp))"/i);
+            const illoMatch = err.match(/Illustration\s+(\d+)/i);
+            structured.push({
+              illustrationNumber: illoMatch ? parseInt(illoMatch[1], 10) : undefined,
+              filename: fileMatch ? fileMatch[1] : undefined,
+              message: err,
+            });
+          }
+        }
+
+        if (structured.length > 0) {
+          setPreflightIssues(structured);
+          setError(null);
+        } else {
+          setPreflightIssues([]);
+          setError(data.error ?? "Could not export for Printify.");
+        }
         return;
       }
       setPrintifyResult({ dir: data.dir, files: data.files, warnings: data.warnings ?? [] });
@@ -682,11 +872,115 @@ export default function ManualFlow({
 
   return (
     <>
-      {error && (
-        <div className={styles.error}>
+      {importReport?.legacyRecoveryProposal && (
+        <div
+          className={styles.preflightBlockedPanel}
+          style={{ border: "2px solid #f59e0b", background: "rgba(245, 158, 11, 0.12)", marginBottom: "16px" }}
+          data-testid="legacy-recovery-proposal-banner"
+        >
+          <div className={styles.preflightBlockedHeader} style={{ color: "#d97706" }}>
+            <span>⚠️</span>
+            <span>Legacy Artwork Alignment Detected</span>
+          </div>
+          <p style={{ margin: "10px 0 14px", fontSize: "14px", color: "var(--ink)" }}>
+            {importReport.legacyRecoveryProposal}
+          </p>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className={styles.button}
+              style={{ background: "#f59e0b", color: "#1c1440", fontWeight: 700 }}
+              onClick={() => {
+                if (pendingLegacyFiles) {
+                  onConfirmLegacyRecovery(pendingLegacyFiles);
+                }
+              }}
+            >
+              Confirm & Map to Slots 3–24
+            </button>
+            <button
+              type="button"
+              className={styles.buttonSecondary}
+              onClick={() => {
+                setImportReport((r) => (r ? { ...r, legacyRecoveryProposal: null } : null));
+                setPendingLegacyFiles(null);
+              }}
+            >
+              Cancel / Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {preflightIssues.length > 0 && (
+        <div className={styles.preflightBlockedPanel} data-testid="preflight-blocked-panel">
+          <div className={styles.preflightBlockedHeader}>
+            <span>⛔</span>
+            <span>Why export is blocked ({preflightIssues.length} {preflightIssues.length === 1 ? "issue" : "issues"})</span>
+          </div>
+          <div className={styles.preflightIssueList}>
+            {preflightIssues.map((issue, idx) => (
+              <div key={idx} className={styles.preflightIssueCard} data-testid="preflight-issue-card">
+                <div className={styles.preflightIssueTitle}>
+                  <span className={styles.preflightBadge}>
+                    {issue.type ? issue.type.toUpperCase() : "ERROR"}
+                  </span>
+                  <span>
+                    {issue.illustrationNumber !== undefined ? `Illustration ${issue.illustrationNumber}` : "General"}
+                    {issue.filename ? ` — ${issue.filename}` : ""}
+                  </span>
+                </div>
+                {(issue.expected || issue.actual) && (
+                  <div className={styles.preflightDetailGrid}>
+                    {issue.expected && (
+                      <>
+                        <div className={styles.preflightLabel}>Expected:</div>
+                        <div className={styles.preflightValue}>{issue.expected}</div>
+                      </>
+                    )}
+                    {issue.actual && (
+                      <>
+                        <div className={styles.preflightLabel}>Actual:</div>
+                        <div className={styles.preflightValue}>{issue.actual}</div>
+                      </>
+                    )}
+                  </div>
+                )}
+                {issue.message && (!issue.expected || !issue.actual) && (
+                  <div style={{ marginTop: "4px", fontSize: "13px", color: "#374151" }}>
+                    {issue.message}
+                  </div>
+                )}
+                {issue.recommendation && (
+                  <div className={styles.preflightAction}>
+                    💡 <strong>Recommended action:</strong> {issue.recommendation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {error && preflightIssues.length === 0 && (
+        <div className={styles.error} data-testid="preflight-generic-error">
           {error.split("\n").map((line, i) => (
             <div key={i}>{line}</div>
           ))}
+        </div>
+      )}
+
+      {preflightWarnings.length > 0 && (
+        <div className={styles.preflightWarningsPanel} data-testid="preflight-warnings-panel">
+          <div className={styles.preflightWarningsHeader}>
+            <span>⚠️</span>
+            <strong>Non-blocking warnings ({preflightWarnings.length})</strong>
+          </div>
+          <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
+            {preflightWarnings.map((w, idx) => (
+              <li key={idx} style={{ marginTop: "4px" }}>{w}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -712,8 +1006,8 @@ export default function ManualFlow({
       {step === "profile" && (
         <>
           <p className={styles.steps}>
-            Step 1 of 3 — tell us about your child, then we&apos;ll give you the
-            prompts to generate for free in the Gemini app.
+            Step 1 of 3 — tell us about your child and choose your book layout,
+            then we&apos;ll give you the prompts to generate for free in the Gemini app.
           </p>
           <ProfileFields
             name={name}
@@ -722,6 +1016,15 @@ export default function ManualFlow({
             setAge={setAge}
             gender={gender}
             setGender={setGender}
+          />
+          <SpreadConfigurator
+            bookId={bookId}
+            profileId={profileId}
+            mode={layoutMode}
+            onModeChange={setLayoutMode}
+            customSpreads={customSpreads}
+            onCustomSpreadsChange={setCustomSpreads}
+            childName={name.trim() || "Child"}
           />
           <button className={styles.button} onClick={getPrompts} disabled={busy}>
             {busy ? "Building prompts…" : "Get my prompts →"}
@@ -864,6 +1167,8 @@ export default function ManualFlow({
           profile={profile}
           bookId={bookId}
           childName={name.trim() || "Alex"}
+          layoutMode={layoutMode}
+          customSpreads={customSpreads}
           strictMode={strictMode}
           onToggleStrict={setStrictMode}
           onBack={() => setStep("prompts")}

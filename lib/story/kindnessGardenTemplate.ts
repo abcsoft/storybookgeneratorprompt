@@ -28,6 +28,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -62,18 +63,30 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     outfitOverride?: string;
     companionOverride?: CompanionSpec | null;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile, profileId?: string): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
       profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
@@ -110,11 +123,12 @@ const STORY: Beat[] = [
   {
     scene:
       "Tipping a small green watering can over a wilted, drooping sunflower in " +
-      "a patch of dry earth, watching hopefully as a single drop catches the " +
+      "a patch of dry earth, and gently watering the tiny glowing seed planted safely " +
+      "in a small clay pot to take home, watching hopefully as a single drop catches the " +
       "light, with Pip sitting attentively beside them.",
     copy: (c) =>
-      `The garden was full of sleepy, thirsty flowers. ${c.name} filled a ` +
-      `little watering can and gave the tallest sunflower a careful drink.`,
+      `The garden was full of sleepy, thirsty flowers. ${c.name} planted the ` +
+      `glowing seed in a warm little pot of earth to take home, and gave the tallest sunflower a careful drink.`,
     light:
       "Warm early-morning sun from the right, soft and golden over dry earth; eye-level camera at flower height.",
   },
@@ -181,25 +195,26 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Crouching by a cluster of hedgehogs at the base of a hedge, opening a " +
-      "small cloth pouch to share seeds and berries, with Pip nibbling a berry " +
-      "of its own; warm dusk light settling over the garden.",
+      "Now back in familiar green overalls after the rain clears, crouching by a " +
+      "cluster of hedgehogs at the base of a hedge, opening a small cloth pouch " +
+      "to share seeds and berries, with Pip nibbling a berry of its own; warm " +
+      "late-afternoon light filtering through damp leaves.",
     copy: (c) =>
-      `Near the hedge, a family of hedgehogs peeked out, hungry and shy. ` +
-      `${c.name} knelt down and shared a pouch of seeds and berries with ` +
-      `every one of them.`,
+      `The rain cleared, leaving the air fresh and sweet. Near the hedge, a family of ` +
+      `hedgehogs peeked out, hungry and shy. ${c.name} knelt down and shared a pouch of ` +
+      `seeds and berries with every one of them.`,
     light:
-      "Warm golden dusk light from the low sun behind, soft and glowing; eye-level camera at hedgehog height.",
+      "Warm golden late-afternoon sunlight from the low sun behind, soft and glowing on damp leaves; eye-level camera at hedgehog height.",
   },
   {
     scene:
-      "Sitting alone and peaceful beneath a big blossoming tree at sunset, " +
-      "writing happily in a small notebook with a stubby pencil, a quiet " +
-      "moment of rest with a contented smile; golden light through the " +
-      "blossoms above.",
+      "Sitting peacefully beneath a big blossoming tree at sunset, drawing " +
+      "picture sketches of the garden animals in a small notebook with a stubby " +
+      "pencil, a quiet moment of rest with a contented smile; golden sunset light " +
+      "through the blossoms above.",
     copy: (c, p) =>
       `As the sun dipped low, ${c.name} sat quietly beneath the blossoming ` +
-      `tree, jotting down every new garden friend ${p.subj} had met that day.`,
+      `tree, sketching picture portraits of every new garden friend ${p.subj} had met that day.`,
     ink: "dark", // golden blossom light — dark text on a panel reads better than white
     light:
       "Warm golden sunset light filtering down through blossoms from above; eye-level camera beneath the tree.",
@@ -211,16 +226,16 @@ const STORY: Beat[] = [
     scene:
       "Sharing the last handful of seeds with a wide-eyed baby fox at the edge " +
       "of the meadow, kneeling low and gentle, with Pip hopping over to greet " +
-      "the new friend too; soft late-afternoon light.",
+      "the new friend too; soft warm dusk light settling over the grass.",
     copy: (c) =>
-      `One last visitor came shyly out of the ferns — a baby fox. ${c.name} ` +
+      `One last visitor came shyly out of the ferns at dusk — a baby fox. ${c.name} ` +
       `knelt down slowly and offered the very last of the seeds.`,
     light:
-      "Soft, warm late-afternoon light from the right, gentle and diffuse; eye-level camera at kneeling height.",
+      "Soft, warm dusk light from the low horizon, gentle and diffuse; eye-level camera at kneeling height.",
   },
   {
     scene:
-      "Standing in the center of the now fully bloomed meadow at golden hour, " +
+      "Standing in the center of the now fully bloomed meadow at twilight, " +
       "arms raised in joy as flowers burst open in every color all around, " +
       "surrounded at a comfortable distance by the squirrel, sparrow, " +
       "hedgehogs, and baby fox, with Pip bouncing at their feet in delight.",
@@ -230,7 +245,7 @@ const STORY: Beat[] = [
     spread: true,
     ink: "dark", // bright golden bloom — dark text on a panel reads better than white
     light:
-      "Bright warm golden-hour light from the low sun, glowing across the blooming meadow; eye-level camera among the flowers.",
+      "Radiant twilight glow as the whole blooming meadow sparkles with magical evening color; eye-level camera among the flowers.",
     compositionNotes:
       "keep the child, Pip, and every garden friend safely inside the frame " +
       "with roughly a 10-12% margin from the outer edge — a wide celebratory " +
@@ -254,6 +269,7 @@ const kindnessGardenPages: PageSpec[] = [
         "face is the focal point and must unmistakably look like the real child " +
         "in the reference photos, with their hair exactly as in those photos.",
       {
+        kind: "cover",
         light:
           "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera at the garden gate.",
         compositionNotes:
@@ -272,10 +288,11 @@ const kindnessGardenPages: PageSpec[] = [
     illustrationPrompt: illustration(
       "In a sunny backyard, crouching to peer through a gap in an old wooden " +
         "fence at a hidden, overgrown garden gate glowing faintly, a small " +
-        "glowing seed resting in one open hand, with Pip peeking through the " +
-        "gap too; soft warm daylight.",
+        "glowing seed resting in one open hand; soft warm daylight.",
       {
+        kind: "intro",
         spread: true,
+        companionOverride: null,
         light:
           "Soft warm midday light from the upper right, gentle and clear; eye-level camera at crouching height by the fence.",
       },
@@ -297,6 +314,7 @@ const kindnessGardenPages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
@@ -313,10 +331,11 @@ const kindnessGardenPages: PageSpec[] = [
     layout: "text-left-subject-right",
     ink: "dark", // verse sits on the pale bedroom (left leaf) — dark text on a panel reads better
     illustrationPrompt: illustration(
-      "Tucked cozily in bed at night in a warm bedroom, with the small seed now " +
-        "grown into a single glowing flower resting on the windowsill and Pip " +
-        "asleep at the foot of the bed; soft moonlight and a peaceful, happy smile.",
+      "Tucked cozily in bed at night in a warm bedroom, with the same little clay pot " +
+        "carried home from the garden now holding a single glowing flower resting on the " +
+        "windowsill and Pip asleep at the foot of the bed; soft moonlight and a peaceful, happy smile.",
       {
+        kind: "closing",
         spread: true,
         light:
           "Soft cool blue moonlight from the window plus the flower's warm glow; eye-level camera beside the bed.",
@@ -327,9 +346,10 @@ const kindnessGardenPages: PageSpec[] = [
       const p = pronouns(c.gender);
       return (
         `${c.name} climbed into bed, tired and happy.\n\n` +
-        `The little garden was wide awake now, all because of ${p.poss} ` +
-        `kindness. Pip curled up close by, and with a warm smile, ${c.name} ` +
-        `drifted off to sleep, dreaming of tomorrow's garden friends.`
+        `On the windowsill, the same little clay pot carried home from the garden ` +
+        `now bloomed with a soft, glowing flower — a quiet reminder of ${p.poss} ` +
+        `kindness. Pip curled up close by, and with a warm smile, ${c.name} drifted ` +
+        `off to sleep, dreaming of tomorrow's garden friends.`
       );
     },
   },
@@ -341,6 +361,9 @@ const kindnessGardenPages: PageSpec[] = [
       "Waving cheerfully with a big joyful smile and a small watering can, with " +
         "Pip beside them, against a soft simple pastel sky with a few gentle " +
         "flowers drifting by.",
+      {
+        kind: "backcover",
+      },
     ),
     text: (c) =>
       `The End…\n...but ${c.name}'s garden will keep growing, one kindness at a time.`,

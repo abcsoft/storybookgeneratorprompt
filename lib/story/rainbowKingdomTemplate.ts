@@ -28,6 +28,7 @@ import type {
   ChildProfile,
   CompanionSpec,
   LayoutType,
+  PageKind,
   PageSpec,
   StoryTemplate,
 } from "./types";
@@ -49,11 +50,11 @@ const LUMA: CompanionSpec = {
 /** The standard adventure outfit, worn on every page unless a scene opts into
  *  the bedtime variant below. */
 const DEFAULT_OUTFIT =
-  "a soft lavender long-sleeve top, a pale gold pinafore dress or overalls, " +
-  "white leggings, and simple soft ankle boots";
+  "a soft lavender long-sleeve top, pale gold explorer overalls, white " +
+  "leggings, and simple soft ankle boots";
 
 const SPECIAL_OUTFITS: Record<string, string> = {
-  pajamas: "cozy pajamas with a small star pattern — no pinafore or boots",
+  pajamas: "cozy pajamas with a small star pattern — no overalls or boots",
 };
 
 const STORY_META = { defaultOutfit: DEFAULT_OUTFIT, companion: LUMA };
@@ -64,18 +65,31 @@ function illustration(
   opts: {
     light?: string;
     spread?: boolean;
+    kind?: PageKind;
     compositionNotes?: string;
     outfitOverride?: string;
     companionOverride?: CompanionSpec | null;
   } = {},
 ) {
-  const layout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
-  return (c: ChildProfile): string =>
+  const baseLayout: LayoutType = opts.spread ? "text-left-subject-right" : "single-page";
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string =>
     buildIllustrationPrompt({
       child: c,
       story: STORY_META,
       scene,
-      layout,
+      kind: opts.kind ?? "scene",
+      layout: overrides?.layout ?? baseLayout,
+      textSide: overrides?.textSide,
+      subjectSide: overrides?.subjectSide,
+      profileId,
       compositionNotes: opts.compositionNotes,
       light: opts.light,
       outfitOverride: opts.outfitOverride,
@@ -98,9 +112,10 @@ interface Beat {
 const STORY: Beat[] = [
   {
     scene:
-      "Kneeling in a garden at dusk, discovering a single glowing ribbon " +
-      "caught on a rosebush, holding it up to the light with a look of pure " +
-      "curiosity; soft golden dusk light settling over the flower beds.",
+      "Kneeling beside a blooming rosebush in the garden at dusk, discovering " +
+      "a shimmering ribbon that glows with soft starlight caught gently on a " +
+      "branch, reaching out with wide curious eyes; soft dusk light over " +
+      "the flower beds.",
     copy: (c) =>
       `Caught on a rosebush, ${c.name} found a ribbon that shimmered like ` +
       `starlight. It seemed to want to lead somewhere.`,
@@ -169,9 +184,9 @@ const STORY: Beat[] = [
       "Standing with Luma on a wide cloud bridge overlook, both looking up " +
       "at a pale, colorless sky where a rainbow should be, expressions " +
       "turning thoughtful and a little sad.",
-    copy: (c, p) =>
+    copy: (c) =>
       `From the cloud bridge, Luma looked up at a pale, empty sky. "Our ` +
-      `rainbow has faded," ${p.subj} said softly. "Without it, the kingdom ` +
+      `rainbow has faded," Luma said softly. "Without it, the kingdom ` +
       `grows quiet."`,
     ink: "dark",
     light:
@@ -185,10 +200,10 @@ const STORY: Beat[] = [
     scene:
       "Bravely crossing a narrow, glowing cloud path high above the kingdom, " +
       "one hand steady on Luma's mane for balance, reaching the far side " +
-      "where a single ribbon of red-gold light now curls into the sky.",
+      "where a first ribbon of red-gold light now curls into the sky.",
     copy: (c) =>
       `Step by careful step, ${c.name} crossed the narrow cloud path — and ` +
-      `on the far side, one ribbon of golden-red light curled back into the ` +
+      `on the far side, the first ribbon of golden-red light curled into the ` +
       `sky.`,
     light:
       "Warm golden-red glow from the returning color mixing with soft cloud light; eye-level camera on the cloud path.",
@@ -201,23 +216,23 @@ const STORY: Beat[] = [
     scene:
       "Kneeling beside a shy, small glowing creature tangled in silver vines " +
       "at the edge of a glade, gently helping it free, Luma watching warmly " +
-      "as a ribbon of green light rises into the sky.",
+      "as a second ribbon of emerald-green light rises into the sky.",
     copy: (c) =>
       `In a quiet glade, a shy little creature was tangled in vines. ${c.name} ` +
-      `freed it with gentle hands — and a ribbon of green light rose into ` +
-      `the sky.`,
+      `freed it with gentle hands — and a second ribbon of emerald-green ` +
+      `light rose into the sky.`,
     light:
       "Soft green-tinted glow from the glade mixing with the rising light; eye-level camera at kneeling height.",
   },
   {
     scene:
       "Standing bravely at the edge of a gentle waterfall of shimmering " +
-      "light, reaching a hand through it with a determined smile as the last " +
+      "light, reaching a hand through it with a determined smile as the third " +
       "ribbon of blue-violet color swirls free, Luma close beside them.",
     copy: (c) =>
-      `At last, one color remained. ${c.name} took a breath and reached ` +
-      `through a waterfall of shimmering light — and the final ribbon of ` +
-      `blue-violet swirled free.`,
+      `At last, the final color remained. ${c.name} reached through a ` +
+      `waterfall of shimmering light — and the third ribbon of violet-blue ` +
+      `swirled free to join the others.`,
     light:
       "Cool shimmering light from the waterfall of light, softly glowing; eye-level camera at the waterfall.",
     compositionNotes: "keep Luma's horn and ears fully inside the frame.",
@@ -225,12 +240,13 @@ const STORY: Beat[] = [
   {
     scene:
       "Standing together beneath a magnificent full rainbow arching across " +
-      "the whole kingdom sky, arms raised in joy, Luma rearing gently in " +
-      "celebration, soft magical sparkles drifting all around.",
+      "the whole kingdom sky as the three magical ribbons weave together " +
+      "above, arms raised in joy, Luma rearing gently in celebration, soft " +
+      "magical sparkles drifting all around.",
     copy: (c) =>
-      `Color by color, the rainbow returned — until it arched whole and ` +
-      `bright across the entire sky. The kingdom sparkled with joy, and so ` +
-      `did ${c.name}.`,
+      `Woven together in the sky, the three magical ribbons restored a ` +
+      `brilliant rainbow across the entire kingdom. The kingdom sparkled ` +
+      `with joy, and so did ${c.name}.`,
     spread: true,
     ink: "dark",
     light:
@@ -259,12 +275,13 @@ const rainbowKingdomPages: PageSpec[] = [
         "real child in the reference photos, with their hair exactly as in " +
         "those photos. Keep Luma's horn and ears fully inside the frame.",
       {
+        kind: "cover",
         light:
           "Warm golden-hour light from the low sun, soft and glowing, lighting the child from the front; eye-level camera at the forest edge.",
         compositionNotes:
-          "keep the entire LEFT side and the lower-left calm and open — soft " +
+          "keep the lower portion calm and open — soft " +
           "magical scenery with no part of the child there — so a large " +
-          "title can sit in the lower-left without covering the child.",
+          "title can sit in the lower area without covering the child.",
       },
     ),
     text: (c) => `${c.name}'s Rainbow Kingdom`,
@@ -275,21 +292,23 @@ const rainbowKingdomPages: PageSpec[] = [
     spread: true,
     layout: "text-left-subject-right",
     illustrationPrompt: illustration(
-      "In a sunny garden at dusk, kneeling beside a rosebush, holding up a " +
-        "single glowing ribbon caught on the thorns, an old ivy-covered stone " +
-        "archway just visible in the background.",
+      "In a peaceful garden at dusk, standing among blooming flower beds " +
+        "looking toward the garden path with curious bright eyes, an old " +
+        "stone wall covered in green ivy in the soft background.",
       {
+        kind: "intro",
         spread: true,
+        companionOverride: null,
         light:
-          "Soft golden dusk light over the garden; eye-level camera at kneeling height by the rosebush.",
+          "Soft golden dusk light over the garden flowers; eye-level camera in the garden.",
       },
     ),
     text: (c) => {
       const p = pronouns(c.gender);
       return (
-        `One quiet evening, ${c.name} found a ribbon that shimmered like ` +
-        `starlight, caught on a rosebush at the edge of the garden. ` +
-        `${cap(p.poss)} most magical adventure was about to begin.`
+        `One quiet evening, ${c.name} stepped into the garden just as the ` +
+        `sunset turned the sky to lavender and gold. ${cap(p.poss)} most ` +
+        `magical adventure was about to begin.`
       );
     },
   },
@@ -301,6 +320,7 @@ const rainbowKingdomPages: PageSpec[] = [
       ink: b.ink,
       layout: b.spread ? "text-left-subject-right" : "single-page",
       illustrationPrompt: illustration(b.scene, {
+        kind: "scene",
         light: b.light,
         spread: b.spread,
         compositionNotes: b.compositionNotes,
@@ -321,6 +341,7 @@ const rainbowKingdomPages: PageSpec[] = [
         "ribbon resting on the windowsill, now shimmering with every color of " +
         "the rainbow, soft moonlight and a peaceful, happy smile.",
       {
+        kind: "closing",
         spread: true,
         light:
           "Soft cool blue moonlight from the window plus the ribbon's gentle rainbow glow; eye-level camera beside the bed.",
@@ -346,7 +367,7 @@ const rainbowKingdomPages: PageSpec[] = [
       "Waving cheerfully with a big joyful smile, holding the shimmering " +
         "rainbow ribbon, against a soft simple pastel sky with a faint gentle " +
         "rainbow arc in the far distance.",
-      { companionOverride: null },
+      { kind: "backcover", companionOverride: null },
     ),
     text: (c) =>
       `The End…\n...but somewhere, a kingdom still sparkles because of ${c.name}.`,

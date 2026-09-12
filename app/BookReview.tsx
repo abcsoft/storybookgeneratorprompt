@@ -11,7 +11,7 @@ import {
   DEFAULT_ARTWORK_TRANSFORM,
   type ArtworkTransform,
 } from "@/lib/print/artworkTransform";
-import { buildReviewSequence, buildReviewSequenceForEdition } from "@/lib/manual/reviewOrder";
+import { buildReviewSequence, buildReviewSequenceForEdition, formatPhysicalPageLabel } from "@/lib/manual/reviewOrder";
 import { getEditionForProfile } from "@/lib/story/editions";
 import { computeOverlayGeometry, type OverlayRectPct } from "@/lib/print/overlayGeometry";
 import {
@@ -29,6 +29,8 @@ import styles from "./page.module.css";
 import { computePageTextGeometry } from "@/lib/print/printifyPageTemplate";
 import { computeCoverZonesPct } from "@/lib/print/coverTemplate";
 import { getBook } from "@/lib/story/registry";
+import { isDetectiveSignText, parseDetectiveSignText } from "@/lib/story/theGreatDetectiveTemplate";
+import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection } from "@/lib/story/layoutPlan";
 
 type OverlayToggle = "canvas" | "finished" | "safe" | "gutter" | "text";
 
@@ -54,6 +56,60 @@ function VersePanelOverlay({
   isSpread?: boolean;
 }) {
   if (!text || !text.trim()) return null;
+
+  if (isDetectiveSignText(text)) {
+    const { headline, agency } = parseDetectiveSignText(text);
+    const agencyFontSize =
+      agency.length > 28 ? "clamp(9px, 1.4vw, 15px)" : agency.length > 20 ? "clamp(10px, 1.7vw, 18px)" : "clamp(12px, 2.0vw, 22px)";
+    return (
+      <div
+        style={{
+          position: "absolute",
+          right: "8%",
+          bottom: "12%",
+          width: "34%",
+          textAlign: "center",
+          padding: "2.5% 3%",
+          background: "rgba(254, 243, 199, 0.94)",
+          border: "3.5px solid #78350f",
+          borderRadius: "14px",
+          boxShadow: "0 6px 20px rgba(0, 0, 0, 0.35)",
+          transform: "rotate(-1.5deg)",
+          zIndex: 5,
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: '"Fredoka", "Nunito", sans-serif',
+            fontWeight: 700,
+            fontSize: "clamp(11px, 2.0vw, 22px)",
+            color: "#991b1b",
+            letterSpacing: "0.05em",
+            marginBottom: "4px",
+            textTransform: "uppercase",
+          }}
+        >
+          {headline}
+        </div>
+        <div
+          style={{
+            fontFamily: '"Nunito", "Trebuchet MS", sans-serif',
+            fontWeight: 800,
+            color: "#451a03",
+            lineHeight: 1.18,
+            letterSpacing: "0.03em",
+            textTransform: "uppercase",
+            fontSize: agencyFontSize,
+            wordBreak: "break-word",
+          }}
+        >
+          {agency}
+        </div>
+      </div>
+    );
+  }
+
   const geom = computePageTextGeometry(profile, isSpread);
 
   const style: CSSProperties = {
@@ -94,6 +150,7 @@ function CoverWrapPreview({
   backSrc,
   frontTransform,
   backTransform,
+  backText,
 }: {
   profile: PrintProfile;
   title: string;
@@ -102,6 +159,7 @@ function CoverWrapPreview({
   backSrc: string | null;
   frontTransform?: ArtworkTransform;
   backTransform?: ArtworkTransform;
+  backText?: string | null;
 }) {
   const z = computeCoverZonesPct(profile);
 
@@ -150,6 +208,52 @@ function CoverWrapPreview({
           <ArtworkFrame src={backSrc} transform={backTransform} />
         ) : (
           <div style={{ width: "100%", height: "100%", background: "linear-gradient(165deg, #1f1a4d 0%, #4a3691 55%, #2f9e8f 100%)" }} />
+        )}
+        {isDetectiveSignText(backText ?? null) && (
+          <div
+            style={{
+              position: "absolute",
+              right: "8%",
+              bottom: "14%",
+              width: "35%",
+              textAlign: "center",
+              padding: "2% 3%",
+              background: "rgba(254, 243, 199, 0.94)",
+              border: "2px solid #78350f",
+              borderRadius: "8px",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.35)",
+              transform: "rotate(-1.5deg)",
+              zIndex: 3,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: '"Fredoka", "Nunito", sans-serif',
+                fontWeight: 700,
+                fontSize: "clamp(7px, 1.0vw, 13px)",
+                color: "#991b1b",
+                letterSpacing: "0.04em",
+                marginBottom: "2px",
+                textTransform: "uppercase",
+              }}
+            >
+              {parseDetectiveSignText(backText!).headline}
+            </div>
+            <div
+              style={{
+                fontFamily: '"Nunito", "Trebuchet MS", sans-serif',
+                fontWeight: 800,
+                color: "#451a03",
+                lineHeight: 1.15,
+                letterSpacing: "0.02em",
+                fontSize: "clamp(6px, 0.8vw, 11px)",
+                textTransform: "uppercase",
+                wordBreak: "break-word",
+              }}
+            >
+              {parseDetectiveSignText(backText!).agency}
+            </div>
+          </div>
         )}
       </div>
 
@@ -500,6 +604,22 @@ function FramingEditorModal({
     }
   }
 
+  const [spreadViewMode, setSpreadViewMode] = useState<"continuous" | "split">("continuous");
+  const [textSide, setTextSide] = useState<"left" | "right" | "none">("left");
+  const subjectSide = textSide === "left" ? "right" : textSide === "right" ? "left" : "centered";
+
+  const nominalWidthIn = isSpread ? profile.nominalSizeIn.width * 2 : profile.nominalSizeIn.width;
+  const nominalHeightIn = profile.nominalSizeIn.height;
+  const effectivePpi =
+    naturalSize.width > 0
+      ? Math.min(naturalSize.width / nominalWidthIn, naturalSize.height / nominalHeightIn)
+      : 300;
+  const isLowPpi = effectivePpi < 150;
+
+  // Gutter collision: center zone is 47% to 53% of the wide canvas
+  const subjectCenterPct = pct.leftPct + pct.widthPct / 2;
+  const gutterCollision = isSpread && Math.abs(subjectCenterPct - 50) < 5 && pct.widthPct < 90;
+
   const illoNumStr = String(manifestPage.illustrationNumber ?? manifestPage.page).padStart(2, "0");
   const isNeedsRegen = illustration?.status === "needs-regeneration" || illustration?.needsRegeneration;
 
@@ -535,207 +655,433 @@ function FramingEditorModal({
           </div>
         </div>
 
-        <div className={styles.editorViewportContainer}>
-          <div
-            ref={canvasRef}
-            className={styles.editorCanvas}
-            style={{ width: `${canvasWidthPx}px`, aspectRatio: canvasAspect }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-          >
-            {transform.backgroundMode === "extended" && illustration?.objectUrl && (
-              <img
-                src={illustration.objectUrl}
-                alt=""
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  filter: `blur(${ARTWORK_FRAME_BACKDROP_BLUR_PX / 2}px) brightness(${ARTWORK_FRAME_BACKDROP_BRIGHTNESS})`,
-                  transform: `scale(${ARTWORK_FRAME_BACKDROP_SCALE})`,
-                }}
-              />
-            )}
+        {/* Warning Banners */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", margin: "8px 16px 0 16px" }}>
+          {gutterCollision && (
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "rgba(245, 158, 11, 0.2)",
+                border: "1px solid #f59e0b",
+                borderRadius: "6px",
+                color: "#fef3c7",
+                fontSize: "12px",
+              }}
+            >
+              ⚠️ <strong>Gutter Caution:</strong> Artwork center/subject is near the spine fold (47%–53%). Position faces and key subjects safely on the {subjectSide}-hand side to prevent them from being lost in the binding.
+            </div>
+          )}
+          {isLowPpi && (
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "rgba(239, 68, 68, 0.2)",
+                border: "1px solid #ef4444",
+                borderRadius: "6px",
+                color: "#fee2e2",
+                fontSize: "12px",
+              }}
+            >
+              ⚠️ <strong>Resolution Warning:</strong> {naturalSize.width}×{naturalSize.height} px yields only {Math.round(effectivePpi)} PPI on this {nominalWidthIn}×{nominalHeightIn}&quot; canvas. High quality print requires at least 150 PPI (ideal 300 PPI).
+            </div>
+          )}
+        </div>
 
-            {illustration?.objectUrl && (
-              <img
-                src={illustration.objectUrl}
-                alt=""
-                onLoad={(e) => {
-                  const img = e.currentTarget;
-                  if (img.naturalWidth && img.naturalHeight) {
-                    setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
-                  }
-                }}
+        {/* Spread Controls: Preview Mode & Story Text Side */}
+        {isSpread && (
+          <div className={styles.editorToolbar} style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", padding: "6px 16px" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", justifyContent: "space-between", width: "100%" }}>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <span style={{ color: "#94a3b8", fontSize: "12px", fontWeight: 700 }}>Preview:</span>
+                <button
+                  type="button"
+                  className={`${styles.editorModeBtn} ${spreadViewMode === "continuous" ? styles.editorModeBtnActive : ""}`}
+                  onClick={() => setSpreadViewMode("continuous")}
+                >
+                  Panoramic Spread
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.editorModeBtn} ${spreadViewMode === "split" ? styles.editorModeBtnActive : ""}`}
+                  onClick={() => setSpreadViewMode("split")}
+                >
+                  Two-Page Split
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <span style={{ color: "#94a3b8", fontSize: "12px", fontWeight: 700 }}>Story Text Side:</span>
+                <button
+                  type="button"
+                  className={`${styles.editorModeBtn} ${textSide === "left" ? styles.editorModeBtnActive : ""}`}
+                  onClick={() => setTextSide("left")}
+                >
+                  Text Left
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.editorModeBtn} ${textSide === "right" ? styles.editorModeBtnActive : ""}`}
+                  onClick={() => setTextSide("right")}
+                >
+                  Text Right
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.editorModeBtn} ${textSide === "none" ? styles.editorModeBtnActive : ""}`}
+                  onClick={() => setTextSide("none")}
+                >
+                  No Text
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={styles.editorViewportContainer}>
+          {isSpread && spreadViewMode === "split" ? (
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              {/* Left Page (Verso) */}
+              <div
                 style={{
-                  position: "absolute",
+                  position: "relative",
+                  width: `${canvasWidthPx / 2}px`,
+                  aspectRatio: "1 / 1",
+                  background: "#110b29",
+                  borderRadius: "8px 0 0 8px",
+                  overflow: "hidden",
+                  boxShadow: "inset -12px 0 20px -8px rgba(0,0,0,0.6)",
+                  borderRight: "1px solid rgba(255,255,255,0.15)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    width: `${canvasWidthPx}px`,
+                    height: "100%",
+                  }}
+                >
+                  {illustration?.objectUrl && (
+                    <img
+                      src={illustration.objectUrl}
+                      alt=""
+                      style={{
+                        position: "absolute",
+                        left: `${pct.leftPct}%`,
+                        top: `${pct.topPct}%`,
+                        width: `${pct.widthPct}%`,
+                        height: `${pct.heightPct}%`,
+                        objectFit: "fill",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
+                </div>
+                <div style={{ position: "absolute", top: "8px", left: "10px", background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#ffd36b" }}>
+                  Left Page (Verso)
+                </div>
+                {guideToggles.has("text") && textSide === "left" && manifestPage.text && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "10%",
+                      bottom: "10%",
+                      width: "80%",
+                      background: "rgba(255, 255, 255, 0.9)",
+                      color: "#1c1440",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    📝 {manifestPage.text}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Page (Recto) */}
+              <div
+                style={{
+                  position: "relative",
+                  width: `${canvasWidthPx / 2}px`,
+                  aspectRatio: "1 / 1",
+                  background: "#110b29",
+                  borderRadius: "0 8px 8px 0",
+                  overflow: "hidden",
+                  boxShadow: "inset 12px 0 20px -8px rgba(0,0,0,0.6)",
+                  borderLeft: "1px solid rgba(255,255,255,0.15)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `-${canvasWidthPx / 2}px`,
+                    top: 0,
+                    width: `${canvasWidthPx}px`,
+                    height: "100%",
+                  }}
+                >
+                  {illustration?.objectUrl && (
+                    <img
+                      src={illustration.objectUrl}
+                      alt=""
+                      style={{
+                        position: "absolute",
+                        left: `${pct.leftPct}%`,
+                        top: `${pct.topPct}%`,
+                        width: `${pct.widthPct}%`,
+                        height: `${pct.heightPct}%`,
+                        objectFit: "fill",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
+                </div>
+                <div style={{ position: "absolute", top: "8px", right: "10px", background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", color: "#ffd36b" }}>
+                  Right Page (Recto)
+                </div>
+                {guideToggles.has("text") && textSide === "right" && manifestPage.text && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "10%",
+                      bottom: "10%",
+                      width: "80%",
+                      background: "rgba(255, 255, 255, 0.9)",
+                      color: "#1c1440",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    📝 {manifestPage.text}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={canvasRef}
+              className={styles.editorCanvas}
+              style={{ width: `${canvasWidthPx}px`, aspectRatio: canvasAspect }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            >
+              {transform.backgroundMode === "extended" && illustration?.objectUrl && (
+                <img
+                  src={illustration.objectUrl}
+                  alt=""
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    filter: `blur(${ARTWORK_FRAME_BACKDROP_BLUR_PX / 2}px) brightness(${ARTWORK_FRAME_BACKDROP_BRIGHTNESS})`,
+                    transform: `scale(${ARTWORK_FRAME_BACKDROP_SCALE})`,
+                  }}
+                />
+              )}
+
+              {illustration?.objectUrl && (
+                <img
+                  src={illustration.objectUrl}
+                  alt=""
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalWidth && img.naturalHeight) {
+                      setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+                    }
+                  }}
+                  style={{
+                    position: "absolute",
+                    left: `${pct.leftPct}%`,
+                    top: `${pct.topPct}%`,
+                    width: `${pct.widthPct}%`,
+                    height: `${pct.heightPct}%`,
+                    objectFit: "fill",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+
+              {/* Canva/Lulu Bounding Box & 4 Corner Resize Handles */}
+              <div
+                className={styles.framingBoundingBox}
+                style={{
                   left: `${pct.leftPct}%`,
                   top: `${pct.topPct}%`,
                   width: `${pct.widthPct}%`,
                   height: `${pct.heightPct}%`,
-                  objectFit: "fill",
-                  pointerEvents: "none",
                 }}
-              />
-            )}
-
-            {/* Canva/Lulu Bounding Box & 4 Corner Resize Handles */}
-            <div
-              className={styles.framingBoundingBox}
-              style={{
-                left: `${pct.leftPct}%`,
-                top: `${pct.topPct}%`,
-                width: `${pct.widthPct}%`,
-                height: `${pct.heightPct}%`,
-              }}
-            >
-              <div
-                className={`${styles.cornerHandle} ${styles.cornerHandleTopLeft}`}
-                onPointerDown={(e) => startCornerDrag(e, "top-left")}
-              />
-              <div
-                className={`${styles.cornerHandle} ${styles.cornerHandleTopRight}`}
-                onPointerDown={(e) => startCornerDrag(e, "top-right")}
-              />
-              <div
-                className={`${styles.cornerHandle} ${styles.cornerHandleBottomLeft}`}
-                onPointerDown={(e) => startCornerDrag(e, "bottom-left")}
-              />
-              <div
-                className={`${styles.cornerHandle} ${styles.cornerHandleBottomRight}`}
-                onPointerDown={(e) => startCornerDrag(e, "bottom-right")}
-              />
-            </div>
-
-            {/* Fixed Print Guides & Overlays */}
-            <div className={styles.overlayLayer} style={{ pointerEvents: "none" }}>
-              {guideToggles.has("canvas") && (
+              >
                 <div
-                  style={{
-                    position: "absolute",
-                    inset: "0%",
-                    border: "2px solid rgba(59, 130, 246, 0.6)",
-                    boxSizing: "border-box",
-                  }}
+                  className={`${styles.cornerHandle} ${styles.cornerHandleTopLeft}`}
+                  onPointerDown={(e) => startCornerDrag(e, "top-left")}
                 />
-              )}
-              {guideToggles.has("trim") && (
                 <div
-                  style={{
-                    position: "absolute",
-                    inset: "3.2%",
-                    border: "2px solid #58e0c6",
-                    boxSizing: "border-box",
-                  }}
+                  className={`${styles.cornerHandle} ${styles.cornerHandleTopRight}`}
+                  onPointerDown={(e) => startCornerDrag(e, "top-right")}
                 />
-              )}
-              {isSpread ? (
-                <>
-                  {guideToggles.has("trim") && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: "5%",
-                        top: "6%",
-                        width: "42%",
-                        height: "88%",
-                        border: "2px dashed #ffd36b",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  )}
-                  {guideToggles.has("gutter") && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: "47%",
-                        top: "0%",
-                        width: "6%",
-                        height: "100%",
-                        background: "rgba(232, 93, 93, 0.28)",
-                        borderLeft: "1px dashed #e85d5d",
-                        borderRight: "1px dashed #e85d5d",
-                      }}
-                    />
-                  )}
-                  {guideToggles.has("trim") && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: "53%",
-                        top: "6%",
-                        width: "42%",
-                        height: "88%",
-                        border: "2px dashed #ffd36b",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  )}
-                </>
-              ) : (
-                guideToggles.has("trim") && (
+                <div
+                  className={`${styles.cornerHandle} ${styles.cornerHandleBottomLeft}`}
+                  onPointerDown={(e) => startCornerDrag(e, "bottom-left")}
+                />
+                <div
+                  className={`${styles.cornerHandle} ${styles.cornerHandleBottomRight}`}
+                  onPointerDown={(e) => startCornerDrag(e, "bottom-right")}
+                />
+              </div>
+
+              {/* Fixed Print Guides & Overlays */}
+              <div className={styles.overlayLayer} style={{ pointerEvents: "none" }}>
+                {guideToggles.has("canvas") && (
                   <div
                     style={{
                       position: "absolute",
-                      left: "6%",
-                      top: "6%",
-                      width: "88%",
-                      height: "88%",
-                      border: "2px dashed #ffd36b",
+                      inset: "0%",
+                      border: "2px solid rgba(59, 130, 246, 0.6)",
                       boxSizing: "border-box",
                     }}
                   />
-                )
-              )}
+                )}
+                {guideToggles.has("trim") && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: "3.2%",
+                      border: "2px solid #58e0c6",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                )}
+                {isSpread ? (
+                  <>
+                    {guideToggles.has("trim") && (
+                      <>
+                        {/* Text-safe and Subject-safe overlays */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: textSide === "right" ? "56%" : "6%",
+                            top: "6%",
+                            width: "38%",
+                            height: "88%",
+                            border: "2px dashed #60a5fa",
+                            background: "rgba(96, 165, 250, 0.08)",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <span style={{ position: "absolute", top: "6px", left: "8px", fontSize: "10px", color: "#93c5fd", fontWeight: 700 }}>
+                            Story Text Safe Area
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: subjectSide === "right" ? "56%" : "6%",
+                            top: "6%",
+                            width: "38%",
+                            height: "88%",
+                            border: "2px dashed #34d399",
+                            background: "rgba(52, 211, 153, 0.08)",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <span style={{ position: "absolute", top: "6px", right: "8px", fontSize: "10px", color: "#6ee7b7", fontWeight: 700 }}>
+                            Subject Safe Area
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {guideToggles.has("gutter") && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: "47%",
+                          top: "0%",
+                          width: "6%",
+                          height: "100%",
+                          background: "rgba(232, 93, 93, 0.28)",
+                          borderLeft: "1px dashed #e85d5d",
+                          borderRight: "1px dashed #e85d5d",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <span style={{ writingMode: "vertical-rl", fontSize: "10px", color: "#fca5a5", letterSpacing: "1px" }}>
+                          GUTTER FOLD
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  guideToggles.has("trim") && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: "6%",
+                        top: "6%",
+                        width: "88%",
+                        height: "88%",
+                        border: "2px dashed #ffd36b",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  )
+                )}
 
-              {/* Fixed Story Text Overlay */}
-              {guideToggles.has("text") && manifestPage.text && (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: isSpread ? "6%" : "8%",
-                    bottom: "8%",
-                    width: isSpread ? "38%" : "84%",
-                    background: "rgba(255, 255, 255, 0.88)",
-                    color: "#1c1440",
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  📝 {manifestPage.text}
-                </div>
-              )}
+                {/* Fixed Story Text Overlay */}
+                {guideToggles.has("text") && textSide !== "none" && manifestPage.text && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: isSpread ? (textSide === "right" ? "56%" : "6%") : "8%",
+                      bottom: "8%",
+                      width: isSpread ? "38%" : "84%",
+                      background: "rgba(255, 255, 255, 0.88)",
+                      color: "#1c1440",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    📝 {manifestPage.text}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Guides Toggle Bar */}
         <div className={styles.editorToolbar}>
           <div className={styles.guideToggleGroup}>
             <span style={{ color: "#fff", fontSize: "12px", fontWeight: 700, marginRight: "4px" }}>
-              Guides:
+              Editor Guides:
             </span>
             <button
               type="button"
               className={`${styles.guideToggleBtn} ${guideToggles.has("canvas") ? styles.guideToggleBtnActive : ""}`}
               onClick={() => toggleGuide("canvas")}
             >
-              Canvas
+              Canvas & Bleed
             </button>
             <button
               type="button"
               className={`${styles.guideToggleBtn} ${guideToggles.has("trim") ? styles.guideToggleBtnActive : ""}`}
               onClick={() => toggleGuide("trim")}
             >
-              Trim/Safe
+              Trim & Safe Areas
             </button>
             {isSpread && (
               <button
@@ -743,7 +1089,7 @@ function FramingEditorModal({
                 className={`${styles.guideToggleBtn} ${guideToggles.has("gutter") ? styles.guideToggleBtnActive : ""}`}
                 onClick={() => toggleGuide("gutter")}
               >
-                Gutter
+                Center Gutter (47%–53%)
               </button>
             )}
             {manifestPage.text && (
@@ -920,6 +1266,8 @@ export default function BookReview({
   profile,
   bookId,
   childName = "Alex",
+  layoutMode,
+  customSpreads,
   strictMode,
   onToggleStrict,
   onBack,
@@ -938,6 +1286,8 @@ export default function BookReview({
   profile: PrintProfile;
   bookId?: string;
   childName?: string;
+  layoutMode?: LayoutMode;
+  customSpreads?: CustomSpreadSelection[];
   strictMode: boolean;
   onToggleStrict: (v: boolean) => void;
   onBack: () => void;
@@ -958,6 +1308,20 @@ export default function BookReview({
   );
   const statuses = manifest.map((_, i) => illustrations[i]?.status ?? "missing");
   const gate = evaluateExportGate(statuses, { strict: strictMode });
+
+  const layoutPlan = useMemo(() => {
+    if (!bookId) return null;
+    return resolveLayoutPlan({
+      child: { name: childName || "Child", age: 5, gender: "boy" },
+      bookId,
+      profileId: profile.id,
+      mode: layoutMode ?? "standard-single",
+      customSpreads,
+    });
+  }, [bookId, childName, profile.id, layoutMode, customSpreads]);
+
+  const isProfileInvalid = layoutPlan ? !layoutPlan.isValidForProfile : false;
+  const profileErrors: string[] = layoutPlan?.limitations ?? [];
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [framingEditorIndex, setFramingEditorIndex] = useState<number | null>(null);
@@ -1035,6 +1399,7 @@ export default function BookReview({
                 backSrc={backCoverEntry?.objectUrl ?? null}
                 frontTransform={coverEntry?.transform}
                 backTransform={backCoverEntry?.transform}
+                backText={manifest[manifest.length - 1]?.text ?? null}
               />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "6px" }}>
                 <span className={styles.reviewTileLabel} style={{ fontSize: "12px", fontWeight: 700 }}>
@@ -1070,7 +1435,7 @@ export default function BookReview({
         {entries.map((e) => {
           const entry = illustrations[e.manifestIndex];
           const status = entry?.status ?? "missing";
-          const label = e.layout === "spread" ? `Pages ${e.startPage}–${e.endPage}` : `Page ${e.page}`;
+          const label = formatPhysicalPageLabel(e);
           const manifestPage = manifest.find((m) => m.index === e.manifestIndex);
           const isSpread = manifestPage
             ? (manifestPage.pageLayout ? manifestPage.pageLayout === "spread" : (manifestPage.spread ?? false))
@@ -1207,7 +1572,18 @@ export default function BookReview({
         </button>
       </div>
 
-      <button className={styles.button} onClick={onExport} disabled={busy || gate.blocked}>
+      {isProfileInvalid && (
+        <div style={{ color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", padding: "12px 16px", borderRadius: "8px", margin: "12px 0" }}>
+          <strong>⚠️ Incompatible Profile / Layout Combination:</strong>
+          <ul style={{ margin: "6px 0 0 16px", padding: 0 }}>
+            {profileErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <button className={styles.button} onClick={onExport} disabled={busy || gate.blocked || isProfileInvalid}>
         {busy ? "Working…" : exportLabel}
       </button>
 
@@ -1254,6 +1630,7 @@ export default function BookReview({
               backSrc={backCoverEntry?.objectUrl ?? null}
               frontTransform={coverEntry?.transform}
               backTransform={backCoverEntry?.transform}
+              backText={manifest[manifest.length - 1]?.text ?? null}
             />
 
             <p className={styles.hint} style={{ marginTop: "10px" }}>

@@ -19,6 +19,12 @@ function article(word: string): string {
   return /^[aeiou]/i.test(word.trim()) ? "an" : "a";
 }
 
+export const BOOKEND_OUTFIT =
+  "cozy casual clothes: a cheerful everyday sweater and comfortable pants";
+export const INTRO_PAJAMAS = "soft cozy blue pajamas";
+
+export const STORY_META = { defaultOutfit: BOOKEND_OUTFIT };
+
 /** Build a full illustration prompt using the central prompt engine. */
 function illustration(
   role: string,
@@ -26,17 +32,40 @@ function illustration(
   layout: LayoutType = "single-page",
   kind: PageKind = "scene",
   compositionNotes?: string,
+  outfitOverride?: string,
 ) {
-  return (c: ChildProfile, profileId?: string): string =>
-    buildIllustrationPrompt({
+  return (
+    c: ChildProfile,
+    profileId?: string,
+    overrides?: {
+      layout?: LayoutType;
+      textSide?: "left" | "right" | "none";
+      subjectSide?: "left" | "right" | "centered";
+    },
+  ): string => {
+    const isCareer = kind === "scene" && role !== "dreamer";
+    const costumeNote = isCareer
+      ? `The child's outfit changes to match the ${role} career uniform, but ${c.name}'s exact face shape, skin tone, hairstyle, hairline, eye color, and facial proportions must remain strictly identical to the reference photos. A costume changes clothing only, never the child’s face, age, ethnicity, hair, or body proportions.`
+      : "";
+    const fullScene = `as ${article(role)} ${role}: ${scene}${costumeNote ? ` ${costumeNote}` : ""}`;
+
+    const effectiveLayout = overrides?.layout ?? layout;
+    const effectiveTextSide = overrides?.textSide;
+    const effectiveSubjectSide = overrides?.subjectSide;
+
+    return buildIllustrationPrompt({
       child: c,
-      story: {},
-      scene: `as ${article(role)} ${role}: ${scene}`,
-      layout,
+      story: STORY_META,
+      scene: fullScene,
+      layout: effectiveLayout,
       kind,
+      textSide: effectiveTextSide,
+      subjectSide: effectiveSubjectSide,
       profileId,
       compositionNotes,
+      outfitOverride,
     });
+  };
 }
 
 /** One career scene: the badge label, the illustration scene, and the copy. */
@@ -59,8 +88,6 @@ const ROLES: Role[] = [
       `Up, up, and away! ${c.name} the pilot soars through the clouds, ` +
       `steering the plane with a brave and happy heart.`,
   },
-  // Racer comes before Astronaut so the Astronaut spread begins on an even page
-  // (see lib/pdf/imposition.ts — spreads must land on a facing pair).
   {
     role: "race car driver",
     badge: "RACER",
@@ -74,7 +101,7 @@ const ROLES: Role[] = [
   {
     role: "astronaut",
     badge: "ASTRONAUT",
-    spread: true,
+    spread: false,
     scene:
       "Floating in outer space in a white astronaut suit and helmet, with " +
       "glittering stars, colorful planets, and Earth glowing softly behind.",
@@ -225,13 +252,10 @@ const ROLES: Role[] = [
       `Click! ${c.name} the photographer captures the most beautiful moments and ` +
       `keeps them forever.`,
   },
-  // Deep-sea Diver is a two-page spread placed before Vet so it begins on an
-  // even page; this also makes the closing spread land on a facing pair (see
-  // lib/pdf/imposition.ts).
   {
     role: "deep-sea diver",
     badge: "DEEP-SEA DIVER",
-    spread: true,
+    spread: false,
     scene:
       "Wearing a diving suit underwater among colorful coral reefs, friendly " +
       "fish, and a smiling sea turtle in sparkling blue water.",
@@ -261,7 +285,7 @@ const ROLES: Role[] = [
   },
 ];
 
-/** The full ordered book: cover + dedication + scenes + closing + back cover. */
+/** The full ordered book: cover + dedication + scenes + closing + final page + back cover. */
 export const dreamBigPages: PageSpec[] = [
   // Front cover
   {
@@ -277,51 +301,56 @@ export const dreamBigPages: PageSpec[] = [
         "covering the child.",
       "single-page",
       "cover",
+      undefined,
+      BOOKEND_OUTFIT,
     ),
     text: (c) => `${c.name}'s Dream Big Adventure`,
   },
-  // Dedication / intro
+  // Dedication / intro (Physical Page 1 - single right-hand page)
   {
     kind: "intro",
-    spread: true,
-    layout: "text-left-subject-right",
+    spread: false,
+    layout: "single-page",
     illustrationPrompt: illustration(
       "cozy reader",
       "Snuggled up reading a glowing storybook in a cozy bedroom at night, with " +
         "soft warm lamplight and dreamy stars drifting from the open book.",
-      "text-left-subject-right",
+      "single-page",
       "intro",
+      undefined,
+      INTRO_PAJAMAS,
     ),
     text: (c) =>
       `Once upon a time there was a ${childNoun(c.gender)} named ${c.name}, ` +
       `who could be anything ${pronouns(c.gender).subj} dreamed. ` +
       `Turn the page and let's find out who ${c.name} can be!`,
   },
-  // 20 career scenes
+  // 20 career scenes (Physical Pages 2–21)
   ...ROLES.map(
     (r): PageSpec => {
-      const layout: LayoutType = r.spread ? "text-left-subject-right" : "single-page";
       return {
         kind: "scene",
         role: r.badge,
-        spread: r.spread,
-        layout,
-        illustrationPrompt: illustration(r.role, r.scene, layout, "scene"),
+        spread: false,
+        layout: "single-page",
+        illustrationPrompt: illustration(r.role, r.scene, "single-page", "scene"),
         text: (c) => r.copy(c, pronouns(c.gender)),
       };
     },
   ),
-  // Closing
+  // Closing (Physical Page 23)
   {
     kind: "closing",
-    spread: true,
-    layout: "text-left-subject-right",
+    spread: false,
+    layout: "single-page",
     illustrationPrompt: illustration(
       "dreamer",
       "Standing on a hilltop at sunset with arms open wide, looking up at a sky " +
         "full of glowing silhouettes of a rocket, a plane, musical notes, and stars.",
-      "text-left-subject-right",
+      "single-page",
       "closing",
+      undefined,
+      BOOKEND_OUTFIT,
     ),
     text: (c) =>
       `No matter how big you dream, ${c.name}, you can be anything.\n\n` +
@@ -330,6 +359,7 @@ export const dreamBigPages: PageSpec[] = [
   // Back cover
   {
     kind: "backcover",
+    role: "happy dreamer",
     layout: "single-page",
     illustrationPrompt: illustration(
       "happy dreamer",
@@ -337,6 +367,8 @@ export const dreamBigPages: PageSpec[] = [
         "background with a few gentle stars.",
       "single-page",
       "backcover",
+      undefined,
+      BOOKEND_OUTFIT,
     ),
     text: () => `Dream big.`,
   },
@@ -352,7 +384,7 @@ export const dreamBigBook: StoryTemplate = {
   pages: dreamBigPages,
 };
 
-/** Printify Hardcover Square 8x8 Edition — maps 24 illustrations/pages to exactly 24 physical interior pages. */
+/** Printify Hardcover Square 8x8 Edition — maps 24 physical interior pages. */
 export const dreamBigPrintify24Edition: PrintEdition = {
   id: "dream-big-printify-24",
   storyId: "dream-big",
@@ -403,3 +435,4 @@ export const dreamBigPrintify24Edition: PrintEdition = {
 };
 
 registerPrintEdition(dreamBigPrintify24Edition);
+

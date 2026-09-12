@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { greatAdventureBook } from "./greatAdventureTemplate";
+import { greatAdventureBook, greatAdventurePrintify24Edition } from "./greatAdventureTemplate";
+import { resolveLayoutPlan } from "./layoutPlan";
 import { buildPages } from "./registry";
 import { assertSpreadsAligned, spreadStartPages } from "../pdf/imposition";
 import type { ChildProfile } from "./types";
@@ -99,10 +100,11 @@ describe("greatAdventureTemplate", () => {
     expect(closing?.prompt).toContain("pajamas");
   });
 
-  it("keeps Scout consistent via companionRules, except the solo whale-ride rest scene", () => {
+  it("keeps Scout consistent via companionRules throughout the journey including the whale ride", () => {
     const pages = buildPages(child, BOOK_ID);
     const whale = pages.find((p) => p.prompt.includes("huge friendly blue whale"));
-    expect(whale?.prompt).not.toContain("COMPANION CONTINUITY");
+    expect(whale?.prompt).toContain("COMPANION CONTINUITY");
+    expect(whale?.prompt).toContain("Scout");
 
     const jungle = pages.find((p) => p.prompt.includes("cheeky monkeys"));
     expect(jungle?.prompt).toContain("COMPANION CONTINUITY");
@@ -111,7 +113,7 @@ describe("greatAdventureTemplate", () => {
   it("gives spread scenes the strong gutter/edge-safety composition rules instead of the legacy note", () => {
     const pages = buildPages(child, BOOK_ID);
     const bridge = pages.find((p) => p.prompt.includes("wobbly rope bridge"));
-    expect(bridge?.prompt).toContain("CENTER GUTTER");
+    expect(bridge?.prompt).toContain("central gutter-safe zone");
     expect(bridge?.prompt).toContain(
       "NO PARTIAL HUMAN OR ANIMAL BODY PART MAY ENTER FROM ANY EDGE",
     );
@@ -125,5 +127,101 @@ describe("greatAdventureTemplate", () => {
 
     const flyingHome = pages.at(-3); // last journey scene, before closing + back cover
     expect(flyingHome?.prompt.toLowerCase()).toContain("safe art page");
+  });
+
+  it("strictly maps all 19 interior scene IDs across 24 physical pages in edition mode, and 19 pages in single mode", () => {
+    // 1. Template-level interior scene count: 1 intro + 17 journey + 1 closing = 19 scenes
+    const interiorPages = greatAdventureBook.pages.filter(
+      (p) => p.kind !== "cover" && p.kind !== "backcover",
+    );
+    expect(interiorPages.length).toBe(19);
+
+    // 2. Exact scene IDs in chronological narrative order
+    const expectedSceneIds = [
+      "intro",
+      "scene-02", "scene-03", "scene-04", "scene-05", "scene-06",
+      "scene-07", "scene-08", "scene-09", "scene-10", "scene-11",
+      "scene-12", "scene-13", "scene-14", "scene-15", "scene-16",
+      "scene-17", "scene-18",
+      "closing",
+    ];
+    expect(expectedSceneIds.length).toBe(19);
+
+    // 3. Supported Edition Mode (great-adventure-printify-24)
+    const editionPlan = resolveLayoutPlan({
+      child,
+      bookId: BOOK_ID,
+      profileId: "printify-hardcover-square-8x8",
+    });
+    expect(editionPlan.isValidForProfile).toBe(true);
+    expect(editionPlan.interiorPageCount).toBe(24);
+    expect(editionPlan.interiorAssets.length).toBe(19);
+
+    const editionSceneIds = editionPlan.interiorAssets.map((a) => a.sceneId);
+    expect(editionSceneIds).toEqual(expectedSceneIds);
+
+    const spreads = editionPlan.interiorAssets.filter((a) => a.layout !== "single-page");
+    const singles = editionPlan.interiorAssets.filter((a) => a.layout === "single-page");
+    expect(spreads.length).toBe(5);
+    expect(singles.length).toBe(14);
+    expect(spreads.length * 2 + singles.length).toBe(24);
+
+    // 4. Standard Single Mode (all 19 scenes forced to single-page, rejecting 24-page fixed profile)
+    const singlePlan = resolveLayoutPlan({
+      child,
+      bookId: BOOK_ID,
+      profileId: "printify-hardcover-square-8x8",
+      mode: "standard-single",
+    });
+    expect(singlePlan.interiorPageCount).toBe(19);
+    expect(singlePlan.interiorAssets.length).toBe(19);
+    expect(singlePlan.interiorAssets.every((a) => a.layout === "single-page")).toBe(true);
+    expect(singlePlan.interiorAssets.map((a) => a.sceneId)).toEqual(expectedSceneIds);
+    expect(singlePlan.isValidForProfile).toBe(false);
+    expect(singlePlan.limitations?.[0]).toContain("resolves to 19 interior pages, but Printify Hardcover Square 8×8 requires exactly 24 interior pages");
+  });
+
+  it("verifies authentic narrative fingerprints for all 19 interior beats (not hallucinated titles)", () => {
+    const pages = buildPages(child, BOOK_ID);
+    const interior = pages.filter((p) => p.kind !== "cover" && p.kind !== "backcover");
+    expect(interior.length).toBe(19);
+
+    const fingerprints: Array<{ name: string; requiredPromptWords: string[]; requiredCopyWords: string[] }> = [
+      { name: "intro", requiredPromptWords: ["treasure map", "bedroom", "scout"], requiredCopyWords: ["glowing", "backpack", "scout"] },
+      { name: "scene-02 (sailboat)", requiredPromptWords: ["sailboat", "harbour"], requiredCopyWords: ["map", "bay"] },
+      { name: "scene-03 (jungle)", requiredPromptWords: ["jungle", "trail", "monkeys", "toucans"], requiredCopyWords: ["jungle", "vines", "toucans"] },
+      { name: "scene-04 (waterfall)", requiredPromptWords: ["rope bridge", "waterfall"], requiredCopyWords: ["bridge", "water"] },
+      { name: "scene-05 (desert camel)", requiredPromptWords: ["camel", "desert", "dunes"], requiredCopyWords: ["desert", "camel", "dunes"] },
+      { name: "scene-06 (ancient ruins)", requiredPromptWords: ["ruins", "pillars"], requiredCopyWords: ["ruins", "carving"] },
+      { name: "scene-07 (savanna)", requiredPromptWords: ["savanna", "giraffes", "elephants"], requiredCopyWords: ["giraffes", "elephants"] },
+      { name: "scene-08 (snowy mountain)", requiredPromptWords: ["mountain", "eagle"], requiredCopyWords: ["mountain", "eagle"] },
+      { name: "scene-09 (Arctic shore)", requiredPromptWords: ["arctic", "polar bears", "northern lights"], requiredCopyWords: ["polar bears", "lights"] },
+      { name: "scene-10 (coral reef)", requiredPromptWords: ["coral", "dolphin"], requiredCopyWords: ["waves", "dolphins"] },
+      { name: "scene-11 (blue whale)", requiredPromptWords: ["whale", "jellyfish"], requiredCopyWords: ["whale", "jellyfish"] },
+      { name: "scene-12 (ocean storm)", requiredPromptWords: ["storm", "mast"], requiredCopyWords: ["storm", "waves"] },
+      { name: "scene-13 (treasure island)", requiredPromptWords: ["island", "cove"], requiredCopyWords: ["island", "spot"] },
+      { name: "scene-14 (crystal cave)", requiredPromptWords: ["crystal cave", "gems"], requiredCopyWords: ["crystal cave", "gems"] },
+      { name: "scene-15 (treasure chamber)", requiredPromptWords: ["chamber", "chest"], requiredCopyWords: ["chest", "lid"] },
+      { name: "scene-16 (chest opens)", requiredPromptWords: ["chest", "starlight"], requiredCopyWords: ["golden light", "stars"] },
+      { name: "scene-17 (star friend)", requiredPromptWords: ["star", "smiling"], requiredCopyWords: ["star", "friend"] },
+      { name: "scene-18 (flying home)", requiredPromptWords: ["starry night sky", "trail of stars"], requiredCopyWords: ["flew", "night sky"] },
+      { name: "closing (bedtime)", requiredPromptWords: ["bed", "bedroom"], requiredCopyWords: ["home", "star", "sleep"] },
+    ];
+
+    expect(interior.length).toBe(fingerprints.length);
+
+    for (let i = 0; i < fingerprints.length; i++) {
+      const page = interior[i];
+      const fp = fingerprints[i];
+      const pText = page.prompt.toLowerCase();
+      const cText = page.text.toLowerCase();
+
+      for (const word of fp.requiredPromptWords) {
+        expect(pText, `Page ${i + 1} (${fp.name}) prompt must contain '${word}'`).toContain(word.toLowerCase());
+      }
+      for (const word of fp.requiredCopyWords) {
+        expect(cText, `Page ${i + 1} (${fp.name}) text copy must contain '${word}'`).toContain(word.toLowerCase());
+      }
+    }
   });
 });

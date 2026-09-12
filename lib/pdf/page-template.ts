@@ -12,6 +12,7 @@
 
 import { BLEED_INCHES, PAGE_HEIGHT_IN, PAGE_WIDTH_IN } from "../config";
 import type { ChildProfile, GeneratedPage } from "../story/types";
+import { isDetectiveSignText, parseDetectiveSignText } from "../story/theGreatDetectiveTemplate";
 
 /** Full leaf size in inches, including bleed on every edge. */
 export const PAGE_W_IN = PAGE_WIDTH_IN + BLEED_INCHES * 2;
@@ -77,12 +78,20 @@ function dataUri(page: GeneratedPage): string | null {
 }
 
 /** Non-destructive artwork framing for classic PDF (contain + backdrop). */
-function background(page: GeneratedPage, side?: "left" | "right" | "full"): string {
+function background(page: GeneratedPage, side?: "left" | "right" | "full", isDraft?: boolean): string {
   const uri = dataUri(page);
-  if (!uri) return `<div class="bg fallback"></div>`;
+  if (!uri) {
+    const label = page.slotId ?? page.role ?? (page.kind ? `${page.kind}` : `Page ${page.index + 1}`);
+    return `<div class="bg fallback">
+      <div class="draft-watermark">DRAFT — MISSING ART: ${escapeHtml(label)}</div>
+    </div>`;
+  }
 
-  const transform = sanitizeTransform(page.transform);
-  const showBackdrop = transform.backgroundMode === "extended";
+  const transform = page.transform ? sanitizeTransform(page.transform) : undefined;
+  // In print PDF, backdrop is only emitted if explicitly configured on a fitted asset with extended background
+  const showBackdrop = Boolean(
+    transform && transform.mode === "fit" && transform.backgroundMode === "extended",
+  );
 
   if (side === "left" || side === "right") {
     const shiftStyle = side === "left" ? "left: 0%;" : "left: -100%;";
@@ -138,23 +147,31 @@ function verseStyle(): string {
   );
 }
 
-function pageHtml(page: GeneratedPage, child: ChildProfile): string {
+function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): string {
   if (page.kind === "cover") {
     return `<section class="page cover">
-      ${background(page, "full")}
+      ${background(page, "full", isDraft)}
       <div class="scrim cover-scrim"></div>
       ${coverLockup(page, child)}
     </section>`;
   }
 
   if (page.kind === "backcover") {
-    // The verse panel is omitted entirely when the back cover has no text, so an
-    // image-only closing page stays clean (no empty panel painted over the art).
-    const backText = page.text.trim()
-      ? `<div class="backcover-text"><span class="backcover-panel">${escapeHtml(page.text)}</span></div>`
-      : "";
+    const isDetective = isDetectiveSignText(page.text);
+    let backText = "";
+    if (isDetective) {
+      const { headline, agency } = parseDetectiveSignText(page.text);
+      // Auto-scale font size for long child names to guarantee readable fit without overflow
+      const fontSizePt = agency.length > 28 ? 13 : agency.length > 20 ? 15 : 18;
+      backText = `<div class="detective-sign-overlay">
+        <div class="detective-sign-headline">${escapeHtml(headline)}</div>
+        <div class="detective-sign-agency" style="font-size: ${fontSizePt}pt;">${escapeHtml(agency)}</div>
+      </div>`;
+    } else if (page.text.trim()) {
+      backText = `<div class="backcover-text"><span class="backcover-panel">${escapeHtml(page.text)}</span></div>`;
+    }
     return `<section class="page backcover">
-      ${background(page, "full")}
+      ${background(page, "full", isDraft)}
       <div class="scrim scrim-strong"></div>
       ${backText}
     </section>`;
@@ -163,18 +180,18 @@ function pageHtml(page: GeneratedPage, child: ChildProfile): string {
   // Two-page spread: one wide image split across the gutter, verse on the left.
   if (page.spread) {
     return `<section class="page spread spread-left">
-      ${background(page, "left")}
+      ${background(page, "left", isDraft)}
       <div class="scrim"></div>
       <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
     </section>
     <section class="page spread spread-right">
-      ${background(page, "right")}
+      ${background(page, "right", isDraft)}
     </section>`;
   }
 
   // Single full-bleed page with verse woven into the art.
   return `<section class="page single">
-    ${background(page, "full")}
+    ${background(page, "full", isDraft)}
     <div class="scrim"></div>
     <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
   </section>`;
@@ -183,8 +200,10 @@ function pageHtml(page: GeneratedPage, child: ChildProfile): string {
 export function renderBookHtml(
   pages: GeneratedPage[],
   child: ChildProfile,
+  options?: { draft?: boolean },
 ): string {
-  const body = pages.map((p) => pageHtml(p, child)).join("\n");
+  const isDraft = options?.draft === true;
+  const body = pages.map((p) => pageHtml(p, child, isDraft)).join("\n");
 
   // Document title = the cover's title text, so it reflects the chosen book.
   const coverText = pages.find((p) => p.kind === "cover")?.text?.trim();
@@ -197,6 +216,7 @@ export function renderBookHtml(
 <title>${escapeHtml(docTitle)}</title>
 <style>
   ${fontFaceCss()}
+  ${ARTWORK_FRAME_CSS}
   @page { size: ${PAGE_W_IN}in ${PAGE_H_IN}in; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -226,7 +246,26 @@ export function renderBookHtml(
     object-fit: cover;
   }
   .fallback {
+    position: relative;
     background: linear-gradient(165deg, #1f1a4d 0%, #4a3691 55%, #2f9e8f 100%);
+  }
+
+  .draft-watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Fredoka", "Nunito", sans-serif;
+    font-size: 24pt;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 24px;
+    text-align: center;
+    z-index: 10;
   }
 
   /* Spread: the same wide image, shifted so each leaf shows half (continuous
@@ -244,14 +283,26 @@ export function renderBookHtml(
     pointer-events: none;
   }
 
-  /* Rhyming verse, woven into the lower-left of the art. */
+  /* Rhyming verse, woven into the page within the strict profile-aware text-safe boundary */
   .verse {
     position: absolute;
-    left: ${BLEED_INCHES + 0.6}in;
+    left: 1.25in;
     right: auto;
-    bottom: ${BLEED_INCHES + 0.55}in;
-    max-width: 6.4in;
+    bottom: 0.95in;
+    max-width: 5.2in;
     text-align: left;
+  }
+  .spread-left .verse {
+    left: 1.20in;
+    right: auto;
+    bottom: 0.95in;
+    max-width: 4.8in;
+  }
+  .spread-right .verse {
+    left: 1.35in;
+    right: auto;
+    bottom: 0.95in;
+    max-width: 4.8in;
   }
   .verse p {
     margin: 0 0 0.1in;
@@ -266,10 +317,10 @@ export function renderBookHtml(
   /* Cover title sits directly on the art (no dark glow); legibility via outline. */
   .cover-title {
     position: absolute;
-    left: ${BLEED_INCHES + 0.85}in;
+    left: 1.25in;
     right: auto;
-    bottom: ${BLEED_INCHES + 0.95}in;
-    max-width: 6in;
+    bottom: 1.05in;
+    max-width: 5.8in;
     text-align: left;
   }
   .cover-eyebrow {
@@ -301,18 +352,19 @@ export function renderBookHtml(
     margin: 0;
     color: #fff;
     font-family: "Fredoka", "Trebuchet MS", sans-serif;
-    font-size: 82pt;
+    font-size: 64pt;
     line-height: 0.96;
     font-weight: 700;
     letter-spacing: -0.015em;
     /* Plain text directly on the art — no shadow/box behind it. */
     text-shadow: none;
+    word-break: break-word;
   }
   .backcover-text {
     position: absolute;
-    left: ${BLEED_INCHES + 0.7}in;
-    right: ${BLEED_INCHES + 0.7}in;
-    bottom: ${BLEED_INCHES + 0.8}in;
+    left: 1.25in;
+    right: 1.25in;
+    bottom: 1.05in;
     text-align: center;
     font-family: "Fredoka", "Trebuchet MS", sans-serif;
     font-size: 30pt;
@@ -330,6 +382,39 @@ export function renderBookHtml(
     padding: 0.16in 0.24in;
     border-radius: 0.16in;
     text-shadow: none;
+  }
+
+  /* Dedicated rustic wooden sign placard overlay for The Great Detective back cover */
+  .detective-sign-overlay {
+    position: absolute;
+    right: 1.25in;
+    bottom: 1.05in;
+    width: 3.3in;
+    text-align: center;
+    padding: 0.18in 0.24in;
+    background: rgba(254, 243, 199, 0.94);
+    border: 3.5px solid #78350f;
+    border-radius: 0.18in;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    transform: rotate(-1.5deg);
+  }
+  .detective-sign-headline {
+    font-family: "Fredoka", "Nunito", sans-serif;
+    font-weight: 700;
+    font-size: 19pt;
+    color: #991b1b;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.06in;
+    text-transform: uppercase;
+  }
+  .detective-sign-agency {
+    font-family: "Nunito", "Trebuchet MS", sans-serif;
+    font-weight: 800;
+    color: #451a03;
+    line-height: 1.16;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    word-break: break-word;
   }
 
 </style>

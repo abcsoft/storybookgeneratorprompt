@@ -13,6 +13,7 @@ import {
   indexFromFilename,
   type ProvidedImage,
 } from "@/lib/manual/assemble";
+import { parseFilename } from "@/lib/manual/filenameMatch";
 import { runPreflight } from "@/lib/print/preflight";
 import { sanitizeTransform, type ArtworkTransform } from "@/lib/print/artworkTransform";
 import { saveRun } from "@/lib/generate/saveRun";
@@ -73,38 +74,81 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  const bookId = (form.get("bookId") as string) || undefined;
+  const profileId = (form.get("profileId") as string) || undefined;
+  const isDraft = form.get("draft") === "true";
+  const confirmLegacyOffsetRecovery = form.get("confirmLegacyOffsetRecovery") === "true";
+  const rawMode = ((form.get("layoutMode") as string) || (form.get("mode") as string)) || null;
+  const mode = rawMode === "custom-spreads" || rawMode === "standard-single" ? rawMode : undefined;
+  let customSpreads: any = undefined;
+  const rawSpreads = form.get("customSpreads");
+  if (typeof rawSpreads === "string") {
+    try {
+      customSpreads = JSON.parse(rawSpreads);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   const rawFiles: { filename: string; buffer: Buffer }[] = [];
-  const images = new Map<number, ProvidedImage>();
+  const images = new Map<number | string, ProvidedImage>();
   for (const file of files) {
     const buffer = Buffer.from(await file.arrayBuffer());
     rawFiles.push({ filename: file.name, buffer });
     const index = indexFromFilename(file.name);
-    if (index === null) continue;
-    images.set(index, {
+    const parsed = parseFilename(file.name);
+    const providedImg: ProvidedImage = {
       buffer,
       mimeType: file.type || "image/png",
-      transform: transformsMap[index] ? sanitizeTransform(transformsMap[index]) : undefined,
-    });
+      transform: index !== null && transformsMap[index] ? sanitizeTransform(transformsMap[index]) : undefined,
+    };
+    if (index !== null) images.set(index, providedImg);
+    if (parsed.slotId) images.set(parsed.slotId, providedImg);
+    images.set(file.name, providedImg);
+    images.set(file.name.toLowerCase(), providedImg);
+    images.set(file.name.replace(/\.[^/.]+$/, "").toLowerCase(), providedImg);
   }
 
   if (images.size === 0) {
     return NextResponse.json(
-      { error: "Couldn't match any images to pages. Name them 01.png, 02.png, …" },
+      { error: "Couldn't match any images to pages. Name them 01-cover.png, 02-intro.png, …" },
       { status: 400 },
     );
   }
 
-  const bookId = (form.get("bookId") as string) || undefined;
-  const profileId = (form.get("profileId") as string) || undefined;
-  const isDraft = form.get("draft") === "true";
-
   if (!isDraft) {
-    const preflight = await runPreflight({ child, bookId, profileId, files: rawFiles });
+    const preflight = await runPreflight({
+      child,
+      bookId,
+      profileId,
+      files: rawFiles,
+      mode,
+      customSpreads,
+    });
     if (!preflight.ok) {
-      const issues = preflight.errors.map((err) => ({
-        type: "PREFLIGHT_ERROR",
-        message: err,
-      }));
+      const missingArtworkIssues = preflight.issues?.filter((i) => i.type === "MISSING_REQUIRED_ARTWORK");
+      if (missingArtworkIssues && missingArtworkIssues.length > 0) {
+        return NextResponse.json(
+          {
+            code: "MISSING_REQUIRED_ARTWORK",
+            error: "Cannot export production PDF: required artwork is missing.",
+            missingSlots: missingArtworkIssues.map((i) => ({
+              slotId: (i as any).slotId ?? i.filename ?? "unknown",
+              physicalPages: (i as any).physicalPages ?? [i.illustrationNumber ?? 1],
+            })),
+            issues: preflight.issues,
+            preflight,
+          },
+          { status: 400 },
+        );
+      }
+
+      const issues = preflight.issues && preflight.issues.length > 0
+        ? preflight.issues
+        : preflight.errors.map((err) => ({
+            type: "PREFLIGHT_ERROR",
+            message: err,
+          }));
       return NextResponse.json(
         {
           code: "PREFLIGHT_FAILED",
@@ -117,7 +161,29 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
-  const { pdf } = await assembleFromImages(child, images, bookId, profileId);
+  let pdf: Buffer;
+  try {
+    const assembled = await assembleFromImages(child, images, bookId, profileId, {
+      mode,
+      layoutMode: mode,
+      customSpreads,
+      draft: isDraft,
+      confirmLegacyOffsetRecovery,
+    });
+    pdf = assembled.pdf;
+  } catch (err: any) {
+    if (err?.code === "MISSING_REQUIRED_ARTWORK" || err?.name === "MissingArtworkError") {
+      return NextResponse.json(
+        {
+          code: "MISSING_REQUIRED_ARTWORK",
+          error: "Cannot export production PDF: required artwork is missing.",
+          missingSlots: err.missingSlots ?? [],
+        },
+        { status: 400 },
+      );
+    }
+    throw err;
+  }
 
   // Keep a per-child folder with the images, prompts, and finished PDF.
   try {
@@ -125,8 +191,8 @@ export async function POST(request: Request): Promise<Response> {
       child,
       bookId,
       pdf,
-      images: [...images.entries()].map(([index, img]) => ({
-        index,
+      images: [...images.entries()].map(([index, img], i) => ({
+        index: typeof index === "number" ? index : i,
         data: img.buffer,
         mimeType: img.mimeType,
       })),

@@ -27,13 +27,14 @@ describe("FIX PART 3: Print-Profile Aware Gemini Prompts", () => {
       profileId: "printify-hardcover-square-8x8",
     });
 
-    expect(prompt).toContain("TARGET ARTWORK FORMAT — Square 1:1 composition.");
+    expect(prompt).toContain("TARGET ARTWORK FORMAT — 1:1 single page (2400×2400 px target");
     expect(prompt).not.toContain("wide landscape");
-    expect(prompt).toContain("Keep approximately 8-10% visual safety from outside edges.");
+    expect(prompt).not.toContain("2:1 / 21:9");
+    expect(prompt).toContain("10% safety margin");
   });
 
-  // Test 3: Printify spread prompt (2:1 master spread + gutter)
-  it("3. Printify spread prompt contains 2:1 master spread and gutter instructions", () => {
+  // Test 3: Printify spread prompt (continuous panoramic spread contract)
+  it("3. Printify spread prompt contains 2:1 continuous panoramic spread and gutter instructions without seam/split", () => {
     const prompt = buildIllustrationPrompt({
       child,
       story: {},
@@ -42,13 +43,15 @@ describe("FIX PART 3: Print-Profile Aware Gemini Prompts", () => {
       profileId: "printify-hardcover-square-8x8",
     });
 
-    expect(prompt).toContain("TARGET ARTWORK FORMAT — Wide approximately 2:1 master spread.");
-    expect(prompt).toContain("divided vertically into two square facing pages");
-    expect(prompt).toContain("CENTER GUTTER");
+    expect(prompt).toContain("TARGET ARTWORK FORMAT — 2:1 continuous panoramic spread (4800×2400 px target");
+    expect(prompt).toContain("uninterrupted panoramic scene across one wide canvas");
+    expect(prompt).toContain("This is not a diptych, split-screen");
+    expect(prompt).toContain("central gutter-safe zone");
+    expect(prompt).not.toContain("2:1 / 21:9");
   });
 
   // Test 4: Lulu square prompt (square 1:1)
-  it("4. Lulu square prompt contains Square 1:1 composition", () => {
+  it("4. Lulu square prompt contains Square 1:1 single page", () => {
     const prompt = buildIllustrationPrompt({
       child,
       story: {},
@@ -57,8 +60,8 @@ describe("FIX PART 3: Print-Profile Aware Gemini Prompts", () => {
       profileId: "lulu-square-8.5x8.5",
     });
 
-    expect(prompt).toContain("TARGET ARTWORK FORMAT — Square 1:1 composition.");
-    expect(prompt).not.toContain("Landscape composition appropriate");
+    expect(prompt).toContain("TARGET ARTWORK FORMAT — 1:1 single page");
+    expect(prompt).not.toContain("2:1 / 21:9");
   });
 
   // Test 5: Lulu landscape prompt (landscape)
@@ -71,19 +74,26 @@ describe("FIX PART 3: Print-Profile Aware Gemini Prompts", () => {
       profileId: "lulu-landscape-11x8.5",
     });
 
-    expect(prompt).toContain("TARGET ARTWORK FORMAT — Landscape composition appropriate for the selected Lulu landscape page geometry.");
+    expect(prompt).toContain("TARGET ARTWORK FORMAT — 4:3 single page");
+    expect(prompt).not.toContain("2:1 / 21:9");
   });
 
+
   // Test 6: Dream Big uses centralized prompt engine
-  it("6. Dream Big manifest entries use centralized prompt builder with profile geometry", () => {
+  it("6. Dream Big manifest entries use centralized prompt builder with profile geometry and no contradictory aspects", () => {
     const squareManifest = buildManifest(child, "dream-big", "printify-hardcover-square-8x8");
     const landscapeManifest = buildManifest(child, "dream-big", "lulu-landscape-11x8.5");
 
     expect(squareManifest[0].prompt).toContain("Square 1:1 composition for the front cover.");
     expect(landscapeManifest[0].prompt).toContain("Landscape composition for the front cover.");
-    expect(squareManifest[1].prompt).toContain("Wide approximately 2:1 master spread.");
-    expect(landscapeManifest[1].prompt).toContain("Wide approximately 2:1 / 21:9 master spread composition.");
+    for (const m of squareManifest) {
+      expect(m.prompt).not.toContain("2:1 / 21:9");
+    }
+    for (const m of landscapeManifest) {
+      expect(m.prompt).not.toContain("2:1 / 21:9");
+    }
   });
+
 
   // Test 7: Same scene prompt changes when profile changes
   it("7. Same scene prompt differs between Printify Square and Lulu Landscape profiles", () => {

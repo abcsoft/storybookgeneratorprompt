@@ -13,7 +13,11 @@ import { buildPages, DEFAULT_BOOK_ID, getBook } from "../story/registry";
 import type { ChildProfile, PageLayout } from "../story/types";
 
 export interface ManualPage {
-  /** 1-based illustration number (1 for 01.png). */
+  slotId?: string;
+  roleSlug?: string;
+  expectedFilename?: string;
+  canonicalFilename?: string;
+  /** 1-based illustration number (1 for 01-cover.png). */
   illustrationNumber?: number;
   /** 0-based illustration index (0, 1, 2...). */
   illustrationIndex?: number;
@@ -23,7 +27,7 @@ export interface ManualPage {
   index: number;
   kind: string;
   role?: string;
-  /** What to save the generated image as, e.g. "01.png". */
+  /** Canonical filename to save the generated image as, e.g. "01-cover.png". */
   filename: string;
   prompt: string;
   text: string;
@@ -33,6 +37,9 @@ export interface ManualPage {
   pageLayout?: PageLayout;
   /** Aspect ratio to set in the Gemini app, e.g. "3:2" or "21:9". */
   aspect: string;
+  /** Authoritative physical interior page numbers. Empty for covers. */
+  physicalPages?: number[];
+  legacyAliases?: string[];
 }
 
 /** Zero-padded 1-based filename for a page index, e.g. 0 -> "01.png". */
@@ -46,28 +53,42 @@ export function imageFilename(index: number): string {
  *   callers (no `profileId` passed) get byte-identical output to before the
  *   print-profile system existed.
  */
+import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection } from "../story/layoutPlan";
+
 export function buildManifest(
   child: ChildProfile,
   bookId: string = DEFAULT_BOOK_ID,
   profileId?: string,
+  mode?: LayoutMode,
+  customSpreads?: CustomSpreadSelection[],
 ): ManualPage[] {
   const profile = getPrintProfile(profileId);
-  return buildPages(child, bookId, profileId).map((p) => {
-    const isSpread = p.pageLayout ? p.pageLayout === "spread" : (p.spread ?? false);
+  const plan = resolveLayoutPlan({ child, bookId, profileId: profile.id, mode, customSpreads });
+  return plan.assets.map((slot, assetIndex) => {
+    const illNumber = assetIndex + 1;
+    const isSpread = slot.assetKind === "spread";
     const layout: PageLayout = isSpread ? "spread" : "single";
+    const chosenFilename = slot.filename;
+
     return {
-      illustrationNumber: p.index + 1,
-      illustrationIndex: p.index,
-      page: p.index + 1,
-      index: p.index,
-      kind: p.kind,
-      role: p.role,
-      filename: imageFilename(p.index),
-      prompt: p.prompt,
-      text: p.text,
+      slotId: slot.slotId,
+      roleSlug: slot.roleSlug,
+      expectedFilename: slot.expectedFilename ?? slot.filename,
+      illustrationNumber: illNumber,
+      illustrationIndex: assetIndex,
+      index: assetIndex,
+      page: slot.physicalPages[0] ?? illNumber,
+      kind: slot.pageKind ?? (slot.assetKind === "front-cover" ? "cover" : slot.assetKind === "back-cover" ? "backcover" : "story"),
+      role: slot.sourceSceneRole,
+      filename: chosenFilename,
+      canonicalFilename: slot.filename,
+      legacyAliases: slot.legacyAliases,
+      prompt: slot.prompt,
+      text: slot.storyText,
       spread: isSpread,
       pageLayout: layout,
-      aspect: isSpread ? profile.spreadAspect : profile.singleAspect,
+      aspect: slot.expectedSourceAspect,
+      physicalPages: slot.physicalPages,
     };
   });
 }
@@ -77,8 +98,10 @@ export function renderPromptsMarkdown(
   child: ChildProfile,
   bookId: string = DEFAULT_BOOK_ID,
   profileId?: string,
+  mode?: LayoutMode,
+  customSpreads?: CustomSpreadSelection[],
 ): string {
-  const manifest = buildManifest(child, bookId, profileId);
+  const manifest = buildManifest(child, bookId, profileId, mode, customSpreads);
   const profile = getPrintProfile(profileId);
   const name = child.name;
   const header = `# ${name}'s ${getBook(bookId).title} — image prompts
@@ -120,7 +143,9 @@ This one step is what keeps every page looking like the *same* ${name}:
     .map((m) => {
       const label = m.role ? `${m.role}` : m.kind.toUpperCase();
       const aspectLabel = m.spread ? `${m.aspect} · WIDE SPREAD` : m.aspect;
-      return `### Illustration ${String(m.illustrationNumber).padStart(2, "0")} · ${label} · ${aspectLabel} → save as \`${m.filename}\`
+      const num = String(m.illustrationNumber).padStart(2, "0");
+      const altSave = m.filename !== `${num}.png` ? ` (or save as \`${num}.png\`)` : "";
+      return `### Illustration ${num} · ${label} · ${aspectLabel} → save as \`${m.filename}\`${altSave}
 
 **Prompt:**
 ${m.prompt}

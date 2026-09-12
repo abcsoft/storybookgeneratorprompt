@@ -14,6 +14,7 @@
 import { escapeHtml, fontFaceCss } from "../pdf/page-template";
 import { ARTWORK_FRAME_CSS } from "./artworkFrame";
 import type { PrintProfile } from "./types";
+import { isDetectiveSignText, parseDetectiveSignText } from "../story/theGreatDetectiveTemplate";
 
 export interface CoverArt {
   /** data: URI for the front-cover art (required). */
@@ -27,6 +28,7 @@ export interface CoverText {
   title: string;
   childName: string;
   subtitle?: string;
+  backCoverText?: string;
 }
 
 const TITLE_GOLD = "#ffd36b";
@@ -101,12 +103,24 @@ export function renderCoverHtml(
 ): string {
   const z = zones(profile);
 
+  const hasDetectiveSign = isDetectiveSignText(text.backCoverText ?? null);
+  let detectiveSignHtml = "";
+  if (hasDetectiveSign && text.backCoverText) {
+    const { headline, agency } = parseDetectiveSignText(text.backCoverText);
+    const fontSizePx = agency.length > 28 ? 24 : agency.length > 20 ? 28 : 34;
+    detectiveSignHtml = `
+      <div class="detective-back-sign">
+        <div class="detective-back-headline">${escapeHtml(headline)}</div>
+        <div class="detective-back-agency" style="font-size: ${fontSizePx}px;">${escapeHtml(agency)}</div>
+      </div>`;
+  }
+
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <style>
-  ${fontFaceCss()}
+${fontFaceCss()}
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
@@ -186,11 +200,46 @@ export function renderCoverHtml(
     font-weight: 700;
     letter-spacing: -0.015em;
   }
+  .detective-back-sign {
+    position: absolute;
+    right: 8%;
+    bottom: 12%;
+    width: 35%;
+    text-align: center;
+    padding: 24px 28px;
+    background: rgba(254, 243, 199, 0.94);
+    border: 5px solid #78350f;
+    border-radius: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    transform: rotate(-1.5deg);
+    z-index: 3;
+  }
+  .detective-back-headline {
+    font-family: "Fredoka", "Nunito", sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    color: #991b1b;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .detective-back-agency {
+    font-family: "Nunito", "Trebuchet MS", sans-serif;
+    font-weight: 800;
+    color: #451a03;
+    line-height: 1.16;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    word-break: break-word;
+  }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="art back">${art.backDataUri ? artFrameHtml(art.backDataUri) : `<div class="art-fallback"></div>`}</div>
+    <div class="art back">
+      ${art.backDataUri ? artFrameHtml(art.backDataUri) : `<div class="art-fallback"></div>`}
+      ${detectiveSignHtml}
+    </div>
     <div class="spine"></div>
     <div class="art front">${artFrameHtml(art.frontDataUri)}</div>
     <div class="cover-title">

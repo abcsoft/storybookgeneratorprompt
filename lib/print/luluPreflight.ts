@@ -44,6 +44,14 @@ export async function runLuluPreflight(
 
   const interiorPages = pages.filter((p) => p.kind !== "cover" && p.kind !== "backcover");
 
+  // Validate page count requirements: must be even interior pages and >= 24 total pages for hardcover
+  if (interiorPages.length % 2 !== 0) {
+    errors.push(`Lulu requires an even interior page count (divisible by 2), but found ${interiorPages.length} pages.`);
+  }
+  if (pages.length < 24) {
+    errors.push(`Lulu requires at least 24 pages for hardcover binding, but found ${pages.length} pages.`);
+  }
+
   // Check missing images
   const missingPages = interiorPages.filter((p) => !p.image && (!pageRasters || !pageRasters[p.index]));
   if (missingPages.length > 0) {
