@@ -44,6 +44,7 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       mode: "standard-single",
       files,
       allowLowResolutionForTesting: false,
+      acknowledgeQualityWarnings: true,
     });
 
     expect(preflight.ok).toBe(true);
@@ -128,8 +129,8 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     expect(preflight.warnings.some((w) => w.includes("draft mode") && w.includes("watermark"))).toBe(true);
   });
 
-  // Test 2c: Intermediate resolution (150 to < 300 PPI) passes with warning requiring user acknowledgement
-  it("2c. Intermediate resolution (150 to < 300 PPI) passes production with explicit warning", async () => {
+  // Test 2c: Intermediate resolution (150 to < 300 PPI) is BLOCKED without acknowledgement
+  it("2c. Intermediate resolution (150 to < 300 PPI) is blocked without acknowledgeQualityWarnings", async () => {
     // 2000x1500 px on 11.25x8.25 in gives ~178 PPI
     const files = await Promise.all(
       Array.from({ length: 24 }, async (_, idx) => ({
@@ -146,11 +147,41 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       files,
       allowLowResolutionForTesting: false,
       draft: false,
+      // acknowledgeQualityWarnings NOT set — must be blocked
+    });
+
+    expect(preflight.ok).toBe(false);
+    expect(preflight.errors.length).toBeGreaterThan(0);
+    expect(preflight.issues?.some((i) => i.type === "QUALITY_WARNING_UNACKNOWLEDGED")).toBe(true);
+    expect(preflight.qualityWarnings).toBeDefined();
+    expect(preflight.qualityWarnings!.length).toBeGreaterThan(0);
+    expect(preflight.qualityWarnings![0].nativeWidth).toBe(2000);
+    expect(preflight.qualityWarnings![0].nativeHeight).toBe(1500);
+  });
+
+  // Test 2d: Intermediate resolution (150 to < 300 PPI) PASSES with explicit acknowledgement
+  it("2d. Intermediate resolution (150 to < 300 PPI) passes production with acknowledgeQualityWarnings", async () => {
+    const files = await Promise.all(
+      Array.from({ length: 24 }, async (_, idx) => ({
+        filename: `${String(idx + 1).padStart(2, "0")}.png`,
+        buffer: await makeImage(2000, 1500),
+      })),
+    );
+
+    const preflight = await runPreflight({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+      files,
+      allowLowResolutionForTesting: false,
+      draft: false,
+      acknowledgeQualityWarnings: true,
     });
 
     expect(preflight.ok).toBe(true);
     expect(preflight.errors).toEqual([]);
-    // Non-blocking warning requiring user acknowledgement
+    // Non-blocking warning still present
     expect(preflight.warnings.some((w) => w.includes("between 150 and 299 PPI"))).toBe(true);
     expect(preflight.warnings.some((w) => w.includes("does not create genuine native 300-PPI detail"))).toBe(true);
 

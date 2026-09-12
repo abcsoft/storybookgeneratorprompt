@@ -46,6 +46,11 @@ export interface PreflightOptions {
   allowLowResolutionForTesting?: boolean;
   /** If true, runs preflight in draft mode (accepts lower PPI with watermark warning). */
   draft?: boolean;
+  /** Pre-resolved slot-to-file mapping from authoritative import resolution.
+   *  When provided, preflight skips its own matchFilesToSlots() and uses this directly. */
+  resolvedSlotMapping?: Map<string, PreflightFile>;
+  /** Explicit user acknowledgement of quality warnings (150-299 PPI). */
+  acknowledgeQualityWarnings?: boolean;
 }
 
 export interface PreflightIssue {
@@ -59,12 +64,23 @@ export interface PreflightIssue {
   message: string;
 }
 
+export interface QualityWarningSlot {
+  slotId: string;
+  filename: string;
+  nativeWidth: number;
+  nativeHeight: number;
+  nativeEffectivePpi: number;
+  physicalPages: number[];
+}
+
 export interface PreflightResult {
   ok: boolean;
   errors: string[];
   warnings: string[];
   issues?: PreflightIssue[];
   assetReports?: PreflightAssetReport[];
+  /** Slots with 150-299 PPI that require explicit user acknowledgement. */
+  qualityWarnings?: QualityWarningSlot[];
 }
 
 /**
@@ -333,8 +349,10 @@ export async function runPreflight(
     }
   }
 
-  // 6. Match Files to Resolved Slots
-  const bySlotId = matchFilesToSlots(opts.files, plan.assets, errors, warnings, issues);
+  // 6. Match Files to Resolved Slots — use pre-resolved mapping if provided
+  const bySlotId = opts.resolvedSlotMapping
+    ? opts.resolvedSlotMapping
+    : matchFilesToSlots(opts.files, plan.assets, errors, warnings, issues);
 
   // 7. Check for Missing Required Assets
   const missingSlots = plan.assets.filter((slot) => !bySlotId.has(slot.slotId));
@@ -479,9 +497,29 @@ export async function runPreflight(
           );
         }
       } else if (nativeEffectivePpi < 300) {
-        warnings.push(
-          `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); enlargement does not create genuine native 300-PPI detail.`,
-        );
+        const needsAcknowledgement = isProduction && !opts.acknowledgeQualityWarnings;
+        if (needsAcknowledgement) {
+          const ackMsg =
+            `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). ` +
+            `Requires explicit user acknowledgement for production export. ` +
+            `Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); ` +
+            `enlargement does not create genuine native 300-PPI detail.`;
+          errors.push(ackMsg);
+          issues.push({
+            type: "QUALITY_WARNING_UNACKNOWLEDGED",
+            code: "QUALITY_WARNING_UNACKNOWLEDGED",
+            illustrationNumber: illoNum,
+            filename: file.filename,
+            expected: `Minimum 300 native effective PPI or explicit quality acknowledgement`,
+            actual: `${actualWidth}×${actualHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
+            recommendation: `Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.`,
+            message: ackMsg,
+          });
+        } else {
+          warnings.push(
+            `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); enlargement does not create genuine native 300-PPI detail.`,
+          );
+        }
       }
 
       // Story text safe area and gutter bounds check
@@ -555,12 +593,29 @@ export async function runPreflight(
     );
   }
 
+  // 10. Collect quality warning slots for the acknowledgement contract
+  const qualityWarnings: QualityWarningSlot[] = [];
+  for (const report of assetReports) {
+    if (report.nativeSourcePpi >= 150 && report.nativeSourcePpi < 300) {
+      const slot = plan.assets.find((s) => s.slotId === report.slotId);
+      qualityWarnings.push({
+        slotId: report.slotId,
+        filename: report.filename,
+        nativeWidth: report.nativeSourceWidth,
+        nativeHeight: report.nativeSourceHeight,
+        nativeEffectivePpi: report.nativeSourcePpi,
+        physicalPages: slot?.physicalPages ?? report.destinationPages,
+      });
+    }
+  }
+
   return {
     ok: errors.length === 0,
     errors,
     warnings,
     issues,
     assetReports,
+    qualityWarnings: qualityWarnings.length > 0 ? qualityWarnings : undefined,
   };
 }
 

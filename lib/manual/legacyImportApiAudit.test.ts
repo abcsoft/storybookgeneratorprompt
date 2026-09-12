@@ -1,0 +1,394 @@
+/**
+ * Legacy Import API Audit: Verifies that the /api/assemble route uses
+ * authoritative import resolution through matchImportedFiles() and properly
+ * handles ambiguous 22-file Dream Big packages.
+ *
+ * Tests use role-labelled images (not identical gray files) so mismatched
+ * slot assignments are semantically detectable.
+ */
+
+import { describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { POST as assemblePost } from "../../app/api/assemble/route";
+import { matchImportedFiles } from "./importMatch";
+import { resolveLayoutPlan } from "../story/layoutPlan";
+import type { ChildProfile } from "../story/types";
+
+const child: ChildProfile = { name: "TestChild", age: 5, gender: "boy" };
+
+/** 22 hardcoded role labels — independently defined, NOT derived from the production mapping. */
+const LEGACY_22_ROLES = [
+  "PILOT",
+  "RACER",
+  "ASTRONAUT",
+  "DOCTOR",
+  "FIREFIGHTER",
+  "SCIENTIST",
+  "ARMY_OFFICER",
+  "SOCCER_PLAYER",
+  "KARATE_MASTER",
+  "DETECTIVE",
+  "MAGICIAN",
+  "CHEF",
+  "ROCKSTAR",
+  "ARTIST",
+  "TEACHER",
+  "EXPLORER",
+  "PHOTOGRAPHER",
+  "DIVER",
+  "VETERINARIAN",
+  "INVENTOR",
+  "CLOSING",
+  "BACKCOVER",
+];
+
+async function makeRoleLabelledImage(role: string, index: number): Promise<Buffer> {
+  const label = `${String(index + 1).padStart(2, "0")}-${role}`;
+  // Create a visually distinct image with role text burned in.
+  // Different hue per role so mismatches are visually obvious.
+  const hue = Math.round((index / 22) * 360);
+  const r = Math.round(128 + 127 * Math.sin((hue * Math.PI) / 180));
+  const g = Math.round(128 + 127 * Math.sin(((hue + 120) * Math.PI) / 180));
+  const b = Math.round(128 + 127 * Math.sin(((hue + 240) * Math.PI) / 180));
+
+  // Create base image with role-colored background
+  const svgOverlay = `<svg width="3375" height="2475">
+    <rect width="100%" height="100%" fill="rgb(${r},${g},${b})" />
+    <text x="50%" y="40%" font-size="120" fill="white" text-anchor="middle" font-family="sans-serif" font-weight="bold">${label}</text>
+    <text x="50%" y="60%" font-size="80" fill="white" text-anchor="middle" font-family="sans-serif">ROLE: ${role}</text>
+  </svg>`;
+
+  return sharp(Buffer.from(svgOverlay))
+    .png()
+    .toBuffer();
+}
+
+async function makeHighResImage(width = 3375, height = 2475): Promise<Buffer> {
+  return sharp({
+    create: { width, height, channels: 3, background: { r: 100, g: 150, b: 200 } },
+  })
+    .png()
+    .toBuffer();
+}
+
+describe("Legacy 22-file Import API Audit", () => {
+  const dreamBigSlots = resolveLayoutPlan({
+    child,
+    bookId: "dream-big",
+    profileId: "classic-landscape-11x8",
+    mode: "standard-single",
+  }).assets;
+
+  // ──────────────────────────────────────────────────
+  // Test 1: 22 plain-numbered files trigger HTTP 409 with two choices
+  // ──────────────────────────────────────────────────
+  it("1. 22 legacy files trigger LEGACY_MAPPING_CONFIRMATION_REQUIRED (HTTP 409) with both choices", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+
+    for (let i = 0; i < 22; i++) {
+      const buf = await makeRoleLabelledImage(LEGACY_22_ROLES[i], i);
+      const filename = `${String(i + 1).padStart(2, "0")}.png`;
+      formData.append("images", new File([new Uint8Array(buf)], filename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.code).toBe("LEGACY_MAPPING_CONFIRMATION_REQUIRED");
+    expect(data.choices).toBeDefined();
+    expect(data.choices.length).toBe(2);
+
+    // Verify SHIFT_PLUS_TWO choice
+    const shiftChoice = data.choices.find((c: any) => c.interpretation === "SHIFT_PLUS_TWO");
+    expect(shiftChoice).toBeDefined();
+    expect(shiftChoice.resultingMissingSlots).toEqual([
+      expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+      expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+    ]);
+
+    // Verify KEEP_NUMERIC_SLOTS choice
+    const keepChoice = data.choices.find((c: any) => c.interpretation === "KEEP_NUMERIC_SLOTS");
+    expect(keepChoice).toBeDefined();
+    expect(keepChoice.resultingMissingSlots).toEqual([
+      expect.objectContaining({ slotId: "23-closing" }),
+      expect.objectContaining({ slotId: "24-backcover" }),
+    ]);
+  });
+
+  // ──────────────────────────────────────────────────
+  // Test 2: SHIFT_PLUS_TWO → missing 01-cover and 02-intro (NOT 23-closing, 24-backcover)
+  // ──────────────────────────────────────────────────
+  it("2. SHIFT_PLUS_TWO maps 22 files to slots 03-24, reports 01-cover and 02-intro missing", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+    formData.append("legacyInterpretation", "SHIFT_PLUS_TWO");
+
+    for (let i = 0; i < 22; i++) {
+      const buf = await makeRoleLabelledImage(LEGACY_22_ROLES[i], i);
+      const filename = `${String(i + 1).padStart(2, "0")}.png`;
+      formData.append("images", new File([new Uint8Array(buf)], filename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.code).toBe("MISSING_REQUIRED_ARTWORK");
+
+    // CRITICAL ASSERTION: Must report 01-cover and 02-intro as missing
+    expect(data.missingSlots).toEqual([
+      expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+      expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+    ]);
+
+    // CRITICAL NEGATIVE ASSERTION: Must NOT report 23-closing or 24-backcover
+    const slotIds = data.missingSlots.map((s: any) => s.slotId);
+    expect(slotIds).not.toContain("23-closing");
+    expect(slotIds).not.toContain("24-backcover");
+  });
+
+  // ──────────────────────────────────────────────────
+  // Test 3: KEEP_NUMERIC_SLOTS → missing 23-closing and 24-backcover
+  // ──────────────────────────────────────────────────
+  it("3. KEEP_NUMERIC_SLOTS maps 22 files to slots 01-22, reports 23-closing and 24-backcover missing", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+    formData.append("legacyInterpretation", "KEEP_NUMERIC_SLOTS");
+
+    for (let i = 0; i < 22; i++) {
+      const buf = await makeRoleLabelledImage(LEGACY_22_ROLES[i], i);
+      const filename = `${String(i + 1).padStart(2, "0")}.png`;
+      formData.append("images", new File([new Uint8Array(buf)], filename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.code).toBe("MISSING_REQUIRED_ARTWORK");
+
+    // Must report 23-closing and 24-backcover as missing
+    const slotIds = data.missingSlots.map((s: any) => s.slotId);
+    expect(slotIds).toContain("23-closing");
+    expect(slotIds).toContain("24-backcover");
+
+    // Must NOT report 01-cover or 02-intro
+    expect(slotIds).not.toContain("01-cover");
+    expect(slotIds).not.toContain("02-intro");
+  });
+
+  // ──────────────────────────────────────────────────
+  // Test 4: matchImportedFiles SHIFT_PLUS_TWO exact assertions
+  // ──────────────────────────────────────────────────
+  it("4. matchImportedFiles SHIFT_PLUS_TWO returns exact missingSlots", () => {
+    const files22 = Array.from({ length: 22 }, (_, i) => `${String(i + 1).padStart(2, "0")}.png`);
+    const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
+      bookId: "dream-big",
+      legacyInterpretation: "SHIFT_PLUS_TWO",
+      confirmLegacyOffsetRecovery: true,
+    });
+
+    expect(report.legacyRecoveryApplied).toBe(true);
+    expect(report.missingSlotDetails).toEqual([
+      expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+      expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+    ]);
+
+    // 01.png mapped to 03-pilot, NOT 01-cover
+    expect(report.bySlotId.get("03-pilot")).toBe("01.png");
+    expect(report.bySlotId.has("01-cover")).toBe(false);
+
+    // 22.png mapped to 24-backcover
+    expect(report.bySlotId.get("24-backcover")).toBe("22.png");
+  });
+
+  // ──────────────────────────────────────────────────
+  // Test 5: matchImportedFiles KEEP_NUMERIC_SLOTS exact assertions
+  // ──────────────────────────────────────────────────
+  it("5. matchImportedFiles KEEP_NUMERIC_SLOTS returns exact missingSlots", () => {
+    const files22 = Array.from({ length: 22 }, (_, i) => `${String(i + 1).padStart(2, "0")}.png`);
+    const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
+      bookId: "dream-big",
+      legacyInterpretation: "KEEP_NUMERIC_SLOTS",
+    });
+
+    expect(report.missingSlotDetails).toEqual([
+      expect.objectContaining({ slotId: "23-closing" }),
+      expect.objectContaining({ slotId: "24-backcover" }),
+    ]);
+
+    // 01.png mapped to 01-cover
+    expect(report.bySlotId.get("01-cover")).toBe("01.png");
+    expect(report.bySlotId.get("02-intro")).toBe("02.png");
+
+    // 23-closing and 24-backcover are missing
+    expect(report.bySlotId.has("23-closing")).toBe(false);
+    expect(report.bySlotId.has("24-backcover")).toBe(false);
+  });
+
+  // ──────────────────────────────────────────────────
+  // Test 6: Full 24-file canonical set passes through API and produces PDF
+  // ──────────────────────────────────────────────────
+  it("6. Full 24 canonical files pass API preflight and produce a PDF", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+
+    for (let i = 0; i < 24; i++) {
+      const slot = dreamBigSlots[i];
+      const buf = await makeHighResImage();
+      formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+    const pdfBytes = await res.arrayBuffer();
+    expect(pdfBytes.byteLength).toBeGreaterThan(10000);
+  }, 60000);
+
+  // ──────────────────────────────────────────────────
+  // Test 7: Quality warning acknowledgement contract
+  // ──────────────────────────────────────────────────
+  it("7. 150-299 PPI without acknowledgement returns HTTP 409 QUALITY_WARNING_ACKNOWLEDGEMENT_REQUIRED", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+
+    // 2000x1500 ≈ 178 PPI (between 150 and 300)
+    for (let i = 0; i < 24; i++) {
+      const slot = dreamBigSlots[i];
+      const buf = await sharp({
+        create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
+      }).png().toBuffer();
+      formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.code).toBe("QUALITY_WARNING_ACKNOWLEDGEMENT_REQUIRED");
+    expect(data.qualityWarnings).toBeDefined();
+    expect(data.qualityWarnings.length).toBeGreaterThan(0);
+    expect(data.qualityWarnings[0]).toEqual(
+      expect.objectContaining({
+        slotId: expect.any(String),
+        filename: expect.any(String),
+        nativeWidth: 2000,
+        nativeHeight: 1500,
+      }),
+    );
+  }, 30000);
+
+  // ──────────────────────────────────────────────────
+  // Test 8: 150-299 PPI WITH acknowledgement produces PDF
+  // ──────────────────────────────────────────────────
+  it("8. 150-299 PPI with acknowledgeQualityWarnings=true produces PDF", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+    formData.append("acknowledgeQualityWarnings", "true");
+
+    for (let i = 0; i < 24; i++) {
+      const slot = dreamBigSlots[i];
+      const buf = await sharp({
+        create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
+      }).png().toBuffer();
+      formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+  }, 60000);
+
+  // ──────────────────────────────────────────────────
+  // Test 9: Below 150 PPI is a hard error, even with acknowledgement
+  // ──────────────────────────────────────────────────
+  it("9. Below 150 PPI is a hard error that acknowledgement cannot bypass", async () => {
+    const formData = new FormData();
+    formData.append("name", child.name);
+    formData.append("age", String(child.age));
+    formData.append("gender", child.gender);
+    formData.append("bookId", "dream-big");
+    formData.append("profileId", "classic-landscape-11x8");
+    formData.append("layoutMode", "standard-single");
+    formData.append("acknowledgeQualityWarnings", "true");
+
+    // 1376x768 ≈ 122 PPI (below 150)
+    for (let i = 0; i < 24; i++) {
+      const slot = dreamBigSlots[i];
+      const buf = await sharp({
+        create: { width: 1376, height: 768, channels: 3, background: { r: 100, g: 100, b: 100 } },
+      }).png().toBuffer();
+      formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
+    }
+
+    const req = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData,
+    });
+    const res = await assemblePost(req);
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    // Must be a hard error, not a quality warning
+    expect(data.code).not.toBe("QUALITY_WARNING_ACKNOWLEDGEMENT_REQUIRED");
+  }, 30000);
+});

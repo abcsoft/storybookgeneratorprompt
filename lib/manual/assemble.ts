@@ -27,6 +27,8 @@ export interface AssembleFromImagesOptions {
   customSpreads?: CustomSpreadSelection[];
   draft?: boolean;
   confirmLegacyOffsetRecovery?: boolean;
+  /** Pre-resolved slot-to-image mapping from authoritative import resolution. */
+  resolvedSlotMapping?: Map<string, ProvidedImage>;
 }
 
 export class MissingArtworkError extends Error {
@@ -45,13 +47,15 @@ export class MissingArtworkError extends Error {
  */
 function findImageForSlot(
   slot: ResolvedAssetSlot,
-  assetIndex: number,
+  _assetIndex: number,
   images: Map<number | string, ProvidedImage>,
 ): ProvidedImage | undefined {
   if (images.has(slot.slotId)) return images.get(slot.slotId);
   if (images.has(slot.expectedFilename)) return images.get(slot.expectedFilename);
   if (images.has(slot.filename)) return images.get(slot.filename);
-  if (images.has(assetIndex)) return images.get(assetIndex);
+  // REMOVED: generic numeric assetIndex fallback — images must resolve by
+  // authoritative identity (slotId, canonical filename, or validated aliases),
+  // never by raw positional index.
 
   for (const alias of slot.legacyAliases) {
     if (images.has(alias)) return images.get(alias);
@@ -90,10 +94,13 @@ export async function assembleFromImages(
   });
 
   // Check for missing required slots
+  const resolvedMap = opts?.resolvedSlotMapping;
   const missingSlots: { slotId: string; physicalPages: number[]; role?: string }[] = [];
   for (let i = 0; i < plan.assets.length; i++) {
     const slot = plan.assets[i];
-    const img = findImageForSlot(slot, i, images);
+    const img = resolvedMap
+      ? resolvedMap.get(slot.slotId)
+      : findImageForSlot(slot, i, images);
     if (slot.required && !img) {
       missingSlots.push({
         slotId: slot.slotId,
@@ -108,7 +115,9 @@ export async function assembleFromImages(
   }
 
   const generated: GeneratedPage[] = plan.assets.map((slot, assetIndex) => {
-    const img = findImageForSlot(slot, assetIndex, images);
+    const img = resolvedMap
+      ? resolvedMap.get(slot.slotId)
+      : findImageForSlot(slot, assetIndex, images);
     const isSpread = slot.assetKind === "spread";
     return {
       index: assetIndex,

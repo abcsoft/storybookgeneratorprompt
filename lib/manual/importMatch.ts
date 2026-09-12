@@ -34,6 +34,16 @@ export interface LegacyRecoveryProposalTableEntry {
   physicalPages: number[];
 }
 
+export type LegacyInterpretation = "SHIFT_PLUS_TWO" | "KEEP_NUMERIC_SLOTS";
+
+export interface LegacyRecoveryChoice {
+  interpretation: LegacyInterpretation;
+  label: string;
+  description: string;
+  mappingTable: LegacyRecoveryProposalTableEntry[];
+  resultingMissingSlots: ImportMissingSlot[];
+}
+
 export interface ImportMatchReport {
   required: number;
   matched: number;
@@ -57,6 +67,8 @@ export interface ImportMatchReport {
   legacyRecoveryProposal?: string | null;
   legacyRecoveryTable?: LegacyRecoveryProposalTableEntry[];
   legacyRecoveryApplied?: boolean;
+  /** Two human-readable interpretation choices for ambiguous packages. */
+  legacyRecoveryChoices?: LegacyRecoveryChoice[];
 }
 
 export interface ManifestItem {
@@ -70,6 +82,8 @@ export interface ManifestItem {
 export interface MatchImportedFilesOptions {
   resolvedSlots?: ResolvedAssetSlot[];
   confirmLegacyOffsetRecovery?: boolean;
+  /** Explicit user-selected interpretation for ambiguous legacy packages. */
+  legacyInterpretation?: LegacyInterpretation;
   bookId?: string;
   manifest?: ManifestItem[];
 }
@@ -173,6 +187,9 @@ export function matchImportedFiles(
   } else if (resolvedSlotsOrOptions && typeof resolvedSlotsOrOptions === "object") {
     options = resolvedSlotsOrOptions;
     if (options.resolvedSlots) resolvedSlots = options.resolvedSlots;
+  } else if (optionsOrUndefined) {
+    options = optionsOrUndefined;
+    if (options.resolvedSlots) resolvedSlots = options.resolvedSlots;
   }
 
   const byIndex = new Map<number, string>();
@@ -189,33 +206,45 @@ export function matchImportedFiles(
   let legacyRecoveryProposal: string | null = null;
   let legacyRecoveryApplied = false;
 
-  const isDreamBig = options.bookId === "dream-big" || totalSlots === 24;
+  // Scope legacy detection to Dream Big templates or manifest declarations:
+  // If bookId is explicitly specified, it must be "dream-big".
+  // If bookId is not specified, inspect manifest or resolved slot roles (e.g. 03-pilot).
+  // Do NOT use generic totalSlots === 24 as proof.
+  const isDreamBig = options.bookId
+    ? options.bookId === "dream-big"
+    : Boolean(
+        (options.manifest && options.manifest.length === 22) ||
+        (resolvedSlots && resolvedSlots.some((s) => s.slotId === "03-pilot" || s.roleSlug === "pilot" || s.expectedFilename?.includes("pilot")))
+      );
   const is22Legacy = isDreamBig && isDreamBig22LegacySequence(providedFilenames, resolvedSlots, options.manifest);
 
   if (is22Legacy) {
-    if (!options.confirmLegacyOffsetRecovery) {
+    if (!options.confirmLegacyOffsetRecovery && !options.legacyInterpretation) {
       legacyRecoveryProposal = "Cover and intro appear to be missing. Map these 22 assets to slots 3–24?";
-    } else {
+    } else if (options.legacyInterpretation === "SHIFT_PLUS_TWO" || options.confirmLegacyOffsetRecovery) {
       legacyRecoveryApplied = true;
+    } else if (options.legacyInterpretation === "KEEP_NUMERIC_SLOTS") {
+      // Will be handled in the KEEP_NUMERIC_SLOTS path below
     }
   }
 
   // If 22 legacy assets detected without user confirmation:
   // DO NOT assign 01.png to 01-cover or 02.png to 02-intro!
   // Offer the guarded +2 recovery proposal table and keep slots 01-cover and 02-intro visibly missing.
-  if (is22Legacy && !options.confirmLegacyOffsetRecovery && resolvedSlots && resolvedSlots.length >= 24) {
+  if (is22Legacy && !options.confirmLegacyOffsetRecovery && !options.legacyInterpretation && resolvedSlots && resolvedSlots.length >= 24) {
     const sortedFiles = [...providedFilenames].sort((a, b) => {
       const na = indexFromFilename(a) ?? 0;
       const nb = indexFromFilename(b) ?? 0;
       return na - nb;
     });
 
-    const legacyRecoveryTable: LegacyRecoveryProposalTableEntry[] = [];
+    // Build SHIFT_PLUS_TWO table: map 01..22 to slots 03..24
+    const shiftPlusTwoTable: LegacyRecoveryProposalTableEntry[] = [];
     for (let i = 0; i < sortedFiles.length; i++) {
       const file = sortedFiles[i];
       const targetSlot = resolvedSlots[i + 2];
       if (targetSlot) {
-        legacyRecoveryTable.push({
+        shiftPlusTwoTable.push({
           filename: file,
           proposedSlotId: targetSlot.slotId,
           role: targetSlot.roleSlug,
@@ -223,7 +252,52 @@ export function matchImportedFiles(
         });
       }
     }
+    const shiftPlusTwoMissing: ImportMissingSlot[] = resolvedSlots.slice(0, 2).map((s) => ({
+      slotId: s.slotId,
+      physicalPages: s.physicalPages,
+      role: s.role,
+      expectedFilename: s.expectedFilename ?? s.filename,
+    }));
 
+    // Build KEEP_NUMERIC_SLOTS table: map 01..22 to slots 01..22
+    const keepNumericTable: LegacyRecoveryProposalTableEntry[] = [];
+    for (let i = 0; i < sortedFiles.length; i++) {
+      const file = sortedFiles[i];
+      const targetSlot = resolvedSlots[i];
+      if (targetSlot) {
+        keepNumericTable.push({
+          filename: file,
+          proposedSlotId: targetSlot.slotId,
+          role: targetSlot.roleSlug,
+          physicalPages: targetSlot.physicalPages,
+        });
+      }
+    }
+    const keepNumericMissing: ImportMissingSlot[] = resolvedSlots.slice(22).map((s) => ({
+      slotId: s.slotId,
+      physicalPages: s.physicalPages,
+      role: s.role,
+      expectedFilename: s.expectedFilename ?? s.filename,
+    }));
+
+    const legacyRecoveryChoices: LegacyRecoveryChoice[] = [
+      {
+        interpretation: "SHIFT_PLUS_TWO",
+        label: "Files are Pilot through Back Cover (Cover & Intro missing)",
+        description: "Map 01.png–22.png to slots 03–24. Slots 01-cover and 02-intro remain missing.",
+        mappingTable: shiftPlusTwoTable,
+        resultingMissingSlots: shiftPlusTwoMissing,
+      },
+      {
+        interpretation: "KEEP_NUMERIC_SLOTS",
+        label: "Files are Cover through Inventor (Closing & Back Cover missing)",
+        description: "Map 01.png–22.png to slots 01–22. Slots 23-closing and 24-backcover remain missing.",
+        mappingTable: keepNumericTable,
+        resultingMissingSlots: keepNumericMissing,
+      },
+    ];
+
+    // All slots reported as missing (no assignment until user chooses)
     const missingSlots: string[] = [];
     const missingSlotDetails: ImportMissingSlot[] = [];
     const missing: string[] = [];
@@ -256,7 +330,65 @@ export function matchImportedFiles(
         "Legacy 22-asset offset detected: cover and intro are absent. Guarded +2 recovery offered; explicit confirmation required.",
       ],
       legacyRecoveryProposal,
-      legacyRecoveryTable,
+      legacyRecoveryTable: shiftPlusTwoTable,
+      legacyRecoveryApplied: false,
+      legacyRecoveryChoices,
+    };
+  }
+
+  // KEEP_NUMERIC_SLOTS explicit path: map 22 files to slots 01..22, keep 23-closing and 24-backcover missing
+  if (is22Legacy && options.legacyInterpretation === "KEEP_NUMERIC_SLOTS" && resolvedSlots && resolvedSlots.length >= 24) {
+    const sortedFiles = [...providedFilenames].sort((a, b) => {
+      const na = indexFromFilename(a) ?? 0;
+      const nb = indexFromFilename(b) ?? 0;
+      return na - nb;
+    });
+
+    for (let i = 0; i < sortedFiles.length; i++) {
+      const file = sortedFiles[i];
+      if (i < resolvedSlots.length) {
+        const slot = resolvedSlots[i];
+        byIndex.set(i, file);
+        bySlotId.set(slot.slotId, file);
+        migrationWarnings.push(
+          `Numeric mapping: "${file}" mapped to slot "${slot.slotId}" (Physical page ${slot.physicalPages.join(", ")}).`,
+        );
+      }
+    }
+
+    const missingSlots: string[] = [];
+    const missingSlotDetails: ImportMissingSlot[] = [];
+    const missing: string[] = [];
+
+    for (let i = 0; i < resolvedSlots.length; i++) {
+      if (!byIndex.has(i)) {
+        const s = resolvedSlots[i];
+        missing.push(s.expectedFilename ?? s.filename);
+        missingSlots.push(s.slotId);
+        missingSlotDetails.push({
+          slotId: s.slotId,
+          physicalPages: s.physicalPages,
+          role: s.role,
+          expectedFilename: s.expectedFilename ?? s.filename,
+        });
+      }
+    }
+
+    return {
+      required: totalSlots,
+      matched: bySlotId.size,
+      assignedCount: bySlotId.size,
+      matchedSlots: bySlotId,
+      missing,
+      missingSlots,
+      missingSlotDetails,
+      duplicates,
+      unmatched: [],
+      unexpected: [],
+      byIndex,
+      bySlotId,
+      migrationWarnings,
+      legacyRecoveryProposal: null,
       legacyRecoveryApplied: false,
     };
   }

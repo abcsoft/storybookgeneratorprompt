@@ -171,5 +171,80 @@ describe("matchImportedFiles", () => {
       // 24.png is back cover
       expect(report.bySlotId.get("24-backcover")).toBe("24.png");
     });
+
+    it("22-file unconfirmed report includes legacyRecoveryChoices with both SHIFT_PLUS_TWO and KEEP_NUMERIC_SLOTS", () => {
+      const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
+        bookId: "dream-big",
+        confirmLegacyOffsetRecovery: false,
+      });
+
+      expect(report.legacyRecoveryProposal).toBeDefined();
+      expect(report.legacyRecoveryChoices).toBeDefined();
+      expect(report.legacyRecoveryChoices?.length).toBe(2);
+
+      const shiftChoice = report.legacyRecoveryChoices?.find((c) => c.interpretation === "SHIFT_PLUS_TWO");
+      expect(shiftChoice).toBeDefined();
+      expect(shiftChoice!.resultingMissingSlots.map((s) => s.slotId)).toEqual(["01-cover", "02-intro"]);
+
+      const keepChoice = report.legacyRecoveryChoices?.find((c) => c.interpretation === "KEEP_NUMERIC_SLOTS");
+      expect(keepChoice).toBeDefined();
+      expect(keepChoice!.resultingMissingSlots.map((s) => s.slotId)).toEqual(["23-closing", "24-backcover"]);
+    });
+
+    it("KEEP_NUMERIC_SLOTS maps files to slots 01-22, keeps 23-closing and 24-backcover missing", () => {
+      const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
+        bookId: "dream-big",
+        legacyInterpretation: "KEEP_NUMERIC_SLOTS",
+      });
+
+      expect(report.assignedCount).toBe(22);
+
+      // 01.png mapped to 01-cover (the user said these ARE cover/intro)
+      expect(report.bySlotId.get("01-cover")).toBe("01.png");
+      expect(report.bySlotId.get("02-intro")).toBe("02.png");
+      expect(report.bySlotId.get("03-pilot")).toBe("03.png");
+      expect(report.bySlotId.get("22-inventor")).toBe("22.png");
+
+      // Exact missing slots — only 23-closing and 24-backcover
+      expect(report.missingSlots).toEqual(["23-closing", "24-backcover"]);
+      expect(report.missingSlotDetails).toEqual([
+        expect.objectContaining({ slotId: "23-closing" }),
+        expect.objectContaining({ slotId: "24-backcover" }),
+      ]);
+
+      // Must NOT have 01-cover or 02-intro missing
+      expect(report.missingSlots).not.toContain("01-cover");
+      expect(report.missingSlots).not.toContain("02-intro");
+    });
+
+    it("SHIFT_PLUS_TWO via legacyInterpretation produces exact missingSlotDetails", () => {
+      const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
+        bookId: "dream-big",
+        legacyInterpretation: "SHIFT_PLUS_TWO",
+        confirmLegacyOffsetRecovery: true,
+      });
+
+      expect(report.legacyRecoveryApplied).toBe(true);
+      expect(report.missingSlotDetails).toEqual([
+        expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+        expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+      ]);
+
+      // Must NOT report 23-closing or 24-backcover
+      const missingIds = report.missingSlots;
+      expect(missingIds).not.toContain("23-closing");
+      expect(missingIds).not.toContain("24-backcover");
+    });
+
+    it("does not use totalSlots === 24 as proof of Dream Big (scoped to exact bookId)", () => {
+      // If bookId is not "dream-big", 22 legacy files should NOT trigger recovery
+      const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
+        bookId: "some-other-book",
+        confirmLegacyOffsetRecovery: false,
+      });
+
+      expect(report.legacyRecoveryProposal).toBeNull();
+      expect(report.legacyRecoveryChoices).toBeUndefined();
+    });
   });
 });

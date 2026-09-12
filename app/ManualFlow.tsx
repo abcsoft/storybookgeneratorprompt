@@ -135,11 +135,14 @@ export default function ManualFlow({
   const [error, setError] = useState<string | null>(null);
   const [preflightIssues, setPreflightIssues] = useState<PreflightIssueDetail[]>([]);
   const [preflightWarnings, setPreflightWarnings] = useState<string[]>([]);
+  /** Quality warning slots requiring explicit user acknowledgement (150-299 PPI). */
+  const [pendingQualityWarnings, setPendingQualityWarnings] = useState<any[] | null>(null);
 
   const clearServerErrors = useCallback(() => {
     setError(null);
     setPreflightIssues([]);
     setPreflightWarnings([]);
+    setPendingQualityWarnings(null);
   }, []);
 
   useEffect(() => {
@@ -681,15 +684,34 @@ export default function ManualFlow({
     return form;
   }
 
-  async function buildPdf() {
+  async function buildPdf(overrideAcknowledgeQualityWarnings?: boolean) {
     clearServerErrors();
     const form = buildExportForm();
     if (!form) return;
+    // Pass quality warning acknowledgement if user explicitly approved
+    if (overrideAcknowledgeQualityWarnings) {
+      form.append("acknowledgeQualityWarnings", "true");
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/assemble", { method: "POST", body: form });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+
+        // HTTP 409: Quality warning acknowledgement required
+        if (res.status === 409 && data.code === "QUALITY_WARNING_ACKNOWLEDGEMENT_REQUIRED") {
+          setPendingQualityWarnings(data.qualityWarnings ?? []);
+          return;
+        }
+
+        // HTTP 409: Legacy mapping confirmation required (should not normally
+        // happen from buildPdf since files are named canonically by the UI,
+        // but handle gracefully)
+        if (res.status === 409 && data.code === "LEGACY_MAPPING_CONFIRMATION_REQUIRED") {
+          setError(data.message ?? "Ambiguous file package — please re-import with canonical filenames.");
+          return;
+        }
+
         const rawErrors: string[] = data.preflight?.errors ?? [];
         const rawWarnings: string[] = data.preflight?.warnings ?? [];
         const rawIssues: any[] = data.issues ?? data.preflight?.issues ?? [];
@@ -981,6 +1003,48 @@ export default function ManualFlow({
               <li key={idx} style={{ marginTop: "4px" }}>{w}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Quality Warning Acknowledgement Dialog */}
+      {pendingQualityWarnings && pendingQualityWarnings.length > 0 && (
+        <div className={styles.preflightWarningsPanel} data-testid="quality-warning-dialog" style={{ borderColor: "#f59e0b", background: "#fffbeb" }}>
+          <div className={styles.preflightWarningsHeader}>
+            <span>⚠️</span>
+            <strong>Quality Warning — Acknowledgement Required</strong>
+          </div>
+          <p style={{ margin: "8px 0", fontSize: "13px", color: "#92400e" }}>
+            The following images are between 150–299 native PPI. Production print quality
+            may be reduced. You must explicitly acknowledge this to continue.
+          </p>
+          <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
+            {pendingQualityWarnings.map((w: any, idx: number) => (
+              <li key={idx} style={{ marginTop: "4px", fontSize: "13px" }}>
+                <strong>{w.filename}</strong> — {w.nativeWidth}×{w.nativeHeight} px
+                ({Math.round(w.nativeEffectivePpi)} PPI) → Physical page{w.physicalPages?.length > 1 ? "s" : ""} {w.physicalPages?.join(", ")}
+              </li>
+            ))}
+          </ul>
+          <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+            <button
+              className={styles.sessionNewBook}
+              style={{ background: "#f59e0b", borderColor: "#d97706" }}
+              onClick={() => {
+                setPendingQualityWarnings(null);
+                void buildPdf(true);
+              }}
+              data-testid="acknowledge-quality-warnings"
+            >
+              I understand — proceed with export
+            </button>
+            <button
+              className={styles.linkAction}
+              onClick={() => setPendingQualityWarnings(null)}
+              data-testid="cancel-quality-warnings"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

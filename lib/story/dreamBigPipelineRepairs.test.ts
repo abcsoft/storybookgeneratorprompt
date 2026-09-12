@@ -189,7 +189,7 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
     expect(matchWithConfirm.matchedSlots.get("03-pilot")).toBe("01-pilot.png");
     expect(matchWithConfirm.matchedSlots.get("24-backcover")).toBe("22-backcover.png");
 
-    // Case C: Production API export with these 22 files MUST fail closed (HTTP 400 with MISSING_REQUIRED_ARTWORK)
+    // Case C: Production API export with these 22 files MUST first offer guarded legacy recovery (HTTP 409)
     const formData = new FormData();
     formData.append("name", "Alex");
     formData.append("age", "4");
@@ -209,8 +209,35 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
     });
 
     const res = await assemblePost(req);
-    expect(res.status).toBe(400);
-    const data = await res.json();
+    // Without legacyInterpretation, API must return 409 requiring user choice
+    expect(res.status).toBe(409);
+    const choiceData = await res.json();
+    expect(choiceData.code).toBe("LEGACY_MAPPING_CONFIRMATION_REQUIRED");
+    expect(choiceData.choices).toBeDefined();
+    expect(choiceData.choices.length).toBe(2);
+
+    // Case D: With explicit SHIFT_PLUS_TWO interpretation, API returns 400 with missing cover & intro
+    const formData2 = new FormData();
+    formData2.append("name", "Alex");
+    formData2.append("age", "4");
+    formData2.append("gender", "boy");
+    formData2.append("bookId", "dream-big");
+    formData2.append("profileId", profileId);
+    formData2.append("layoutMode", "standard-single");
+    formData2.append("legacyInterpretation", "SHIFT_PLUS_TWO");
+
+    for (const name of files22) {
+      formData2.append("images", new File([new Uint8Array(sampleBuffer)], name, { type: "image/png" }));
+    }
+
+    const req2 = new Request("http://localhost:3000/api/assemble", {
+      method: "POST",
+      body: formData2,
+    });
+
+    const res2 = await assemblePost(req2);
+    expect(res2.status).toBe(400);
+    const data = await res2.json();
     expect(data.code).toBe("MISSING_REQUIRED_ARTWORK");
     expect(Array.isArray(data.missingSlots)).toBe(true);
 
