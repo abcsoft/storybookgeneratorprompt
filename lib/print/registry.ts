@@ -30,5 +30,11 @@ export function getPrintProfile(id?: string): PrintProfile {
   if (id === "printify-square-8x8") {
     return printifyHardcoverSquare8x8Profile;
   }
+  if (id === "lulu-square-85x85" || id === "lulu-premium-square-85x85") {
+    return luluPremiumColorSquare85x85Profile;
+  }
+  if (id === "lulu-landscape-11x85" || id === "lulu-premium-landscape-11x85") {
+    return luluPremiumColorLandscape11x85Profile;
+  }
   return PRINT_PROFILES.find((p) => p.id === id) ?? PRINT_PROFILES[0];
 }

@@ -9,10 +9,12 @@ import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection, type Re
 import { getEditionForProfile } from "../story/editions";
 import type { ChildProfile } from "../story/types";
 import type { PrintProfile } from "./types";
+import type { ImageProvenanceMetadata } from "../enhance/provenance";
 
 export interface PreflightFile {
   filename: string;
   buffer: Buffer;
+  provenance?: ImageProvenanceMetadata;
 }
 
 export interface PreflightAssetReport {
@@ -33,6 +35,7 @@ export interface PreflightAssetReport {
   finalRasterWidth: number;
   finalRasterHeight: number;
   finalOutputGridPpi: number;
+  provenance?: ImageProvenanceMetadata;
 }
 
 export interface PreflightOptions {
@@ -51,6 +54,8 @@ export interface PreflightOptions {
   resolvedSlotMapping?: Map<string, PreflightFile>;
   /** Explicit user acknowledgement of quality warnings (150-299 PPI). */
   acknowledgeQualityWarnings?: boolean;
+  /** Provenance metadata keyed by slotId or filename */
+  provenances?: Record<string, ImageProvenanceMetadata>;
 }
 
 export interface PreflightIssue {
@@ -118,9 +123,10 @@ function matchFilesToSlots(
     // Find slot by exact filename, slotId, or legacy aliases
     let matchedSlot = slots.find(
       (s) =>
-        s.filename.toLowerCase() === norm ||
-        s.slotId.toLowerCase() === base ||
-        s.legacyAliases.some((alias) => alias.toLowerCase() === norm),
+        (s.filename && s.filename.toLowerCase() === norm) ||
+        (s.expectedFilename && s.expectedFilename.toLowerCase() === norm) ||
+        s.slotId?.toLowerCase() === base ||
+        s.legacyAliases?.some((alias) => alias.toLowerCase() === norm),
     );
 
     if (!matchedSlot) {
@@ -412,14 +418,26 @@ export async function runPreflight(
         continue;
       }
 
+      const provenance =
+        file.provenance ??
+        opts.provenances?.[slot.slotId] ??
+        opts.provenances?.[file.filename];
+
       const actualWidth = meta.width;
       const actualHeight = meta.height;
       const expectedWidth = slot.destinationDimensions.width;
       const expectedHeight = slot.destinationDimensions.height;
 
-      // 1. Aspect ratio & Orientation check (evaluated first so orientation issues are prioritized)
+      // 1. Authoritative aspect ratio calculated exclusively from destinationDimensions
       const actualAspect = actualWidth / actualHeight;
-      const expectedAspect = parseAspect(slot.expectedSourceAspect);
+      const expectedAspect = slot.destinationDimensions
+        ? slot.destinationDimensions.width / slot.destinationDimensions.height
+        : parseAspect(slot.targetCanvasAspect ?? slot.expectedSourceAspect);
+      const expectedAspectLabel =
+        slot.targetCanvasAspect ??
+        (slot.destinationDimensions
+          ? `${slot.destinationDimensions.width}:${slot.destinationDimensions.height}`
+          : slot.expectedSourceAspect);
       const aspectClassification = classifyAspectMatch(actualAspect, expectedAspect);
 
       let willCropOrExtend = false;
@@ -430,7 +448,7 @@ export async function runPreflight(
         const expectedOrientation = orientationOf(expectedAspect);
         const msg =
           `Illustration ${illoNum} (${file.filename}) is ${actualOrientation}, but needs a ` +
-          `${expectedOrientation} layout (recommended ${slot.expectedSourceAspect}) — this can't be ` +
+          `${expectedOrientation} layout (target aspect ${expectedAspectLabel}) — this can't be ` +
           `used here without cropping or padding out the artwork. Regenerate with a ` +
           `${expectedOrientation} aspect ratio.`;
         errors.push(msg);
@@ -438,14 +456,14 @@ export async function runPreflight(
           type: "INCOMPATIBLE_ORIENTATION",
           illustrationNumber: illoNum,
           filename: file.filename,
-          expected: `${expectedOrientation} layout (${slot.expectedSourceAspect})`,
+          expected: `${expectedOrientation} layout (${expectedAspectLabel})`,
           actual: `${actualOrientation} layout (${actualWidth}×${actualHeight}, aspect ${actualAspect.toFixed(2)})`,
           recommendation: `Regenerate or reframe illustration ${illoNum} with a ${expectedOrientation} aspect ratio.`,
           message: msg,
         });
       } else if (aspectClassification === "warn") {
         willCropOrExtend = true;
-        cropOrExtendNote = `aspect ratio differs slightly (${actualAspect.toFixed(2)} vs expected ${slot.expectedSourceAspect}). Background extension or letterboxing will occur.`;
+        cropOrExtendNote = `aspect ratio differs slightly (${actualAspect.toFixed(2)} vs expected ${expectedAspectLabel}). Background extension or letterboxing will occur.`;
         warnings.push(`"${file.filename}": ${cropOrExtendNote}`);
       }
 
@@ -456,69 +474,139 @@ export async function runPreflight(
           ? (profile.finalPageIn?.width ? profile.finalPageIn.width * 2 : profile.nominalSizeIn.width * 2)
           : (profile.finalPageIn?.width ?? profile.nominalSizeIn.width);
       const nominalHeightIn = profile.finalPageIn?.height ?? profile.nominalSizeIn.height;
-      const nativeEffectivePpiX = actualWidth / nominalWidthIn;
-      const nativeEffectivePpiY = actualHeight / nominalHeightIn;
-      const nativeEffectivePpi = Math.min(nativeEffectivePpiX, nativeEffectivePpiY);
-      const effectivePPI = nativeEffectivePpi;
+
+      // Check provenance for original dimensions and enhancement method
+      const isAiEnhanced =
+        provenance?.enhancementMethod === "ai-enhanced" ||
+        provenance?.enhancementMethod === "mocked-ai-super-res";
+      const isResampledOnly = provenance?.enhancementMethod === "resampled";
+      const isApproved = provenance?.enhancementStatus === "approved";
+
+      // Native effective PPI: derive from original pixel dimensions if recorded in provenance
+      const originalWidth = provenance?.originalPixelDimensions?.width ?? actualWidth;
+      const originalHeight = provenance?.originalPixelDimensions?.height ?? actualHeight;
+      const nativeEffectivePpiX = originalWidth / nominalWidthIn;
+      const nativeEffectivePpiY = originalHeight / nominalHeightIn;
+      const nativeEffectivePpi =
+        provenance?.nativeEffectivePpi ?? Math.min(nativeEffectivePpiX, nativeEffectivePpiY);
+      const effectivePPI = isAiEnhanced && isApproved ? 300 : nativeEffectivePpi;
       const nativeSourcePpi = nativeEffectivePpi;
       const finalRasterWidth = slot.destinationDimensions.width;
       const finalRasterHeight = slot.destinationDimensions.height;
       const finalOutputGridPpi = 300;
 
+      // Fail-closed check: if enhanced, dimensions must match destination canvas exactly
+      if (isAiEnhanced) {
+        if (actualWidth !== finalRasterWidth || actualHeight !== finalRasterHeight) {
+          const dimMsg = `Enhanced illustration "${file.filename}" dimensions ${actualWidth}×${actualHeight} do not match destination canvas ${finalRasterWidth}×${finalRasterHeight}.`;
+          errors.push(dimMsg);
+          issues.push({
+            type: "INCORRECT_ENHANCED_DIMENSIONS",
+            code: "INCORRECT_ENHANCED_DIMENSIONS",
+            illustrationNumber: illoNum,
+            filename: file.filename,
+            expected: `${finalRasterWidth}×${finalRasterHeight} px`,
+            actual: `${actualWidth}×${actualHeight} px`,
+            recommendation: "Ensure resolution enhancement scales proportionally to target destination dimensions.",
+            message: dimMsg,
+          });
+        }
+      }
+
       const isDraft = opts.draft === true;
       const isProduction = !isDraft && !opts.allowLowResolutionForTesting;
 
       // Authoritative production quality policy:
-      // - native PPI below 150: hard error; production export blocked
-      // - native PPI from 150 to below 300: warning requiring explicit user acknowledgement
+      // - native PPI below 150:
+      //     * If approved AI-super-resolution: passes directly.
+      //     * If unapproved AI-super-resolution: blocks with ENHANCEMENT_APPROVAL_REQUIRED.
+      //     * If plain resampled: hard error! Plain resampling cannot rewrite native 107 PPI as native 300 PPI.
+      //     * If unenhanced: hard error; production export blocked. Acknowledgement cannot bypass.
+      // - native PPI 150 to below 300:
+      //     * If approved AI-super-resolution: passes.
+      //     * Otherwise: warning requiring explicit user acknowledgement.
       // - native PPI 300 or above: pass
-      // - draft mode may accept lower PPI but must show a visible DRAFT watermark
+      // - draft mode accepts lower PPI with visible DRAFT watermark
       if (nativeEffectivePpi < 150) {
         if (isProduction) {
-          const ppiMsg =
-            `Source resolution for "${file.filename}" is below print-safe threshold: ${actualWidth}×${actualHeight} px ` +
-            `yields only ${Math.round(nativeEffectivePpi)} native effective PPI on ${nominalWidthIn}×${nominalHeightIn}" canvas ` +
-            `(${nativeEffectivePpiX.toFixed(1)} PPI horizontal, ${nativeEffectivePpiY.toFixed(1)} PPI vertical). ` +
-            `Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, ${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px).`;
-          errors.push(ppiMsg);
-          issues.push({
-            type: "LOW_PPI",
-            code: "LOW_PPI",
-            illustrationNumber: illoNum,
-            filename: file.filename,
-            expected: `Minimum 150 native effective PPI (${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px)`,
-            actual: `${actualWidth}×${actualHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
-            recommendation: `Provide a higher-resolution image with at least 150 native PPI (${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px) or export in draft mode.`,
-            message: ppiMsg,
-          });
+          if (isAiEnhanced && isApproved) {
+            // Approved AI-super-resolution passes
+          } else if (isAiEnhanced && !isApproved) {
+            const unapprovedMsg = `AI-enhanced illustration "${file.filename}" (native ${Math.round(nativeEffectivePpi)} PPI) requires explicit visual approval before production export.`;
+            errors.push(unapprovedMsg);
+            issues.push({
+              type: "ENHANCEMENT_APPROVAL_REQUIRED",
+              code: "ENHANCEMENT_APPROVAL_REQUIRED",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: "Explicit visual user approval of AI super-resolution result",
+              actual: "Unapproved enhancement",
+              recommendation: "Review before/after preview and explicitly approve the enhanced illustration.",
+              message: unapprovedMsg,
+            });
+          } else if (isResampledOnly) {
+            const resampledMsg = `Source "${file.filename}" has native ${Math.round(nativeEffectivePpi)} PPI. Plain pixel resampling cannot rewrite native low-resolution artwork as print quality. Production export requires genuine AI enhancement or higher-resolution source artwork.`;
+            errors.push(resampledMsg);
+            issues.push({
+              type: "LOW_PPI",
+              code: "LOW_PPI",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: `Minimum 150 native effective PPI (${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px)`,
+              actual: `${actualWidth}×${actualHeight} px (native ${Math.round(nativeEffectivePpi)} PPI, plain resampled)`,
+              recommendation: "Use AI super-resolution or upload a high-resolution source file.",
+              message: resampledMsg,
+            });
+          } else {
+            const ppiMsg =
+              `Source resolution for "${file.filename}" is below print-safe threshold: ${originalWidth}×${originalHeight} px ` +
+              `yields only ${Math.round(nativeEffectivePpi)} native effective PPI on ${nominalWidthIn}×${nominalHeightIn}" canvas ` +
+              `(${nativeEffectivePpiX.toFixed(1)} PPI horizontal, ${nativeEffectivePpiY.toFixed(1)} PPI vertical). ` +
+              `Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, ${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px).`;
+            errors.push(ppiMsg);
+            issues.push({
+              type: "LOW_PPI",
+              code: "LOW_PPI",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: `Minimum 150 native effective PPI (${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px)`,
+              actual: `${originalWidth}×${originalHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
+              recommendation: `Provide a higher-resolution image with at least 150 native PPI (${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px), auto-fix with AI enhancement, or export in draft mode.`,
+              message: ppiMsg,
+            });
+          }
         } else {
           warnings.push(
             `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (below 150 PPI). Allowed in draft mode with visible DRAFT watermark.`,
           );
         }
       } else if (nativeEffectivePpi < 300) {
-        const needsAcknowledgement = isProduction && !opts.acknowledgeQualityWarnings;
-        if (needsAcknowledgement) {
-          const ackMsg =
-            `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). ` +
-            `Requires explicit user acknowledgement for production export. ` +
-            `Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); ` +
-            `enlargement does not create genuine native 300-PPI detail.`;
-          errors.push(ackMsg);
-          issues.push({
-            type: "QUALITY_WARNING_UNACKNOWLEDGED",
-            code: "QUALITY_WARNING_UNACKNOWLEDGED",
-            illustrationNumber: illoNum,
-            filename: file.filename,
-            expected: `Minimum 300 native effective PPI or explicit quality acknowledgement`,
-            actual: `${actualWidth}×${actualHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
-            recommendation: `Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.`,
-            message: ackMsg,
-          });
+        if (isAiEnhanced && isApproved) {
+          // Approved AI-enhancement passes
         } else {
-          warnings.push(
-            `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); enlargement does not create genuine native 300-PPI detail.`,
-          );
+          const needsAcknowledgement = isProduction && !opts.acknowledgeQualityWarnings;
+          if (needsAcknowledgement) {
+            const ackMsg =
+              `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). ` +
+              `Requires explicit user acknowledgement for production export. ` +
+              `Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); ` +
+              `enlargement does not create genuine native 300-PPI detail.`;
+            errors.push(ackMsg);
+            issues.push({
+              type: "QUALITY_WARNING_UNACKNOWLEDGED",
+              code: "QUALITY_WARNING_UNACKNOWLEDGED",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: `Minimum 300 native effective PPI or explicit quality acknowledgement`,
+              actual: `${actualWidth}×${actualHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
+              recommendation: `Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.`,
+              message: ackMsg,
+            });
+          } else {
+            warnings.push(
+              `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); enlargement does not create genuine native 300-PPI detail.`,
+            );
+          }
         }
       }
 
@@ -560,6 +648,7 @@ export async function runPreflight(
         finalRasterWidth,
         finalRasterHeight,
         finalOutputGridPpi,
+        provenance,
       });
     } catch {
       const msg = `Could not read "${file.filename}" as an image (file is corrupt or unreadable).`;
@@ -596,7 +685,12 @@ export async function runPreflight(
   // 10. Collect quality warning slots for the acknowledgement contract
   const qualityWarnings: QualityWarningSlot[] = [];
   for (const report of assetReports) {
-    if (report.nativeSourcePpi >= 150 && report.nativeSourcePpi < 300) {
+    const isApprovedAi =
+      (report.provenance?.enhancementMethod === "ai-enhanced" ||
+        report.provenance?.enhancementMethod === "mocked-ai-super-res") &&
+      report.provenance?.enhancementStatus === "approved";
+
+    if (!isApprovedAi && report.nativeSourcePpi >= 150 && report.nativeSourcePpi < 300) {
       const slot = plan.assets.find((s) => s.slotId === report.slotId);
       qualityWarnings.push({
         slotId: report.slotId,

@@ -102,6 +102,16 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  let provenancesMap: Record<string, any> = {};
+  const rawProvenances = form.get("provenances");
+  if (typeof rawProvenances === "string") {
+    try {
+      provenancesMap = JSON.parse(rawProvenances);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   // ──────────────────────────────────────────────────
   // 1. Resolve the authoritative layout plan
   // ──────────────────────────────────────────────────
@@ -208,12 +218,18 @@ export async function POST(request: Request): Promise<Response> {
   // 6. Run preflight with pre-resolved mapping (no independent re-matching)
   // ──────────────────────────────────────────────────
   if (!isDraft) {
-    const preflightFiles: { filename: string; buffer: Buffer }[] = [];
-    const preflightSlotMapping = new Map<string, { filename: string; buffer: Buffer }>();
+    const preflightFiles: PreflightFile[] = [];
+    const preflightSlotMapping = new Map<string, PreflightFile>();
 
     for (const [slotId, entry] of resolvedSlotFileMapping) {
-      preflightFiles.push(entry);
-      preflightSlotMapping.set(slotId, entry);
+      const prov = provenancesMap[slotId] ?? provenancesMap[entry.filename];
+      const pfFile: PreflightFile = {
+        filename: entry.filename,
+        buffer: entry.buffer,
+        provenance: prov,
+      };
+      preflightFiles.push(pfFile);
+      preflightSlotMapping.set(slotId, pfFile);
     }
 
     const preflight = await runPreflight({
@@ -225,6 +241,7 @@ export async function POST(request: Request): Promise<Response> {
       customSpreads,
       resolvedSlotMapping: preflightSlotMapping,
       acknowledgeQualityWarnings,
+      provenances: provenancesMap,
     });
 
     // HTTP 409: Quality warnings require explicit acknowledgement

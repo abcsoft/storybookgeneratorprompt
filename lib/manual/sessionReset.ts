@@ -15,6 +15,8 @@
 import type { ClientImageCheckResult } from "./clientImageCheck";
 import type { IllustrationStatus } from "./illustrationStatus";
 import type { ArtworkTransform } from "../print/artworkTransform";
+import type { ImageProvenanceMetadata } from "../enhance/provenance";
+import type { SemanticValidationResult } from "../semantic/types";
 
 /** One illustration's session-scoped state. Never becomes "approved"
  *  automatically — see illustrationStatus.ts. */
@@ -25,10 +27,22 @@ export interface IllustrationEntry {
   objectUrl: string | null;
   clientCheck: ClientImageCheckResult | null;
   transform?: ArtworkTransform;
+  /** Resolution quality provenance and enhancement state */
+  provenance?: ImageProvenanceMetadata;
+  /** Preserved original file before any enhancement, enabling clean revert */
+  originalFile?: File | null;
+  originalObjectUrl?: string | null;
+  /** Story/image semantic validation result */
+  semanticValidation?: SemanticValidationResult | null;
 }
 
 export function emptyEntry(): IllustrationEntry {
-  return { status: "missing", file: null, objectUrl: null, clientCheck: null };
+  return {
+    status: "missing",
+    file: null,
+    objectUrl: null,
+    clientCheck: null,
+  };
 }
 
 /** A fresh, all-"missing" illustration map for a given set of page indices —
@@ -47,9 +61,12 @@ export function freshIllustrations(
 export function collectObjectUrls(
   illustrations: Record<number, IllustrationEntry>,
 ): string[] {
-  return Object.values(illustrations)
-    .map((e) => e.objectUrl)
-    .filter((u): u is string => Boolean(u));
+  const urls: string[] = [];
+  for (const e of Object.values(illustrations)) {
+    if (e.objectUrl) urls.push(e.objectUrl);
+    if (e.originalObjectUrl) urls.push(e.originalObjectUrl);
+  }
+  return urls;
 }
 
 /**

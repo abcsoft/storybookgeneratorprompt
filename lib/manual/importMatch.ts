@@ -507,35 +507,41 @@ export function matchImportedFiles(
       // Priority 1: manifest asset ID / slotId
       matchedSlot =
         resolvedSlots.find(
-          (s) => s.slotId.toLowerCase() === base || s.slotId.toLowerCase() === norm,
+          (s) => s.slotId?.toLowerCase() === base || s.slotId?.toLowerCase() === norm,
         ) ?? null;
 
       // Priority 2: exact canonical filename
       if (!matchedSlot) {
         matchedSlot =
-          resolvedSlots.find(
-            (s) =>
-              s.expectedFilename.toLowerCase() === norm ||
-              s.filename.toLowerCase() === norm ||
-              s.expectedFilename.toLowerCase().replace(/\.[^/.]+$/, "") === base,
-          ) ?? null;
+          resolvedSlots.find((s) => {
+            const exp = s.expectedFilename?.toLowerCase();
+            const fn = s.filename?.toLowerCase();
+            const canon = (s.expectedFilename ?? s.filename)?.toLowerCase();
+            return (
+              exp === norm ||
+              fn === norm ||
+              (canon ? canon.replace(/\.[^/.]+$/, "") === base : false)
+            );
+          }) ?? null;
       }
 
       // Priority 3: manifest role matching (when manifest is available, map by semantic role before generic numeric aliases)
       if (!matchedSlot && options.manifest) {
         const mItem = options.manifest.find(
-          (m) => m.filename.toLowerCase() === norm || m.filename.toLowerCase().replace(/\.[^/.]+$/, "") === base,
+          (m) =>
+            m.filename?.toLowerCase() === norm ||
+            m.filename?.toLowerCase().replace(/\.[^/.]+$/, "") === base,
         );
         if (mItem) {
           if (mItem.slotId) {
-            matchedSlot = resolvedSlots.find((s) => s.slotId.toLowerCase() === mItem.slotId!.toLowerCase()) ?? null;
+            matchedSlot = resolvedSlots.find((s) => s.slotId?.toLowerCase() === mItem.slotId!.toLowerCase()) ?? null;
           }
           if (!matchedSlot && (mItem.roleSlug || mItem.role)) {
             const r = (mItem.roleSlug ?? mItem.role!).toLowerCase();
             matchedSlot =
               resolvedSlots.find(
                 (s) =>
-                  s.roleSlug.toLowerCase() === r ||
+                  s.roleSlug?.toLowerCase() === r ||
                   s.role?.toLowerCase() === r ||
                   s.sourceSceneRole?.toLowerCase() === r,
               ) ?? null;
@@ -547,10 +553,10 @@ export function matchImportedFiles(
       if (!matchedSlot) {
         matchedSlot =
           resolvedSlots.find((s) =>
-            s.legacyAliases.some(
+            s.legacyAliases?.some(
               (alias) =>
-                alias.toLowerCase() === norm ||
-                alias.toLowerCase().replace(/\.[^/.]+$/, "") === base,
+                alias?.toLowerCase() === norm ||
+                alias?.toLowerCase().replace(/\.[^/.]+$/, "") === base,
             ),
           ) ?? null;
       }

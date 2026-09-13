@@ -246,5 +246,39 @@ describe("matchImportedFiles", () => {
       expect(report.legacyRecoveryProposal).toBeNull();
       expect(report.legacyRecoveryChoices).toBeUndefined();
     });
+
+    it("safely handles slots where filename is undefined without throwing TypeError", () => {
+      const slotsWithoutFilename = dreamBigSlots.map((s) => {
+        const copy: any = { ...s };
+        delete copy.filename;
+        return copy;
+      });
+
+      expect(() => {
+        const report = matchImportedFiles(
+          ["01-cover.png", "02-intro.png", "03-pilot.png"],
+          slotsWithoutFilename,
+        );
+        expect(report.matched).toBe(3);
+        expect(report.bySlotId.get("01-cover")).toBe("01-cover.png");
+      }).not.toThrow();
+    });
+
+    it("safely handles slots where expectedFilename is undefined without throwing TypeError", () => {
+      const slotsWithoutExpected = dreamBigSlots.map((s) => {
+        const copy: any = { ...s };
+        delete copy.expectedFilename;
+        return copy;
+      });
+
+      expect(() => {
+        const report = matchImportedFiles(
+          ["01-cover.png", "02-intro.png", "03-pilot.png"],
+          slotsWithoutExpected,
+        );
+        expect(report.matched).toBe(3);
+        expect(report.bySlotId.get("01-cover")).toBe("01-cover.png");
+      }).not.toThrow();
+    });
   });
 });

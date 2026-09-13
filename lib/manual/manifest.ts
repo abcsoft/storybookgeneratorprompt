@@ -89,6 +89,7 @@ export function buildManifest(
       spread: isSpread,
       pageLayout: layout,
       aspect: slot.expectedSourceAspect,
+      targetCanvasAspect: slot.targetCanvasAspect,
       physicalPages: slot.physicalPages,
       resolvedSlot: slot,
     };

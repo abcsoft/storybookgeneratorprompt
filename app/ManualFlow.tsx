@@ -26,6 +26,8 @@ import type { PrintProfile } from "@/lib/print/types";
 import { getEditionForProfile } from "@/lib/story/editions";
 import type { ArtworkTransform } from "@/lib/print/artworkTransform";
 import type { LayoutMode, CustomSpreadSelection, ResolvedAssetSlot } from "@/lib/story/layoutPlan";
+import type { ImageProvenanceMetadata } from "@/lib/enhance/provenance";
+import type { SemanticValidationResult } from "@/lib/semantic/types";
 import styles from "./page.module.css";
 
 export type { IllustrationEntry };
@@ -43,18 +45,22 @@ export interface PreflightIssueDetail {
 import type { PageLayout } from "@/lib/story/types";
 
 export interface ManualPage {
+  slotId?: string;
   illustrationNumber?: number;
   illustrationIndex?: number;
   page: number;
   index: number;
   kind: string;
   role?: string;
+  roleSlug?: string;
   filename: string;
   canonicalFilename?: string;
+  expectedFilename?: string;
   legacyAliases?: string[];
   prompt: string;
   text: string;
   aspect: string;
+  targetCanvasAspect?: string;
   spread?: boolean;
   pageLayout?: PageLayout;
   physicalPages?: number[];
@@ -164,6 +170,14 @@ export default function ManualFlow({
   const [correctionIndex, setCorrectionIndex] = useState<number | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
+  // Resolution enhancement and semantic validation states
+  const [enhancingIndices, setEnhancingIndices] = useState<Set<number>>(new Set());
+  const [checkingSemanticIndices, setCheckingSemanticIndices] = useState<Set<number>>(new Set());
+  const [batchEnhancing, setBatchEnhancing] = useState(false);
+  const [batchEnhanceProgress, setBatchEnhanceProgress] = useState<{ total: number; completed: number; failed: number } | null>(null);
+  const batchEnhanceCancelRef = useRef(false);
+  const [batchChecking, setBatchChecking] = useState(false);
+
   // The native file input, so a destructive reset can explicitly zero its
   // value — React state alone doesn't reliably reset the browser's own
   // file-selection value (the dropzone's own onChange already does this
@@ -234,9 +248,14 @@ export default function ManualFlow({
       }
       collectObjectUrls(illustrations).forEach((u) => URL.revokeObjectURL(u));
       const nextPages = data.pages as ManualPage[];
-      const nextResolvedSlots: ResolvedAssetSlot[] =
+      const rawSlots: any[] =
         data.resolvedSlots ??
         (nextPages.map((p) => p.resolvedSlot).filter(Boolean) as ResolvedAssetSlot[]);
+      const nextResolvedSlots: ResolvedAssetSlot[] = rawSlots.map((s) => ({
+        ...s,
+        filename: s.filename ?? s.expectedFilename,
+        expectedFilename: s.expectedFilename ?? s.filename,
+      }));
 
       setPages(nextPages);
       setResolvedSlots(nextResolvedSlots);
@@ -343,7 +362,10 @@ export default function ManualFlow({
         for (const p of nextPages) {
           const currentFile = illustrations[p.index]?.file;
           if (!currentFile) continue;
-          void checkImportedImage(currentFile, p.aspect).then((check) => {
+          const expectedAspect = p.resolvedSlot?.destinationDimensions
+            ? `${p.resolvedSlot.destinationDimensions.width}:${p.resolvedSlot.destinationDimensions.height}`
+            : (p.targetCanvasAspect ?? p.aspect);
+          void checkImportedImage(currentFile, expectedAspect).then((check) => {
             if (importGeneration.isStale(generation)) return; // reset meanwhile
             setIllustrations((cur) => {
               const current = cur[p.index];
@@ -400,12 +422,61 @@ export default function ManualFlow({
   async function runClientCheck(index: number, file: File, generation: number) {
     const page = pages.find((p) => p.index === index);
     if (!page) return;
-    const check = await checkImportedImage(file, page.aspect);
+    const expectedAspect = page.resolvedSlot?.destinationDimensions
+      ? `${page.resolvedSlot.destinationDimensions.width}:${page.resolvedSlot.destinationDimensions.height}`
+      : (page.targetCanvasAspect ?? page.aspect);
+    const check = await checkImportedImage(file, expectedAspect);
     if (importGeneration.isStale(generation)) return; // a reset happened meanwhile
+
+    let width = check.width ?? 0;
+    let height = check.height ?? 0;
+    let nativeEffectivePpi = 300;
+    let sha256 = "";
+
+    if (width > 0 && height > 0) {
+      const nominalWidthIn = page.resolvedSlot?.assetKind === "spread"
+        ? (profile.finalPageIn?.width ? profile.finalPageIn.width * 2 : profile.nominalSizeIn.width * 2)
+        : (profile.finalPageIn?.width ?? profile.nominalSizeIn.width);
+      const nominalHeightIn = profile.finalPageIn?.height ?? profile.nominalSizeIn.height;
+      nativeEffectivePpi = Math.min(width / nominalWidthIn, height / nominalHeightIn);
+    }
+
+    try {
+      const arrayBuf = await file.arrayBuffer();
+      const hashBuf = await crypto.subtle.digest("SHA-256", arrayBuf);
+      sha256 = Array.from(new Uint8Array(hashBuf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    } catch {
+      /* fallback if subtle crypto is unavailable */
+    }
+
     setIllustrations((cur) => {
       const current = cur[index];
       if (!current || current.file !== file) return cur; // superseded already
-      return { ...cur, [index]: { ...current, clientCheck: check } };
+      const initialProvenance: ImageProvenanceMetadata = current.provenance ?? {
+        originalPixelDimensions: { width: width || 1200, height: height || 880 },
+        nativeEffectivePpi: Number(nativeEffectivePpi.toFixed(1)),
+        outputGridPpi: 300,
+        upscaleFactor: 1.0,
+        enhancementMethod: "none",
+        enhancementStatus: "none",
+        originalSha256: sha256,
+        approvalRequired: false,
+        approvedAt: null,
+        originalFilename: file.name,
+      };
+
+      return {
+        ...cur,
+        [index]: {
+          ...current,
+          clientCheck: check,
+          originalFile: current.originalFile ?? file,
+          originalObjectUrl: current.originalObjectUrl ?? current.objectUrl,
+          provenance: initialProvenance,
+        },
+      };
     });
   }
 
@@ -428,8 +499,14 @@ export default function ManualFlow({
   const [pendingLegacyFiles, setPendingLegacyFiles] = useState<File[] | null>(null);
 
   const currentResolvedSlots = useMemo<ResolvedAssetSlot[]>(() => {
-    if (resolvedSlots.length > 0) return resolvedSlots;
-    return pages.map((p) => p.resolvedSlot).filter(Boolean) as ResolvedAssetSlot[];
+    const base = resolvedSlots.length > 0
+      ? resolvedSlots
+      : (pages.map((p) => p.resolvedSlot).filter(Boolean) as ResolvedAssetSlot[]);
+    return base.map((s) => ({
+      ...s,
+      filename: s.filename ?? s.expectedFilename,
+      expectedFilename: s.expectedFilename ?? s.filename,
+    }));
   }, [resolvedSlots, pages]);
 
   /**
@@ -665,6 +742,293 @@ export default function ManualFlow({
     setPendingAction(null);
   }
 
+  // ---------- Resolution Enhancement & Semantic Validation Handlers ----------
+
+  async function handleAutoFixResolution(index: number, skipConfirm = false) {
+    const page = pages.find((p) => p.index === index);
+    const entry = illustrations[index];
+    if (!page || !entry?.file) return;
+
+    try {
+      if (!skipConfirm) {
+        const provRes = await fetch("/api/enhance");
+        const provData = await provRes.json().catch(() => ({}));
+        if (provData.provider?.isPaid) {
+          const proceed = window.confirm(
+            `Resolution enhancement uses paid provider "${provData.provider.name}".\n` +
+            `Estimated operations: 1.\n` +
+            `Estimated cost: ${provData.costEstimate?.estimatedTotalCostUsd ? "$" + provData.costEstimate.estimatedTotalCostUsd : "Standard API rate"}.\n\n` +
+            `Proceed with enhancement?`
+          );
+          if (!proceed) return;
+        }
+      }
+
+      setEnhancingIndices((cur) => new Set(cur).add(index));
+
+      const fileToEnhance = entry.originalFile ?? entry.file;
+      const form = new FormData();
+      form.append("file", fileToEnhance);
+      form.append("slotId", page.resolvedSlot?.slotId ?? `slot-${page.page}`);
+      form.append("targetWidth", String(page.resolvedSlot?.destinationDimensions?.width ?? 3375));
+      form.append("targetHeight", String(page.resolvedSlot?.destinationDimensions?.height ?? 2475));
+      form.append("physicalWidthIn", String(profile.nominalSizeIn.width));
+      form.append("physicalHeightIn", String(profile.nominalSizeIn.height));
+      form.append("userConfirmedPaid", "true");
+
+      const res = await fetch("/api/enhance", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Resolution enhancement failed.");
+        return;
+      }
+
+      const byteCharacters = atob(data.enhancedBase64.split(",")[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: data.mimeType || "image/png" });
+      const enhancedFile = new File([blob], fileToEnhance.name, { type: data.mimeType || "image/png" });
+      const enhancedUrl = URL.createObjectURL(enhancedFile);
+
+      setIllustrations((cur) => {
+        const prev = cur[index];
+        if (!prev) return cur;
+        const needsApproval = data.provenance.approvalRequired;
+        return {
+          ...cur,
+          [index]: {
+            ...prev,
+            file: enhancedFile,
+            objectUrl: enhancedUrl,
+            originalFile: prev.originalFile ?? prev.file,
+            originalObjectUrl: prev.originalObjectUrl ?? prev.objectUrl,
+            provenance: data.provenance,
+            status: needsApproval ? "added" : "approved",
+          },
+        };
+      });
+    } catch (err: any) {
+      alert(`Enhancement error: ${err.message ?? String(err)}`);
+    } finally {
+      setEnhancingIndices((cur) => {
+        const next = new Set(cur);
+        next.delete(index);
+        return next;
+      });
+    }
+  }
+
+  function handleApproveEnhancement(index: number) {
+    setIllustrations((cur) => {
+      const prev = cur[index];
+      if (!prev || !prev.provenance) return cur;
+      return {
+        ...cur,
+        [index]: {
+          ...prev,
+          status: "approved",
+          provenance: {
+            ...prev.provenance,
+            enhancementStatus: "approved",
+            approvedAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
+  }
+
+  function handleRevertEnhancement(index: number) {
+    setIllustrations((cur) => {
+      const prev = cur[index];
+      if (!prev || !prev.originalFile || !prev.originalObjectUrl) return cur;
+      if (prev.objectUrl && prev.objectUrl !== prev.originalObjectUrl) {
+        URL.revokeObjectURL(prev.objectUrl);
+      }
+      return {
+        ...cur,
+        [index]: {
+          ...prev,
+          file: prev.originalFile,
+          objectUrl: prev.originalObjectUrl,
+          provenance: prev.provenance
+            ? {
+                ...prev.provenance,
+                enhancedPixelDimensions: undefined,
+                enhancedEffectivePpi: undefined,
+                enhancedSha256: undefined,
+                enhancementMethod: "none",
+                enhancementStatus: "none",
+                approvalRequired: false,
+                approvedAt: null,
+              }
+            : undefined,
+          status: "added",
+        },
+      };
+    });
+  }
+
+  async function handleCheckStoryMatch(index: number) {
+    const page = pages.find((p) => p.index === index);
+    const entry = illustrations[index];
+    if (!page || !entry?.file) return;
+
+    setCheckingSemanticIndices((cur) => new Set(cur).add(index));
+    try {
+      const form = new FormData();
+      form.append("file", entry.originalFile ?? entry.file);
+      form.append("slotId", page.resolvedSlot?.slotId ?? `slot-${page.page}`);
+      form.append("roleSlug", page.roleSlug ?? page.role ?? "");
+      form.append("expectedRole", page.role ?? page.roleSlug ?? page.kind);
+      form.append("storyText", page.text ?? "");
+      form.append("prompt", page.prompt ?? "");
+      form.append(
+        "otherSlots",
+        JSON.stringify(
+          pages.map((p) => ({
+            slotId: p.resolvedSlot?.slotId ?? `slot-${p.page}`,
+            roleSlug: p.roleSlug ?? p.role ?? "",
+            role: p.role ?? "",
+          })),
+        ),
+      );
+
+      const res = await fetch("/api/semantic-check", { method: "POST", body: form });
+      const data = await res.json();
+      if (res.ok) {
+        setIllustrations((cur) => {
+          const prev = cur[index];
+          if (!prev) return cur;
+          return {
+            ...cur,
+            [index]: {
+              ...prev,
+              semanticValidation: data,
+            },
+          };
+        });
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setCheckingSemanticIndices((cur) => {
+        const next = new Set(cur);
+        next.delete(index);
+        return next;
+      });
+    }
+  }
+
+  function handleApproveSemantic(index: number) {
+    setIllustrations((cur) => {
+      const prev = cur[index];
+      if (!prev || !prev.semanticValidation) return cur;
+      return {
+        ...cur,
+        [index]: {
+          ...prev,
+          semanticValidation: {
+            ...prev.semanticValidation,
+            status: "MATCH",
+            userApprovedManualOverride: true,
+          },
+        },
+      };
+    });
+  }
+
+  function handleSwapSlots(slotAIndex: number, slotBIndex: number) {
+    setIllustrations((cur) => {
+      const itemA = cur[slotAIndex];
+      const itemB = cur[slotBIndex];
+      if (!itemA || !itemB) return cur;
+      return {
+        ...cur,
+        [slotAIndex]: itemB,
+        [slotBIndex]: itemA,
+      };
+    });
+  }
+
+  async function onBatchAutoFix() {
+    const eligible = pages.filter((p) => {
+      const entry = illustrations[p.index];
+      if (!entry || entry.status === "missing" || !entry.file) return false;
+      const prov = entry.provenance;
+      if (!prov) return true;
+      if (prov.enhancementMethod === "none") return true;
+      return prov.nativeEffectivePpi < 300 && prov.enhancementStatus !== "approved";
+    });
+
+    if (eligible.length === 0) {
+      alert("All uploaded illustrations already meet resolution standards or are enhanced.");
+      return;
+    }
+
+    const provRes = await fetch("/api/enhance");
+    const provData = await provRes.json().catch(() => ({}));
+    if (provData.provider?.isPaid) {
+      const proceed = window.confirm(
+        `Batch resolution enhancement will process ${eligible.length} image(s) using paid provider "${provData.provider.name}".\n` +
+        `Estimated cost: ${provData.costEstimate?.estimatedTotalCostUsd ? "$" + (provData.costEstimate.estimatedTotalCostUsd * eligible.length).toFixed(2) : "Standard API rates"}.\n\n` +
+        `Proceed with batch enhancement?`
+      );
+      if (!proceed) return;
+    }
+
+    batchEnhanceCancelRef.current = false;
+    setBatchEnhancing(true);
+    setBatchEnhanceProgress({ total: eligible.length, completed: 0, failed: 0 });
+
+    let completedCount = 0;
+    let failedCount = 0;
+
+    const queue = [...eligible];
+    const worker = async () => {
+      while (queue.length > 0) {
+        if (batchEnhanceCancelRef.current) break;
+        const page = queue.shift();
+        if (!page) break;
+        try {
+          await handleAutoFixResolution(page.index, true);
+          completedCount++;
+        } catch {
+          failedCount++;
+        }
+        setBatchEnhanceProgress({ total: eligible.length, completed: completedCount, failed: failedCount });
+      }
+    };
+
+    await Promise.all([worker(), worker()]);
+
+    setBatchEnhancing(false);
+    setBatchEnhanceProgress(null);
+    if (failedCount > 0) {
+      alert(`Batch enhancement completed with ${completedCount} succeeded and ${failedCount} failed.`);
+    }
+  }
+
+  async function onBatchCheckSemantic() {
+    const eligible = pages.filter((p) => {
+      const entry = illustrations[p.index];
+      return entry && entry.status !== "missing" && entry.file;
+    });
+
+    if (eligible.length === 0) {
+      alert("No illustrations uploaded to check.");
+      return;
+    }
+
+    setBatchChecking(true);
+    for (const page of eligible) {
+      await handleCheckStoryMatch(page.index);
+    }
+    setBatchChecking(false);
+  }
+
   // ---------- Export ----------
 
   /** Builds the export FormData, or null (with an error shown) if the
@@ -704,6 +1068,18 @@ export default function ManualFlow({
     }
     if (Object.keys(transformsObj).length > 0) {
       form.append("transforms", JSON.stringify(transformsObj));
+    }
+    const provenancesObj: Record<string, ImageProvenanceMetadata> = {};
+    for (const p of pages) {
+      const entry = illustrations[p.index];
+      if (entry?.provenance) {
+        const slotId = p.resolvedSlot?.slotId ?? p.filename;
+        provenancesObj[slotId] = entry.provenance;
+        provenancesObj[p.filename] = entry.provenance;
+      }
+    }
+    if (Object.keys(provenancesObj).length > 0) {
+      form.append("provenances", JSON.stringify(provenancesObj));
     }
     return form;
   }
@@ -1364,6 +1740,58 @@ export default function ManualFlow({
             </div>
           )}
 
+          {pages.length > 0 && (
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", margin: "14px 0 10px", alignItems: "center" }}>
+              <button
+                className={styles.copyButton}
+                style={{ borderColor: "#8b5cf6", color: "#6d28d9", fontWeight: 700 }}
+                onClick={() => void onBatchAutoFix()}
+                disabled={batchEnhancing || batchChecking}
+              >
+                {batchEnhancing ? "✨ Auto-fixing images…" : "✨ Auto-fix all eligible images"}
+              </button>
+              <button
+                className={styles.copyButton}
+                style={{ borderColor: "#0284c7", color: "#0369a1", fontWeight: 700 }}
+                onClick={() => void onBatchCheckSemantic()}
+                disabled={batchEnhancing || batchChecking}
+              >
+                {batchChecking ? "🎯 Checking story matches…" : "🎯 Check all story matches"}
+              </button>
+            </div>
+          )}
+
+          {batchEnhancing && batchEnhanceProgress && (
+            <div className={styles.batchProgressCard}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                <strong>Batch Resolution Enhancement in Progress…</strong>
+                <span>
+                  {batchEnhanceProgress.completed + batchEnhanceProgress.failed} / {batchEnhanceProgress.total} completed
+                  {batchEnhanceProgress.failed > 0 && ` (${batchEnhanceProgress.failed} failed)`}
+                </span>
+              </div>
+              <div className={styles.batchProgressBar}>
+                <div
+                  className={styles.batchProgressFill}
+                  style={{
+                    width: `${Math.round(((batchEnhanceProgress.completed + batchEnhanceProgress.failed) / batchEnhanceProgress.total) * 100)}%`,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  className={styles.linkAction}
+                  style={{ color: "#ef4444", cursor: "pointer" }}
+                  onClick={() => {
+                    batchEnhanceCancelRef.current = true;
+                  }}
+                >
+                  Cancel remaining
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className={styles.illoList}>
             {pages.map((p) => (
               <IllustrationCard
@@ -1383,6 +1811,15 @@ export default function ManualFlow({
                   setStep("review");
                   // BookReview component handles framingEditorIndex
                 }}
+                onAutoFixResolution={() => void handleAutoFixResolution(p.index)}
+                onApproveEnhancement={() => handleApproveEnhancement(p.index)}
+                onRevertEnhancement={() => handleRevertEnhancement(p.index)}
+                onCheckStoryMatch={() => void handleCheckStoryMatch(p.index)}
+                onApproveSemantic={() => handleApproveSemantic(p.index)}
+                onSwapSlot={(targetIndex) => handleSwapSlots(p.index, targetIndex)}
+                availableSwapPages={pages}
+                isEnhancing={enhancingIndices.has(p.index)}
+                isCheckingSemantic={checkingSemanticIndices.has(p.index)}
               />
             ))}
           </div>
