@@ -188,7 +188,10 @@ export async function validateStoryMatch(
 
   try {
     // 1. If vision provider is configured, run vision provider analysis
-    const visionProvider = getActiveVisionProvider();
+    const visionProvider =
+      options.visionProvider !== undefined
+        ? options.visionProvider
+        : getActiveVisionProvider();
     if (visionProvider) {
       return await visionProvider.analyzeImage(options);
     }

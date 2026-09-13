@@ -42,5 +42,7 @@ next-env.d.ts
 
 # manual workflow output
 storybook-out/
-artifacts/
+artifacts/*
+!artifacts/browser-evidence/
+!artifacts/browser-reproduction/
 scratch/

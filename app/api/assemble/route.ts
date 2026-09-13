@@ -83,6 +83,7 @@ export async function POST(request: Request): Promise<Response> {
   const bookId = (form.get("bookId") as string) || undefined;
   const profileId = (form.get("profileId") as string) || undefined;
   const isDraft = form.get("draft") === "true";
+  const preflightOnly = form.get("preflightOnly") === "true";
   const confirmLegacyOffsetRecovery = form.get("confirmLegacyOffsetRecovery") === "true";
   const rawLegacyInterpretation = form.get("legacyInterpretation") as string | null;
   const legacyInterpretation: LegacyInterpretation | undefined =
@@ -257,6 +258,15 @@ export async function POST(request: Request): Promise<Response> {
       receipts: receiptsMap,
     });
 
+    if (preflightOnly) {
+      return NextResponse.json({
+        ok: preflight.ok,
+        preflight,
+        issues: preflight.issues ?? [],
+        qualityWarnings: preflight.qualityWarnings ?? [],
+      });
+    }
+
     // HTTP 409: Quality warnings require explicit acknowledgement
     if (!preflight.ok && preflight.qualityWarnings && preflight.qualityWarnings.length > 0) {
       const onlyQualityIssues = preflight.issues?.every(
@@ -305,6 +315,7 @@ export async function POST(request: Request): Promise<Response> {
           error: "Preflight validation failed — production export blocked.",
           issues,
           preflight,
+          qualityWarnings: preflight.qualityWarnings ?? [],
         },
         { status: 400 },
       );

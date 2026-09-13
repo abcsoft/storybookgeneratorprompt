@@ -148,11 +148,16 @@ function verseStyle(): string {
 }
 
 function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): string {
+  const draftWatermark = isDraft
+    ? `<div class="draft-overlay-watermark" aria-hidden="true">DRAFT / NOT FOR PRINT</div>`
+    : "";
+
   if (page.kind === "cover") {
     return `<section class="page cover">
       ${background(page, "full", isDraft)}
       <div class="scrim cover-scrim"></div>
       ${coverLockup(page, child)}
+      ${draftWatermark}
     </section>`;
   }
 
@@ -174,6 +179,7 @@ function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): 
       ${background(page, "full", isDraft)}
       <div class="scrim scrim-strong"></div>
       ${backText}
+      ${draftWatermark}
     </section>`;
   }
 
@@ -183,9 +189,11 @@ function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): 
       ${background(page, "left", isDraft)}
       <div class="scrim"></div>
       <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
+      ${draftWatermark}
     </section>
     <section class="page spread spread-right">
       ${background(page, "right", isDraft)}
+      ${draftWatermark}
     </section>`;
   }
 
@@ -194,6 +202,7 @@ function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): 
     ${background(page, "full", isDraft)}
     <div class="scrim"></div>
     <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
+    ${draftWatermark}
   </section>`;
 }
 
@@ -266,6 +275,27 @@ export function renderBookHtml(
     padding: 24px;
     text-align: center;
     z-index: 10;
+  }
+
+  .draft-overlay-watermark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Fredoka", "Trebuchet MS", sans-serif;
+    font-size: 52pt;
+    font-weight: 900;
+    color: rgba(220, 38, 38, 0.48);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    transform: rotate(-25deg);
+    pointer-events: none;
+    z-index: 50;
+    border: 8px dashed rgba(220, 38, 38, 0.40);
+    margin: 1.2in 0.8in;
+    border-radius: 0.25in;
+    text-shadow: 0 2px 10px rgba(255, 255, 255, 0.7);
   }
 
   /* Spread: the same wide image, shifted so each leaf shows half (continuous

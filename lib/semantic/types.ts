@@ -34,11 +34,13 @@ export interface SemanticCheckOptions {
   roleSlug?: string;
   storyText?: string;
   prompt?: string;
+  assembledScenePrompt?: string;
   imageBuffer: Buffer;
   mimeType: string;
   otherSlots?: Array<{ slotId: string; roleSlug: string; role: string }>;
   userConfirmedPaid?: boolean;
   visionProviderId?: string;
+  visionProvider?: SemanticVisionProvider | null;
 }
 
 export interface SemanticVisionProvider {

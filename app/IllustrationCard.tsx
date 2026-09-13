@@ -31,6 +31,7 @@ export default function IllustrationCard({
   availableSwapPages,
   isEnhancing,
   isCheckingSemantic,
+  enhancerAvailable,
 }: {
   page: ManualPage;
   pageLabel: string;
@@ -53,6 +54,7 @@ export default function IllustrationCard({
   availableSwapPages?: ManualPage[];
   isEnhancing?: boolean;
   isCheckingSemantic?: boolean;
+  enhancerAvailable?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -175,7 +177,7 @@ export default function IllustrationCard({
             }}
           >
             <div>
-              <strong>Original:</strong> {prov.originalPixelDimensions.width}×{prov.originalPixelDimensions.height} px ({nativePpi} native PPI)
+              <strong>Original:</strong> {prov.originalPixelDimensions?.width ?? 1200}×{prov.originalPixelDimensions?.height ?? 880} px ({nativePpi} native PPI)
               {prov.originalSha256 && (
                 <span style={{ fontFamily: "monospace", fontSize: "11px", opacity: 0.8 }} title={prov.originalSha256}>
                   {" "}· SHA: {prov.originalSha256.slice(0, 8)}…
@@ -183,7 +185,7 @@ export default function IllustrationCard({
               )}
             </div>
             <div>
-              <strong>Output Grid:</strong> {prov.outputGridPpi} PPI ({page.resolvedSlot?.destinationDimensions.width ?? 3375}×{page.resolvedSlot?.destinationDimensions.height ?? 2475} px)
+              <strong>Output Grid:</strong> {prov.outputGridPpi ?? 300} PPI ({page.resolvedSlot?.destinationDimensions?.width ?? 3375}×{page.resolvedSlot?.destinationDimensions?.height ?? 2475} px)
             </div>
             {isEnhanced && (
               <div>
@@ -342,16 +344,37 @@ export default function IllustrationCard({
             Fix Image
           </button>
 
-          {/* Auto-fix resolution button */}
-          {hasImage && onAutoFixResolution && !isEnhanced && (
-            <button
-              className={styles.copyButton}
-              style={{ borderColor: "#8b5cf6", color: "#6d28d9", fontWeight: 600 }}
-              onClick={onAutoFixResolution}
-              disabled={isEnhancing}
-            >
-              {isEnhancing ? "✨ Enhancing…" : "✨ Auto-fix resolution"}
-            </button>
+          {/* Auto-fix resolution button or unavailable notice */}
+          {hasImage && !isEnhanced && (
+            enhancerAvailable === false ? (
+              nativePpi !== null && nativePpi < 150 ? (
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#991b1b",
+                    background: "#fef2f2",
+                    border: "1px dashed #fca5a5",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    lineHeight: 1.3,
+                    gridColumn: "1 / -1",
+                  }}
+                  data-testid={`no-enhancer-notice-${page.page}`}
+                >
+                  No production AI enhancer configured—replace/regenerate the image or download a draft PDF.
+                </div>
+              ) : null
+            ) : onAutoFixResolution ? (
+              <button
+                className={styles.copyButton}
+                style={{ borderColor: "#8b5cf6", color: "#6d28d9", fontWeight: 600 }}
+                onClick={onAutoFixResolution}
+                disabled={isEnhancing}
+                data-testid={`auto-fix-btn-${page.page}`}
+              >
+                {isEnhancing ? "✨ Enhancing…" : "✨ Auto-fix resolution"}
+              </button>
+            ) : null
           )}
 
           {/* Enhanced review & revert actions */}

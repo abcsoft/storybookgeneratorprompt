@@ -1274,6 +1274,7 @@ export default function BookReview({
   busy,
   exportLabel,
   onExport,
+  onExportDraft,
   onUpdateTransform,
   onApprovePage,
   onMarkNeedsRegeneration,
@@ -1294,6 +1295,7 @@ export default function BookReview({
   busy: boolean;
   exportLabel: string;
   onExport: () => void;
+  onExportDraft?: () => void;
   onUpdateTransform?: (manifestIndex: number, transform: ArtworkTransform) => void;
   onApprovePage?: (manifestIndex: number) => void;
   onMarkNeedsRegeneration?: (manifestIndex: number) => void;
@@ -1583,9 +1585,24 @@ export default function BookReview({
         </div>
       )}
 
-      <button className={styles.button} onClick={onExport} disabled={busy || gate.blocked || isProfileInvalid}>
-        {busy ? "Working…" : exportLabel}
-      </button>
+      <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+        <button className={styles.button} onClick={onExport} disabled={busy || gate.blocked || isProfileInvalid} data-testid="build-pdf-button">
+          {busy ? "Working…" : exportLabel}
+        </button>
+        {onExportDraft && (
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            style={{ background: "#4b5563", color: "#fff", borderColor: "#374151", cursor: "pointer" }}
+            onClick={onExportDraft}
+            disabled={busy || isProfileInvalid}
+            data-testid="download-draft-pdf-review-button"
+            title="Export a watermarked draft PDF for proofing"
+          >
+            {busy ? "Working…" : "Download Draft PDF 📄"}
+          </button>
+        )}
+      </div>
 
       {resultPanel}
 

@@ -1,0 +1,16 @@
+[
+  {
+    "url": "http://localhost:3000/api/assemble",
+    "status": 200,
+    "method": "POST",
+    "headers": {
+      "content-length": "4503801",
+      "keep-alive": "timeout=5",
+      "date": "Sun, 13 Sep 2026 12:34:26 GMT",
+      "content-disposition": "attachment; filename=\"leo-dream-big.pdf\"",
+      "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+      "connection": "keep-alive",
+      "content-type": "application/pdf"
+    }
+  }
+]

@@ -150,6 +150,17 @@ export default function ManualFlow({
   const [preflightWarnings, setPreflightWarnings] = useState<string[]>([]);
   /** Quality warning slots requiring explicit user acknowledgement (150-299 PPI). */
   const [pendingQualityWarnings, setPendingQualityWarnings] = useState<any[] | null>(null);
+  const [acknowledgedQualityWarnings, setAcknowledgedQualityWarnings] = useState<boolean>(false);
+  const [enhancerAvailable, setEnhancerAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/enhance")
+      .then((r) => r.json())
+      .then((data) => {
+        setEnhancerAvailable(data.isAvailable === true && data.provider !== null);
+      })
+      .catch(() => setEnhancerAvailable(false));
+  }, []);
 
   const clearServerErrors = useCallback(() => {
     setError(null);
@@ -179,7 +190,12 @@ export default function ManualFlow({
   const [enhancingIndices, setEnhancingIndices] = useState<Set<number>>(new Set());
   const [checkingSemanticIndices, setCheckingSemanticIndices] = useState<Set<number>>(new Set());
   const [batchEnhancing, setBatchEnhancing] = useState(false);
-  const [batchEnhanceProgress, setBatchEnhanceProgress] = useState<{ total: number; completed: number; failed: number } | null>(null);
+  const [batchEnhanceProgress, setBatchEnhanceProgress] = useState<{
+    total: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+  } | null>(null);
   const batchEnhanceCancelRef = useRef(false);
   const [batchChecking, setBatchChecking] = useState(false);
 
@@ -1067,34 +1083,47 @@ export default function ManualFlow({
 
     batchEnhanceCancelRef.current = false;
     setBatchEnhancing(true);
-    setBatchEnhanceProgress({ total: eligible.length, completed: 0, failed: 0 });
+    setBatchEnhanceProgress({ total: eligible.length, completed: 0, failed: 0, cancelled: 0 });
 
     let completedCount = 0;
     let failedCount = 0;
+    let cancelledCount = 0;
 
     const queue = [...eligible];
-    const worker = async () => {
-      while (queue.length > 0) {
-        if (batchEnhanceCancelRef.current) break;
-        const page = queue.shift();
-        if (!page) break;
-        const result = await handleAutoFixResolution(page.index, true, userConfirmedPaid, provData.provider.id);
-        if (result.success) {
-          completedCount++;
-        } else {
-          failedCount++;
-        }
-        setBatchEnhanceProgress({ total: eligible.length, completed: completedCount, failed: failedCount });
+    while (queue.length > 0) {
+      if (batchEnhanceCancelRef.current) {
+        cancelledCount += queue.length;
+        queue.length = 0;
+        break;
       }
-    };
-
-    await Promise.all([worker(), worker()]);
+      const page = queue.shift();
+      if (!page) break;
+      const result = await handleAutoFixResolution(page.index, true, userConfirmedPaid, provData.provider.id);
+      if (result.success) {
+        completedCount++;
+      } else {
+        failedCount++;
+      }
+      if (batchEnhanceCancelRef.current && queue.length > 0) {
+        cancelledCount += queue.length;
+        queue.length = 0;
+      }
+      setBatchEnhanceProgress({
+        total: eligible.length,
+        completed: completedCount,
+        failed: failedCount,
+        cancelled: cancelledCount,
+      });
+    }
 
     setBatchEnhancing(false);
-    setBatchEnhanceProgress(null);
-    if (failedCount > 0) {
-      alert(`Batch enhancement finished: ${completedCount} succeeded, ${failedCount} failed.`);
-    }
+    setBatchEnhanceProgress({
+      total: eligible.length,
+      completed: completedCount,
+      failed: failedCount,
+      cancelled: cancelledCount,
+    });
+    void runPreflightCheck();
   }
 
   async function onBatchCheckSemantic() {
@@ -1183,8 +1212,8 @@ export default function ManualFlow({
     clearServerErrors();
     const form = buildExportForm();
     if (!form) return;
-    // Pass quality warning acknowledgement if user explicitly approved
-    if (overrideAcknowledgeQualityWarnings === true) {
+    // Pass quality warning acknowledgement if user explicitly approved or already acknowledged
+    if (overrideAcknowledgeQualityWarnings === true || acknowledgedQualityWarnings) {
       form.append("acknowledgeQualityWarnings", "true");
     }
     setBusy(true);
@@ -1197,6 +1226,11 @@ export default function ManualFlow({
         if (res.status === 409 && data.code === "QUALITY_WARNING_ACKNOWLEDGEMENT_REQUIRED") {
           setPendingQualityWarnings(data.qualityWarnings ?? []);
           return;
+        }
+
+        // Capture pending quality warnings even on 400 mixed preflight failures
+        if (data.qualityWarnings && data.qualityWarnings.length > 0) {
+          setPendingQualityWarnings(data.qualityWarnings);
         }
 
         // HTTP 409: Legacy mapping confirmation required (should not normally
@@ -1260,6 +1294,76 @@ export default function ManualFlow({
       setBusy(false);
     }
   }
+
+  async function downloadDraftPdf() {
+    clearServerErrors();
+    const form = buildExportForm();
+    if (!form) return;
+    form.append("draft", "true");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/assemble", { method: "POST", body: form });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Failed to generate draft PDF.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name.trim() || "storybook"}-${bookId}-DRAFT.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Could not reach the server for draft export.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleAcknowledgeQualityWarnings() {
+    setAcknowledgedQualityWarnings(true);
+    setPreflightIssues((prev) =>
+      prev.filter((i) => i.type !== "QUALITY_WARNING_UNACKNOWLEDGED")
+    );
+    setPendingQualityWarnings(null);
+  }
+
+  const runPreflightCheck = useCallback(async () => {
+    const form = buildExportForm();
+    if (!form) return;
+    form.append("preflightOnly", "true");
+    if (acknowledgedQualityWarnings) {
+      form.append("acknowledgeQualityWarnings", "true");
+    }
+    try {
+      const res = await fetch("/api/assemble", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const rawWarnings: string[] = data.preflight?.warnings ?? [];
+        const rawIssues: any[] = data.issues ?? data.preflight?.issues ?? [];
+        setPreflightWarnings(rawWarnings);
+        const structured: PreflightIssueDetail[] = [];
+        if (Array.isArray(rawIssues) && rawIssues.length > 0) {
+          for (const item of rawIssues) {
+            structured.push({
+              type: item.type,
+              illustrationNumber: item.illustrationNumber,
+              filename: item.filename,
+              expected: item.expected,
+              actual: item.actual,
+              recommendation: item.recommendation,
+              message: item.message ?? (typeof item === "string" ? item : ""),
+            });
+          }
+        }
+        setPreflightIssues(structured);
+      }
+    } catch {
+      /* ignore background preflight check failure */
+    }
+  }, [buildExportForm, acknowledgedQualityWarnings]);
 
   async function exportPrintify() {
     clearServerErrors();
@@ -1563,55 +1667,156 @@ export default function ManualFlow({
         </div>
       )}
 
-      {preflightIssues.length > 0 && (
-        <div className={styles.preflightBlockedPanel} data-testid="preflight-blocked-panel">
-          <div className={styles.preflightBlockedHeader}>
-            <span>⛔</span>
-            <span>Why export is blocked ({preflightIssues.length} {preflightIssues.length === 1 ? "issue" : "issues"})</span>
-          </div>
-          <div className={styles.preflightIssueList}>
-            {preflightIssues.map((issue, idx) => (
-              <div key={idx} className={styles.preflightIssueCard} data-testid="preflight-issue-card">
-                <div className={styles.preflightIssueTitle}>
-                  <span className={styles.preflightBadge}>
-                    {issue.type ? issue.type.toUpperCase() : "ERROR"}
-                  </span>
-                  <span>
-                    {issue.illustrationNumber !== undefined ? `Illustration ${issue.illustrationNumber}` : "General"}
-                    {issue.filename ? ` — ${issue.filename}` : ""}
+      {preflightIssues.length > 0 && (() => {
+        const qualityWarningIssues = preflightIssues.filter(
+          (i) => i.type === "QUALITY_WARNING_UNACKNOWLEDGED"
+        );
+        const lowPpiIssues = preflightIssues.filter(
+          (i) => i.type === "LOW_PPI" || i.type === "IMAGE_RESOLUTION_TOO_LOW"
+        );
+        const aspectIssues = preflightIssues.filter(
+          (i) => i.type === "ASPECT_RATIO_MISMATCH"
+        );
+        const semanticMismatchCount = pages.filter(
+          (p) => illustrations[p.index]?.semanticValidation?.status === "POSSIBLE_MISMATCH"
+        ).length;
+
+        return (
+          <div className={styles.preflightBlockedPanel} data-testid="preflight-blocked-panel">
+            <div className={styles.preflightBlockedHeader}>
+              <span>⛔</span>
+              <span>Why export is blocked ({preflightIssues.length} {preflightIssues.length === 1 ? "issue" : "issues"})</span>
+            </div>
+
+            {/* Concise actionable summary above detailed issues */}
+            <div className={styles.preflightSummaryCard} data-testid="preflight-actionable-summary">
+              <div className={styles.preflightSummaryTitle}>
+                <span>📊</span>
+                <span>Preflight Quality & Gate Summary</span>
+              </div>
+              <ul className={styles.preflightSummaryList}>
+                <li>
+                  <strong>{qualityWarningIssues.length} {qualityWarningIssues.length === 1 ? "image requires" : "images require"} quality acknowledgement</strong> (213 PPI)
+                  {acknowledgedQualityWarnings && (
+                    <span style={{ color: "#047857", fontWeight: 600, marginLeft: "6px" }}>✓ Acknowledged</span>
+                  )}
+                </li>
+                <li>
+                  <strong>{lowPpiIssues.length} {lowPpiIssues.length === 1 ? "image requires" : "images require"} higher resolution or genuine AI enhancement</strong> (107 PPI)
+                </li>
+                <li>
+                  <strong>{aspectIssues.length} aspect-ratio {aspectIssues.length === 1 ? "problem" : "problems"}</strong>
+                </li>
+                {semanticMismatchCount > 0 && (
+                  <li>
+                    <strong>{semanticMismatchCount} semantic {semanticMismatchCount === 1 ? "mismatch" : "mismatches"}</strong> detected
+                  </li>
+                )}
+              </ul>
+
+              {/* Quality warning acknowledgement action */}
+              {qualityWarningIssues.length > 0 && (
+                <div className={styles.qualityAckBox} data-testid="quality-ack-box">
+                  <div style={{ fontWeight: 600, color: "#92400e", marginBottom: "4px" }}>
+                    ⚠️ Quality Warning Acknowledgement Available
+                  </div>
+                  <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#78350f" }}>
+                    {qualityWarningIssues.length} {qualityWarningIssues.length === 1 ? "image is" : "images are"} between 150–299 native PPI (e.g. 213 PPI).
+                    Acknowledgement allows production export with slightly reduced detail, but does <strong>not</strong> create native 300-PPI detail.
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.sessionNewBook}
+                    style={{ background: "#f59e0b", borderColor: "#d97706", color: "#ffffff", cursor: "pointer", fontWeight: 700 }}
+                    onClick={handleAcknowledgeQualityWarnings}
+                    data-testid="acknowledge-all-quality-warnings"
+                  >
+                    ✓ Acknowledge {qualityWarningIssues.length} quality {qualityWarningIssues.length === 1 ? "warning" : "warnings"} (213 PPI)
+                  </button>
+                </div>
+              )}
+
+              {/* Below-150-PPI guidance */}
+              {lowPpiIssues.length > 0 && (
+                <div className={styles.lowPpiNoticeBox} data-testid="low-ppi-notice-box">
+                  <div style={{ fontWeight: 600, color: "#b91c1c", marginBottom: "4px" }}>
+                    🚫 Hard Quality Gate: {lowPpiIssues.length} {lowPpiIssues.length === 1 ? "image is" : "images are"} below 150 PPI
+                  </div>
+                  <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#7f1d1d" }}>
+                    Acknowledgement cannot bypass the 150-PPI production gate. You must replace, regenerate, or genuinely enhance these illustrations before production export.
+                  </p>
+                  {enhancerAvailable === false && (
+                    <div style={{ fontSize: "12px", background: "#fef2f2", border: "1px dashed #f87171", padding: "6px 10px", borderRadius: "6px", color: "#991b1b" }}>
+                      ℹ️ No production AI enhancer configured—replace/regenerate the image or download a draft PDF.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Download Draft PDF button */}
+              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid #e5e7eb" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className={styles.sessionNewBook}
+                    style={{ background: "#4b5563", borderColor: "#374151", color: "#ffffff", cursor: "pointer", fontWeight: 700 }}
+                    onClick={() => void downloadDraftPdf()}
+                    disabled={busy}
+                    data-testid="download-draft-pdf-button"
+                  >
+                    {busy ? "Generating Draft…" : "📄 Download Draft PDF (Watermarked)"}
+                  </button>
+                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                    Draft PDFs contain a visible "DRAFT / NOT FOR PRINT" watermark on every page and must not be sent to a printer.
                   </span>
                 </div>
-                {(issue.expected || issue.actual) && (
-                  <div className={styles.preflightDetailGrid}>
-                    {issue.expected && (
-                      <>
-                        <div className={styles.preflightLabel}>Expected:</div>
-                        <div className={styles.preflightValue}>{issue.expected}</div>
-                      </>
-                    )}
-                    {issue.actual && (
-                      <>
-                        <div className={styles.preflightLabel}>Actual:</div>
-                        <div className={styles.preflightValue}>{issue.actual}</div>
-                      </>
-                    )}
-                  </div>
-                )}
-                {issue.message && (!issue.expected || !issue.actual) && (
-                  <div style={{ marginTop: "4px", fontSize: "13px", color: "#374151" }}>
-                    {issue.message}
-                  </div>
-                )}
-                {issue.recommendation && (
-                  <div className={styles.preflightAction}>
-                    💡 <strong>Recommended action:</strong> {issue.recommendation}
-                  </div>
-                )}
               </div>
-            ))}
+            </div>
+
+            <div className={styles.preflightIssueList}>
+              {preflightIssues.map((issue, idx) => (
+                <div key={idx} className={styles.preflightIssueCard} data-testid="preflight-issue-card">
+                  <div className={styles.preflightIssueTitle}>
+                    <span className={styles.preflightBadge}>
+                      {issue.type ? issue.type.toUpperCase() : "ERROR"}
+                    </span>
+                    <span>
+                      {issue.illustrationNumber !== undefined ? `Illustration ${issue.illustrationNumber}` : "General"}
+                      {issue.filename ? ` — ${issue.filename}` : ""}
+                    </span>
+                  </div>
+                  {(issue.expected || issue.actual) && (
+                    <div className={styles.preflightDetailGrid}>
+                      {issue.expected && (
+                        <>
+                          <div className={styles.preflightLabel}>Expected:</div>
+                          <div className={styles.preflightValue}>{issue.expected}</div>
+                        </>
+                      )}
+                      {issue.actual && (
+                        <>
+                          <div className={styles.preflightLabel}>Actual:</div>
+                          <div className={styles.preflightValue}>{issue.actual}</div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {issue.message && (!issue.expected || !issue.actual) && (
+                    <div style={{ marginTop: "4px", fontSize: "13px", color: "#374151" }}>
+                      {issue.message}
+                    </div>
+                  )}
+                  {issue.recommendation && (
+                    <div className={styles.preflightAction}>
+                      💡 <strong>Recommended action:</strong> {issue.recommendation}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {error && preflightIssues.length === 0 && (
         <div className={styles.error} data-testid="preflight-generic-error">
@@ -1856,33 +2061,51 @@ export default function ManualFlow({
             </div>
           )}
 
-          {batchEnhancing && batchEnhanceProgress && (
-            <div className={styles.batchProgressCard}>
+          {batchEnhanceProgress && (
+            <div className={styles.batchProgressCard} data-testid="batch-progress-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
-                <strong>Batch Resolution Enhancement in Progress…</strong>
-                <span>
-                  {batchEnhanceProgress.completed + batchEnhanceProgress.failed} / {batchEnhanceProgress.total} completed
-                  {batchEnhanceProgress.failed > 0 && ` (${batchEnhanceProgress.failed} failed)`}
+                <strong data-testid="batch-progress-title">
+                  {batchEnhancing ? "Batch Resolution Enhancement in Progress…" : "Batch Enhancement Complete"}
+                </strong>
+                <span data-testid="batch-counts-summary">
+                  <span data-testid="batch-completed-count">{batchEnhanceProgress.completed}</span> completed,{" "}
+                  <span data-testid="batch-failed-count">{batchEnhanceProgress.failed}</span> failed,{" "}
+                  <span data-testid="batch-cancelled-count">{batchEnhanceProgress.cancelled}</span> cancelled
+                  {" "}of {batchEnhanceProgress.total} total
                 </span>
               </div>
               <div className={styles.batchProgressBar}>
                 <div
                   className={styles.batchProgressFill}
                   style={{
-                    width: `${Math.round(((batchEnhanceProgress.completed + batchEnhanceProgress.failed) / batchEnhanceProgress.total) * 100)}%`,
+                    width: `${Math.round(((batchEnhanceProgress.completed + batchEnhanceProgress.failed + batchEnhanceProgress.cancelled) / batchEnhanceProgress.total) * 100)}%`,
                   }}
                 />
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button
-                  className={styles.linkAction}
-                  style={{ color: "#ef4444", cursor: "pointer" }}
-                  onClick={() => {
-                    batchEnhanceCancelRef.current = true;
-                  }}
-                >
-                  Cancel remaining
-                </button>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                {batchEnhancing ? (
+                  <button
+                    type="button"
+                    className={styles.linkAction}
+                    style={{ color: "#ef4444", cursor: "pointer" }}
+                    onClick={() => {
+                      batchEnhanceCancelRef.current = true;
+                    }}
+                    data-testid="cancel-batch-button"
+                  >
+                    Cancel remaining
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.linkAction}
+                    style={{ color: "#4b5563", cursor: "pointer" }}
+                    onClick={() => setBatchEnhanceProgress(null)}
+                    data-testid="dismiss-batch-button"
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1915,6 +2138,7 @@ export default function ManualFlow({
                 availableSwapPages={pages}
                 isEnhancing={enhancingIndices.has(p.index)}
                 isCheckingSemantic={checkingSemanticIndices.has(p.index)}
+                enhancerAvailable={enhancerAvailable === true}
               />
             ))}
           </div>
@@ -1944,6 +2168,7 @@ export default function ManualFlow({
           busy={busy}
           exportLabel={exportMode === "printify-folder" ? "Export for Printify 📦" : "Build my PDF 📖"}
           onExport={exportMode === "printify-folder" ? exportPrintify : () => void buildPdf()}
+          onExportDraft={() => void downloadDraftPdf()}
           onUpdateTransform={handleUpdateTransform}
           onApprovePage={onApprove}
           onMarkNeedsRegeneration={onMarkNeedsRegeneration}

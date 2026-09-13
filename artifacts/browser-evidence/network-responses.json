@@ -1,0 +1,22 @@
+[
+  {
+    "url": "http://localhost:3000/api/enhance",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:3000/api/prompts",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://localhost:3000/api/assemble",
+    "status": 400,
+    "method": "POST"
+  },
+  {
+    "url": "http://localhost:3000/api/assemble",
+    "status": 200,
+    "method": "POST"
+  }
+]

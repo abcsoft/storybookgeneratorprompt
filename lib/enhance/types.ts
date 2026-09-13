@@ -1,4 +1,5 @@
 import type { EnhancementMethod, EnhancementStatus, ImageProvenanceMetadata } from "./provenance";
+export type { EnhancementMethod, EnhancementStatus, ImageProvenanceMetadata };
 
 export type ProviderClass = "real-ai" | "resampling" | "test-mock";
 

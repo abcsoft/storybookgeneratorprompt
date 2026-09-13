@@ -1,0 +1,1614 @@
+{
+  "timestamp": "2026-09-13T12:21:05.539Z",
+  "canonicalFilesCount": 24,
+  "aspectWarningsCount": 0,
+  "isBlockedVisible": true,
+  "assembleRequest": {
+    "method": "POST",
+    "url": "http://localhost:3000/api/assemble",
+    "headers": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "referer": "http://localhost:3000/",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.7827.55 Safari/537.36",
+      "sec-ch-ua": "\"HeadlessChrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+      "content-type": "multipart/form-data; boundary=----WebKitFormBoundary7SHOyjSnrtmXul4K",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  "assembleResponse": {
+    "status": 400,
+    "headers": {
+      "transfer-encoding": "chunked",
+      "keep-alive": "timeout=5",
+      "date": "Sun, 13 Sep 2026 12:20:59 GMT",
+      "content-type": "application/json",
+      "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+      "connection": "keep-alive"
+    },
+    "body": {
+      "code": "PREFLIGHT_FAILED",
+      "error": "Preflight validation failed — production export blocked.",
+      "issues": [
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 1,
+          "filename": "01-cover.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"01-cover.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 2,
+          "filename": "02-intro.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"02-intro.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 3,
+          "filename": "03-pilot.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"03-pilot.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 4,
+          "filename": "04-race-car-driver.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"04-race-car-driver.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 5,
+          "filename": "05-astronaut.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"05-astronaut.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 6,
+          "filename": "06-doctor.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"06-doctor.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+          "illustrationNumber": 7,
+          "filename": "07-firefighter.png",
+          "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+          "actual": "2400×1760 px (213 native PPI)",
+          "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+          "message": "\"07-firefighter.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 8,
+          "filename": "08-scientist.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"08-scientist.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 9,
+          "filename": "09-army-officer.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"09-army-officer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 10,
+          "filename": "10-soccer-player.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"10-soccer-player.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 11,
+          "filename": "11-karate-master.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"11-karate-master.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 12,
+          "filename": "12-detective.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"12-detective.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 13,
+          "filename": "13-magician.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"13-magician.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 14,
+          "filename": "14-chef.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"14-chef.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 15,
+          "filename": "15-rockstar.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"15-rockstar.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 16,
+          "filename": "16-artist.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"16-artist.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 17,
+          "filename": "17-teacher.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"17-teacher.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 18,
+          "filename": "18-explorer.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"18-explorer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 19,
+          "filename": "19-photographer.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"19-photographer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 20,
+          "filename": "20-deep-sea-diver.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"20-deep-sea-diver.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 21,
+          "filename": "21-veterinarian.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"21-veterinarian.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 22,
+          "filename": "22-inventor.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"22-inventor.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 23,
+          "filename": "23-closing.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"23-closing.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        },
+        {
+          "type": "LOW_PPI",
+          "code": "LOW_PPI",
+          "illustrationNumber": 24,
+          "filename": "24-backcover.png",
+          "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+          "actual": "1200×880 px (107 native PPI)",
+          "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+          "message": "Source resolution for \"24-backcover.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        }
+      ],
+      "preflight": {
+        "ok": false,
+        "errors": [
+          "\"01-cover.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "\"02-intro.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "\"03-pilot.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "\"04-race-car-driver.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "\"05-astronaut.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "\"06-doctor.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "\"07-firefighter.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail.",
+          "Source resolution for \"08-scientist.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"09-army-officer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"10-soccer-player.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"11-karate-master.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"12-detective.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"13-magician.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"14-chef.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"15-rockstar.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"16-artist.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"17-teacher.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"18-explorer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"19-photographer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"20-deep-sea-diver.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"21-veterinarian.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"22-inventor.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"23-closing.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px).",
+          "Source resolution for \"24-backcover.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+        ],
+        "warnings": [
+          "Source dimensions differ between illustrations (2400×1760, 1200×880). Proportional normalization will ensure uniform final page size."
+        ],
+        "issues": [
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 1,
+            "filename": "01-cover.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"01-cover.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 2,
+            "filename": "02-intro.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"02-intro.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 3,
+            "filename": "03-pilot.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"03-pilot.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 4,
+            "filename": "04-race-car-driver.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"04-race-car-driver.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 5,
+            "filename": "05-astronaut.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"05-astronaut.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 6,
+            "filename": "06-doctor.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"06-doctor.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "code": "QUALITY_WARNING_UNACKNOWLEDGED",
+            "illustrationNumber": 7,
+            "filename": "07-firefighter.png",
+            "expected": "Minimum 300 native effective PPI or explicit quality acknowledgement",
+            "actual": "2400×1760 px (213 native PPI)",
+            "recommendation": "Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.",
+            "message": "\"07-firefighter.png\" native effective PPI is 213 (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is 300 PPI (3375×2475 px); enlargement does not create genuine native 300-PPI detail."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 8,
+            "filename": "08-scientist.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"08-scientist.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 9,
+            "filename": "09-army-officer.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"09-army-officer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 10,
+            "filename": "10-soccer-player.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"10-soccer-player.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 11,
+            "filename": "11-karate-master.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"11-karate-master.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 12,
+            "filename": "12-detective.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"12-detective.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 13,
+            "filename": "13-magician.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"13-magician.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 14,
+            "filename": "14-chef.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"14-chef.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 15,
+            "filename": "15-rockstar.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"15-rockstar.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 16,
+            "filename": "16-artist.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"16-artist.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 17,
+            "filename": "17-teacher.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"17-teacher.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 18,
+            "filename": "18-explorer.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"18-explorer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 19,
+            "filename": "19-photographer.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"19-photographer.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 20,
+            "filename": "20-deep-sea-diver.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"20-deep-sea-diver.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 21,
+            "filename": "21-veterinarian.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"21-veterinarian.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 22,
+            "filename": "22-inventor.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"22-inventor.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 23,
+            "filename": "23-closing.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"23-closing.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          },
+          {
+            "type": "LOW_PPI",
+            "code": "LOW_PPI",
+            "illustrationNumber": 24,
+            "filename": "24-backcover.png",
+            "expected": "Minimum 150 native effective PPI (1688×1238 px)",
+            "actual": "1200×880 px (107 native PPI)",
+            "recommendation": "Provide a higher-resolution image with at least 150 native PPI (1688×1238 px), auto-fix with AI enhancement, or export in draft mode.",
+            "message": "Source resolution for \"24-backcover.png\" is below print-safe threshold: 1200×880 px yields only 107 native effective PPI on 11.25×8.25\" canvas (106.7 PPI horizontal, 106.7 PPI vertical). Production export is blocked. Minimum print quality requires 150 PPI (150 native PPI, 1688×1238 px)."
+          }
+        ],
+        "assetReports": [
+          {
+            "slotId": "01-cover",
+            "filename": "01-cover.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              1
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "0d93f9d7eff566f74230db99b2f8b84d6a4a935a8cfcc8906561963ed4a5b1c5",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "01-cover.png"
+            }
+          },
+          {
+            "slotId": "02-intro",
+            "filename": "02-intro.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              2
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "431b0b48f3f06892b90b71e1380c60cb72ccd23018c1c7e6a0ed8c0e98f07344",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "02-intro.png"
+            }
+          },
+          {
+            "slotId": "03-pilot",
+            "filename": "03-pilot.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              3
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "eeba30e86684c529ed6b7c95aa06edeb98c7867390c2e555e7854a04599362b3",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "03-pilot.png"
+            }
+          },
+          {
+            "slotId": "04-race-car-driver",
+            "filename": "04-race-car-driver.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              4
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "d728996e301bee5c318c61be6361f38ee0d7e5e3d3cfd110bda84b847ab76134",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "04-race-car-driver.png"
+            }
+          },
+          {
+            "slotId": "05-astronaut",
+            "filename": "05-astronaut.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              5
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "e265df9fff28fa651e7c6c0200c9b742ad1632a26363af3e544a0d0eb7826721",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "05-astronaut.png"
+            }
+          },
+          {
+            "slotId": "06-doctor",
+            "filename": "06-doctor.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              6
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "10df544dd60043af31876f329071cd25a9b52a59d37e84fdb2e6a413033d013f",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "06-doctor.png"
+            }
+          },
+          {
+            "slotId": "07-firefighter",
+            "filename": "07-firefighter.png",
+            "actualDimensions": {
+              "width": 2400,
+              "height": 1760
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 213,
+            "nativeSourcePpi": 213,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              7
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 2400,
+            "nativeSourceHeight": 1760,
+            "nativeEffectivePpiX": 213.3,
+            "nativeEffectivePpiY": 213.3,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 2400,
+                "height": 1760
+              },
+              "nativeEffectivePpi": 213.3,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "31ff40bac0c23089b469493ec63e934dd63c446650b337e2a2a22586b01c780c",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "07-firefighter.png"
+            }
+          },
+          {
+            "slotId": "08-scientist",
+            "filename": "08-scientist.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              8
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "6c88d7c5f126f09460d4e93b46cb5a86172cc0cca5f5df85be40233d6151b39d",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "08-scientist.png"
+            }
+          },
+          {
+            "slotId": "09-army-officer",
+            "filename": "09-army-officer.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              9
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "91f585446792ff9c645eb0c063732effd0d4f737d5fc60cfd3a63ffca3bcdaea",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "09-army-officer.png"
+            }
+          },
+          {
+            "slotId": "10-soccer-player",
+            "filename": "10-soccer-player.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              10
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "e5e413e7f4ce286fed7f5199661b7f268cd57a797c2a34e81bff70b9226c710d",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "10-soccer-player.png"
+            }
+          },
+          {
+            "slotId": "11-karate-master",
+            "filename": "11-karate-master.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              11
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "516d7e66cad9c894de7547e73b96b16ccc09e3d71fef8aa15ae00b2806e1e623",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "11-karate-master.png"
+            }
+          },
+          {
+            "slotId": "12-detective",
+            "filename": "12-detective.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              12
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "c4f09addc36afad359ec07aee7429dc336012257b521c5f5d32f7368038dd709",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "12-detective.png"
+            }
+          },
+          {
+            "slotId": "13-magician",
+            "filename": "13-magician.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              13
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "fa932299b0a88f89b8f9abd7b928c21718c623dccfed33299c311b0951f366a2",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "13-magician.png"
+            }
+          },
+          {
+            "slotId": "14-chef",
+            "filename": "14-chef.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              14
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "0f822ae74671789f81ae0698495f1137ad23a0288605e2bb52fe385441caccbe",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "14-chef.png"
+            }
+          },
+          {
+            "slotId": "15-rockstar",
+            "filename": "15-rockstar.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              15
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "d1e8c74f74422846fbd5087031bc91b59a00c5aaf354d639617740d4dfe722a5",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "15-rockstar.png"
+            }
+          },
+          {
+            "slotId": "16-artist",
+            "filename": "16-artist.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              16
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "59dcc7573e4bd986d2bbdbc57cc3b8d2bca7370209dc8405fcfa8b121183b430",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "16-artist.png"
+            }
+          },
+          {
+            "slotId": "17-teacher",
+            "filename": "17-teacher.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              17
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "553c2fb71a6dfc47e273145f325d8443ab059ea22d48a4a337a4ffe62dbfaaab",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "17-teacher.png"
+            }
+          },
+          {
+            "slotId": "18-explorer",
+            "filename": "18-explorer.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              18
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "201cce4c41d846f2f5d6d639c27a411213d52cd3dbad282dc6b811ea2b40b998",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "18-explorer.png"
+            }
+          },
+          {
+            "slotId": "19-photographer",
+            "filename": "19-photographer.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              19
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "a55c77ec147c5ea172588f12e7b87eb24c766e6b431db9b8c7535e922b492a41",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "19-photographer.png"
+            }
+          },
+          {
+            "slotId": "20-deep-sea-diver",
+            "filename": "20-deep-sea-diver.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              20
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "0dd6ab288216bbb36b0ac8da9a01f3ef80d6e5806b4da35c113b22df0c6795a8",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "20-deep-sea-diver.png"
+            }
+          },
+          {
+            "slotId": "21-veterinarian",
+            "filename": "21-veterinarian.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              21
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "9b8acca68ecfa4f4396e964af9e4059212ea7abd406d55d024d334f8aefb160f",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "21-veterinarian.png"
+            }
+          },
+          {
+            "slotId": "22-inventor",
+            "filename": "22-inventor.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              22
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "afa65293d17f236f820efe8302fe2c81b4a8455d970d42355dcd561816eda603",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "22-inventor.png"
+            }
+          },
+          {
+            "slotId": "23-closing",
+            "filename": "23-closing.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              23
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "4dcfa18dc9cdc350a90c881d09b71a374a69907261282ff60ddd0b4e0cfe8654",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "23-closing.png"
+            }
+          },
+          {
+            "slotId": "24-backcover",
+            "filename": "24-backcover.png",
+            "actualDimensions": {
+              "width": 1200,
+              "height": 880
+            },
+            "expectedDimensions": {
+              "width": 3375,
+              "height": 2475
+            },
+            "effectivePPI": 107,
+            "nativeSourcePpi": 107,
+            "outputGridPpi": 300,
+            "destinationPages": [
+              24
+            ],
+            "willCropOrExtend": false,
+            "nativeSourceWidth": 1200,
+            "nativeSourceHeight": 880,
+            "nativeEffectivePpiX": 106.7,
+            "nativeEffectivePpiY": 106.7,
+            "finalRasterWidth": 3375,
+            "finalRasterHeight": 2475,
+            "finalOutputGridPpi": 300,
+            "provenance": {
+              "originalPixelDimensions": {
+                "width": 1200,
+                "height": 880
+              },
+              "nativeEffectivePpi": 106.7,
+              "outputGridPpi": 300,
+              "upscaleFactor": 1,
+              "enhancementMethod": "none",
+              "enhancementStatus": "none",
+              "originalSha256": "ed737c9e4a7eb4602477054bf92645e7b8fa3b85080f55e3305f5309da4980d4",
+              "approvalRequired": false,
+              "approvedAt": null,
+              "originalFilename": "24-backcover.png"
+            }
+          }
+        ],
+        "qualityWarnings": [
+          {
+            "slotId": "01-cover",
+            "filename": "01-cover.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              1
+            ]
+          },
+          {
+            "slotId": "02-intro",
+            "filename": "02-intro.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              2
+            ]
+          },
+          {
+            "slotId": "03-pilot",
+            "filename": "03-pilot.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              3
+            ]
+          },
+          {
+            "slotId": "04-race-car-driver",
+            "filename": "04-race-car-driver.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              4
+            ]
+          },
+          {
+            "slotId": "05-astronaut",
+            "filename": "05-astronaut.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              5
+            ]
+          },
+          {
+            "slotId": "06-doctor",
+            "filename": "06-doctor.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              6
+            ]
+          },
+          {
+            "slotId": "07-firefighter",
+            "filename": "07-firefighter.png",
+            "nativeWidth": 2400,
+            "nativeHeight": 1760,
+            "nativeEffectivePpi": 213,
+            "physicalPages": [
+              7
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "failedRequests": [],
+  "pageErrors": [],
+  "consoleLogsSample": [
+    "[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "[log] [HMR] connected",
+    "[error] Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ]
+}

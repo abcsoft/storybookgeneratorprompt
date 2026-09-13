@@ -1,0 +1,26 @@
+page   num  type   width height color comp bpc  enc interp  object ID x-ppi y-ppi size ratio
+--------------------------------------------------------------------------------------------
+   1     0 image    3375  2475  icc     3   8  jpeg   no         4  0   300   300  173K 0.7%
+   2     1 image    3375  2475  icc     3   8  jpeg   no        17  0   300   300  162K 0.7%
+   3     2 image    3375  2475  icc     3   8  jpeg   no        22  0   300   300  157K 0.6%
+   4     3 image    3375  2475  icc     3   8  jpeg   no        25  0   300   300  201K 0.8%
+   5     4 image    3375  2475  icc     3   8  jpeg   no        28  0   300   300  186K 0.8%
+   6     5 image    3375  2475  icc     3   8  jpeg   no        31  0   300   300  172K 0.7%
+   7     6 image    3375  2475  icc     3   8  jpeg   no        34  0   300   300  178K 0.7%
+   8     7 image    3375  2475  icc     3   8  jpeg   no        37  0   300   300  181K 0.7%
+   9     8 image    3375  2475  icc     3   8  jpeg   no        40  0   300   300  177K 0.7%
+  10     9 image    3375  2475  icc     3   8  jpeg   no        43  0   300   300  195K 0.8%
+  11    10 image    3375  2475  icc     3   8  jpeg   no        46  0   300   300  189K 0.8%
+  12    11 image    3375  2475  icc     3   8  jpeg   no        49  0   300   300  171K 0.7%
+  13    12 image    3375  2475  icc     3   8  jpeg   no        52  0   300   300  177K 0.7%
+  14    13 image    3375  2475  icc     3   8  jpeg   no        55  0   300   300  162K 0.7%
+  15    14 image    3375  2475  icc     3   8  jpeg   no        58  0   300   300  182K 0.7%
+  16    15 image    3375  2475  icc     3   8  jpeg   no        61  0   300   300  171K 0.7%
+  17    16 image    3375  2475  icc     3   8  jpeg   no        64  0   300   300  182K 0.7%
+  18    17 image    3375  2475  icc     3   8  jpeg   no        67  0   300   300  175K 0.7%
+  19    18 image    3375  2475  icc     3   8  jpeg   no        70  0   300   300  189K 0.8%
+  20    19 image    3375  2475  icc     3   8  jpeg   no        73  0   300   300  204K 0.8%
+  21    20 image    3375  2475  icc     3   8  jpeg   no        76  0   300   300  183K 0.7%
+  22    21 image    3375  2475  icc     3   8  jpeg   no        79  0   300   300  159K 0.7%
+  23    22 image    3375  2475  icc     3   8  jpeg   no        82  0   300   300  179K 0.7%
+  24    23 image    3375  2475  icc     3   8  jpeg   no        85  0   300   300  186K 0.8%
