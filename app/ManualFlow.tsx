@@ -31,7 +31,7 @@ import {
   computeEffectivePpi,
   type ImageProvenanceMetadata,
 } from "@/lib/enhance/provenance";
-import type { SignedEnhancementReceipt } from "@/lib/enhance/types";
+import type { SignedEnhancementReceipt, SignedEnhancementApprovalRecord } from "@/lib/enhance/types";
 import type { SemanticValidationResult } from "@/lib/semantic/types";
 import type { QualityAcknowledgementRecord } from "@/lib/print/preflight";
 import {
@@ -920,19 +920,50 @@ export default function ManualFlow({
     }
   }
 
-  function handleApproveEnhancement(index: number) {
+  async function handleApproveEnhancement(index: number) {
+    const prev = illustrations[index];
+    if (!prev || !prev.provenance) return;
+    const page = pages.find((p) => p.index === index);
+    const slotId = page?.resolvedSlot?.slotId ?? page?.filename ?? "";
+    const enhancedSha256 = prev.provenance.enhancedSha256;
+    const destDims = page?.resolvedSlot?.destinationDimensions ?? { width: 3375, height: 2475 };
+
+    let signedApprovalRecord: SignedEnhancementApprovalRecord | undefined = undefined;
+    try {
+      const res = await fetch("/api/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve_visual_review",
+          bookId: bookId || "dream-big",
+          slotId,
+          profileId: profile.id,
+          layoutMode: layoutMode || "standard-single",
+          enhancedSha256,
+          destinationDimensions: destDims,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success && data.signedApprovalRecord) {
+        signedApprovalRecord = data.signedApprovalRecord;
+      }
+    } catch (err) {
+      console.error("Failed to sign visual approval record:", err);
+    }
+
     setIllustrations((cur) => {
-      const prev = cur[index];
-      if (!prev || !prev.provenance) return cur;
+      const current = cur[index];
+      if (!current || !current.provenance) return cur;
       return {
         ...cur,
         [index]: {
-          ...prev,
+          ...current,
           status: "approved",
           provenance: {
-            ...prev.provenance,
+            ...current.provenance,
             enhancementStatus: "approved",
-            approvedAt: new Date().toISOString(),
+            approvedAt: signedApprovalRecord?.payload.approvedAt ?? new Date().toISOString(),
+            approvalRecord: signedApprovalRecord,
           },
         },
       };
@@ -940,6 +971,25 @@ export default function ManualFlow({
     setTimeout(() => {
       void runPreflightCheck();
     }, 50);
+  }
+
+  const pendingApprovalCount = useMemo(() => {
+    return pages.filter((p) => {
+      const entry = illustrations[p.index];
+      return entry?.provenance?.approvalRequired && !entry.provenance.approvalRecord;
+    }).length;
+  }, [pages, illustrations]);
+
+  async function handleApproveAllEnhancements() {
+    for (const p of pages) {
+      const entry = illustrations[p.index];
+      if (entry?.provenance?.approvalRequired && !entry.provenance.approvalRecord) {
+        await handleApproveEnhancement(p.index);
+      }
+    }
+    setTimeout(() => {
+      void runPreflightCheck();
+    }, 100);
   }
 
   function handleRevertEnhancement(index: number) {
@@ -1389,6 +1439,22 @@ export default function ManualFlow({
     if (Object.keys(receiptsObj).length > 0) {
       form.append("receipts", JSON.stringify(receiptsObj));
     }
+    const visualApprovalsObj: Record<string, SignedEnhancementApprovalRecord> = {};
+    for (const p of pages) {
+      const entry = illustrations[p.index];
+      const approval = entry?.provenance?.approvalRecord;
+      if (approval) {
+        const slotId = p.resolvedSlot?.slotId ?? p.filename;
+        visualApprovalsObj[slotId] = approval;
+        visualApprovalsObj[p.filename] = approval;
+      }
+    }
+    if (Object.keys(visualApprovalsObj).length > 0) {
+      form.append("visualApprovals", JSON.stringify(visualApprovalsObj));
+    }
+    if (Object.keys(qualityAcknowledgements).length > 0) {
+      form.append("qualityAcknowledgements", JSON.stringify(qualityAcknowledgements));
+    }
     return form;
   }
 
@@ -1396,10 +1462,6 @@ export default function ManualFlow({
     clearServerErrors();
     const form = buildExportForm();
     if (!form) return;
-    // Pass quality warning acknowledgement if user explicitly approved or already acknowledged
-    if (overrideAcknowledgeQualityWarnings === true || Object.keys(qualityAcknowledgements).length > 0) {
-      form.append("acknowledgeQualityWarnings", "true");
-    }
     setBusy(true);
     try {
       const res = await fetch("/api/assemble", { method: "POST", body: form });
@@ -1528,10 +1590,16 @@ export default function ManualFlow({
       if (ppiVal >= 150 && ppiVal < 300) {
         newAcks[slotId] = {
           slotId,
+          sourceSha256: sha256,
           imageSha256: sha256,
-          nativeEffectivePpi: ppiVal,
+          bookId,
           profileId,
+          layout: layoutMode,
           layoutMode,
+          computedNativeEffectivePpi: ppiVal,
+          nativeEffectivePpi: ppiVal,
+          destinationDimensions: page?.resolvedSlot?.destinationDimensions,
+          timestamp: new Date().toISOString(),
           acknowledgedAt: new Date().toISOString(),
         };
       }
@@ -1551,7 +1619,6 @@ export default function ManualFlow({
     form.append("preflightOnly", "true");
     if (Object.keys(acksToUse).length > 0) {
       form.append("qualityAcknowledgements", JSON.stringify(acksToUse));
-      form.append("acknowledgeQualityWarnings", "true");
     }
     try {
       const res = await fetch("/api/assemble", { method: "POST", body: form });
@@ -2481,6 +2548,16 @@ export default function ManualFlow({
               >
                 {batchChecking ? "🎯 Checking story matches…" : "🎯 Check all story matches"}
               </button>
+              {pendingApprovalCount > 0 && (
+                <button
+                  className={styles.copyButton}
+                  style={{ borderColor: "#10b981", color: "#047857", fontWeight: 700 }}
+                  onClick={() => void handleApproveAllEnhancements()}
+                  data-testid="batch-approve-all-button"
+                >
+                  ✓ Approve all reviewed enhancements ({pendingApprovalCount})
+                </button>
+              )}
             </div>
           )}
 

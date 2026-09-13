@@ -1,13 +1,14 @@
 {
-  "timestamp": "2026-09-13T16:07:54.689Z",
+  "timestamp": "2026-09-13T21:09:53.221Z",
   "provider": {
     "id": "local-realesrgan",
     "class": "local-ai",
     "isPaid": false,
+    "model": "realesrgan-x4plus",
     "health": {
       "ok": true,
-      "binPath": "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
-      "modelDir": "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\tools\\realesrgan\\models"
+      "binPath": "tools/realesrgan/realesrgan-ncnn-vulkan.exe",
+      "modelDir": "tools/realesrgan/models"
     }
   },
   "testA_unavailable": {
@@ -19,9 +20,16 @@
   "testB_realLocal": {
     "passed": true,
     "subprocessExecutionConfirmed": true,
-    "processedCount": 2,
+    "realImagesImportedCount": 24,
+    "processedCount": 30,
     "destinationDimensionsMatched": true,
-    "preflightPassedAfterApproval": true
+    "preflightPassedAfterApproval": true,
+    "productionExportConfirmed": true,
+    "networkLogSummary": {
+      "totalEnhancementRequests": 30,
+      "successfulEnhancementResponses": 30,
+      "productionAssembleSuccess": true
+    }
   },
   "testC_tampering": {
     "passed": true,
@@ -40,6 +48,7 @@
     "passed": true,
     "proposalVerified": true,
     "undoVerified": true,
+    "roleAssignmentsVerified": true,
     "productionBlockedUntilGatesPass": true
   },
   "testE_finalPdfs": {
@@ -47,14 +56,117 @@
     "draftPdf": {
       "pageCount": 24,
       "watermarkFound": true,
-      "boxes": null
+      "boxes": {
+        "mediaBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        },
+        "trimBox": {
+          "x": 9,
+          "y": 9,
+          "width": 792,
+          "height": 576,
+          "inches": "11.00 x 8.00 in"
+        },
+        "cropBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        },
+        "bleedBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        },
+        "artBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        }
+      }
     },
     "productionPdf": {
       "pageCount": 24,
-      "dpiGrid": [],
+      "rasterCount": 24,
+      "dpiGrid": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ],
+      "destinationDimensions": {
+        "width": 3375,
+        "height": 2475
+      },
       "watermarkAbsent": true,
       "searchableText": true,
-      "boxes": null
-    }
+      "boxes": {
+        "mediaBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        },
+        "trimBox": {
+          "x": 9,
+          "y": 9,
+          "width": 792,
+          "height": 576,
+          "inches": "11.00 x 8.00 in"
+        },
+        "cropBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        },
+        "bleedBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        },
+        "artBox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 594,
+          "inches": "11.25 x 8.25 in"
+        }
+      }
+    },
+    "contactSheetGenerated": true
   }
 }

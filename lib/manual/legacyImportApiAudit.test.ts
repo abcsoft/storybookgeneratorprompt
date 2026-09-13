@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
+import crypto from "crypto";
 import { POST as assemblePost } from "../../app/api/assemble/route";
 import { matchImportedFiles } from "./importMatch";
 import { resolveLayoutPlan } from "../story/layoutPlan";
@@ -330,7 +331,7 @@ describe("Legacy 22-file Import API Audit", () => {
   // ──────────────────────────────────────────────────
   // Test 8: 150-299 PPI WITH acknowledgement produces PDF
   // ──────────────────────────────────────────────────
-  it("8. 150-299 PPI with acknowledgeQualityWarnings=true produces PDF", async () => {
+  it("8. 150-299 PPI with bound qualityAcknowledgements produces PDF", async () => {
     const formData = new FormData();
     formData.append("name", child.name);
     formData.append("age", String(child.age));
@@ -338,15 +339,27 @@ describe("Legacy 22-file Import API Audit", () => {
     formData.append("bookId", "dream-big");
     formData.append("profileId", "classic-landscape-11x8");
     formData.append("layoutMode", "standard-single");
-    formData.append("acknowledgeQualityWarnings", "true");
 
+    const acks: Record<string, any> = {};
     for (let i = 0; i < 24; i++) {
       const slot = dreamBigSlots[i];
       const buf = await sharp({
         create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
       }).png().toBuffer();
+      const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
       formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
+      acks[slot.slotId] = {
+        slotId: slot.slotId,
+        bookId: "dream-big",
+        profileId: "classic-landscape-11x8",
+        layoutMode: "standard-single",
+        sourceSha256: sha256,
+        computedNativeEffectivePpi: 177.8,
+        destinationDimensions: { width: 3375, height: 2475 },
+        timestamp: new Date().toISOString(),
+      };
     }
+    formData.append("qualityAcknowledgements", JSON.stringify(acks));
 
     const req = new Request("http://localhost:3000/api/assemble", {
       method: "POST",

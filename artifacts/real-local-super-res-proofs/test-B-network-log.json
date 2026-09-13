@@ -10,12 +10,12 @@
     "method": "GET"
   },
   {
-    "url": "http://127.0.0.1:3003/_next/static/chunks/1xa9gy2l39bs3.css",
+    "url": "http://127.0.0.1:3003/_next/static/media/fredoka_600-s.p.3qd093b_yvgag.woff2",
     "status": 200,
     "method": "GET"
   },
   {
-    "url": "http://127.0.0.1:3003/_next/static/media/fredoka_600-s.p.3qd093b_yvgag.woff2",
+    "url": "http://127.0.0.1:3003/_next/static/chunks/1xa9gy2l39bs3.css",
     "status": 200,
     "method": "GET"
   },
@@ -60,17 +60,17 @@
     "method": "GET"
   },
   {
-    "url": "http://127.0.0.1:3003/_next/static/chunks/2g05-lers809t.js",
-    "status": 200,
-    "method": "GET"
-  },
-  {
     "url": "http://127.0.0.1:3003/_next/static/chunks/3yuy_0mj-z6x9.js",
     "status": 200,
     "method": "GET"
   },
   {
-    "url": "http://127.0.0.1:3003/_next/static/chunks/2ug2emss4dg8o.js",
+    "url": "http://127.0.0.1:3003/_next/static/chunks/2g05-lers809t.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/452mb5kzl4xll.js",
     "status": 200,
     "method": "GET"
   },
@@ -85,14 +85,129 @@
     "method": "POST"
   },
   {
-    "url": "blob:http://127.0.0.1:3003/c1de5018-17d1-43ec-9bf7-fba7d29f4857",
+    "url": "blob:http://127.0.0.1:3003/17c1bcfa-89f6-4a22-8551-9b7c82a681b2",
     "status": 200,
     "method": "GET"
   },
   {
-    "url": "blob:http://127.0.0.1:3003/fee7bc64-f43a-44c0-802a-8ee8772ee478",
+    "url": "blob:http://127.0.0.1:3003/81950f9b-ef00-400e-8ba1-21c370941424",
     "status": 200,
     "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/474426e8-e767-43fe-9be1-0ceca247c8c8",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/acbfb698-e554-4e7e-a983-9d8b1b8a9a4a",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/a9c3adf0-b432-402e-a8c2-bc3b309db732",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/b3a796d0-1d8b-4a3e-962d-707dc5bb4114",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/c233b3b1-4d05-4eac-be9d-ca7d6a5e3176",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/47761441-942d-4512-acf2-368c81ee7c9d",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/60d0bdf6-a8fa-4587-8693-a73eb6bf03de",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/cae7d61c-3044-4319-8660-4ed33db1c252",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/9456d073-e1e8-49f7-a75e-d40576b5f9b3",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/895e36b2-cff1-4c15-89fd-e5166cf8a5fb",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/ffd2192e-3201-416e-a0a3-c573f8758646",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/e6cac592-6d22-423c-b30a-102cab1eb609",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/1014ebe7-486c-41a4-8cf7-8815632e1d02",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/cc94b9f6-39b0-49b0-8f4a-557003a6b820",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/e5fee81d-5731-44e2-ad83-e68b2197a57e",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/70cbe2b6-49bb-486a-93d0-d911431e2103",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/586bbd16-8430-4372-9d4a-42c938e75242",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/cb615886-f49c-4dd6-a93d-1168c7505197",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/bec5934c-0aa2-4fa8-9866-b1c67b0da1b5",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/36234ed5-dba5-470b-86a5-f7107827eb0e",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/ab045648-5cfa-4880-b562-9c9ec80fcf51",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/79687971-f4a8-4afc-b433-cab2076be755",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
   },
   {
     "url": "http://127.0.0.1:3003/api/enhance",
@@ -105,7 +220,17 @@
     "method": "POST"
   },
   {
-    "url": "blob:http://127.0.0.1:3003/e249958a-dcc9-4e69-9c09-d96bb46db5fe",
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/92d4b402-c943-4a79-9658-6be13e94876a",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/1ba31574-1c9f-4daa-8064-6f4c9427dad6",
     "status": 200,
     "method": "GET"
   },
@@ -115,13 +240,293 @@
     "method": "POST"
   },
   {
-    "url": "blob:http://127.0.0.1:3003/0afa01a5-92bf-4e39-b50b-f8336ec13293",
+    "url": "blob:http://127.0.0.1:3003/6569bcad-6003-4f52-8ca6-e8c281449ef8",
     "status": 200,
     "method": "GET"
   },
   {
-    "url": "blob:http://127.0.0.1:3003/c1de5018-17d1-43ec-9bf7-fba7d29f4857",
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/bfb32ed0-47aa-4833-971b-e2f7fbc79f2b",
     "status": 200,
     "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/1ff2916b-3869-4d49-928e-06317e933214",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/0ad3a289-f4e2-4429-b008-efb8b8f95c12",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/e36212ae-d906-4641-873f-66319de6d301",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/d8e759d9-08ff-4a54-8ad3-2201f91e7ddd",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/13e78f48-f8e9-4074-be01-7bd2d7dd4554",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/fcc4983f-e4ed-4488-9dfe-7b876e4cd6f8",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/6fb10086-8a7a-4217-bcae-e4ec7395e859",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/92d36aca-dbeb-4267-a1fc-e027fe7e1147",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/67ec3ba2-4402-43a2-bbf8-ece619b8ef77",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/382615ab-36ab-4200-9db8-b650dab64bfe",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 400,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/e9d55018-28da-45e3-8e0c-539e1c16254f",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/f848ac8b-cb6d-4b68-a051-043dd5676ec6",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/82301a80-b510-4cdd-bb2e-49b0124d6c31",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/067abb4d-4d56-4c0c-a3c5-e6f40a0be10f",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/a54d2497-77aa-456e-8d52-b78300e12c19",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/4574e8cb-00ad-481b-adf8-f9fec0283eb4",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/01ac5d73-f2e5-41d8-8954-6ffdc6978d83",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/06077902-25d5-4e39-91b7-1a635d75ea50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/63e48ab0-9105-43dc-8de9-acb6c3eb223c",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/92e0ade1-05e1-4eac-be91-ade6e71065af",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/assemble",
+    "status": 200,
+    "method": "POST"
   }
 ]

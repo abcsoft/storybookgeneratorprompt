@@ -5,20 +5,377 @@ O
 N
 
 F
+A
+R
+D INT
+R
+P
+Yasfa's Dream Big Adventure
+
+F
+T
+
+R
+O
+
+/
 T
 
 F
 A
 R
-T
-DPage 1: ILeo's
-N
-Dream Big journey.
+D INT
 R
-Always
-follow your passion and
 P
-dream big!
+
+O
+N
+
+F
+T
+
+Once upon a time there was a girl
+named Yasfa, who could be
+anything she dreamed. Turn the
+page and let's find out who Yasfa
+can be!
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Up,
+and away!
+Yasfa the pilot
+T
+Dsoarsup,through
+N
+the clouds,
+I
+R
+steering
+the plane with a brave
+P
+and happy heart.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Vroom,
+vroom!
+Yasfa zooms
+T
+Daround Ithe
+N
+track, fast and
+R
+fearless,
+racing all the way to the
+P
+finish line.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Among
+stars
+and far-off
+T
+Dmoons, Ithe
+N
+Yasfa
+the astronaut
+R
+explores
+the galaxy, dreaming as
+P
+big as the whole universe.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+With
+heart and a caring
+T
+Dtouch,a gentle
+N
+Doctor
+Yasfa helps
+I
+R
+everyone
+feel better, one kind
+P
+smile at a time.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Brave
+and strong,
+Yasfa the
+T
+Dfirefighter
+N
+races to the rescue and
+I
+R
+gives
+it her all to keep the whole
+P
+town safe.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Mixing,
+full of wonder —
+T
+DYasfa theItesting,
+N
+scientist discovers how
+R
+the
+world
+works, one big idea at a
+P
+time.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Standing
+tall and
+proud, Yasfa the
+T
+Dofficer leads
+N
+with honor and
+I
+R
+courage,
+protecting the people
+P
+she loves.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+On
+field and
+on the ball, Yasfa
+T
+Dthe the
+N
+soccer
+star scores the
+I
+R
+winning
+goal as the whole crowd
+P
+cheers!
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Focused
+and T
+fearless, Yasfa the
+Dkarate champion
+N
+is strong, kind,
+I
+R
+and
+always ready to do the right
+P
+thing.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Clue
+by clue and
+step by step,
+T
+DDetective
+N
+Yasfa solves the
+I
+R
+mystery
+with a sharp eye and a
+P
+clever mind.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Abracadabra!
+Yasfa the magician
+T
+Dfills the Iroom
+N
+with wonder and
+R
+giggles,
+one sparkling trick at a
+P
+time.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+DA pinchIofNthis,Ta dash of that —
+R
+Chef
+Yasfa cooks up yummy
+P
+treats to share with everyone.
 
 R
 O
@@ -36,14 +393,16 @@ F
 A
 R
 T
-DPage 2: ILeo's
+DStrum and
 N
-Dream Big journey.
+sing, let the music ring
+I
 R
-Always
-follow your passion and
+—
+Yasfa
+the rockstar lights up the
 P
-dream big!
+stage and everybody dances!
 
 R
 O
@@ -61,14 +420,75 @@ F
 A
 R
 T
-DPage 3: ILeo's
+DWith every
 N
-Dream Big journey.
+brushstroke and
+I
 R
-Always
-follow your passion and
+bright
+color, Yasfa the artist
 P
-dream big!
+paints a world full of imagination.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Patient
+kind,
+Yasfa the
+T
+Dteacherand
+N
+helps
+everyone learn
+I
+R
+something
+new and believe in
+P
+themselves.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+Over
+and
+through the trees,
+T
+DYasfarivers
+N
+the
+explorer discovers
+I
+R
+amazing
+places no one has seen
+P
+before.
 
 R
 O
@@ -86,14 +506,39 @@ F
 A
 R
 T
-DPage 4: ILeo's
+DClick! Yasfa
 N
-Dream Big journey.
+the photographer
+I
 R
-Always
-follow your passion and
+captures
+the most beautiful
 P
-dream big!
+moments and keeps them forever.
+
+R
+O
+
+/
+T
+
+O
+N
+
+F
+T
+
+F
+A
+R
+T blue sea, Yasfa
+DDown inItheNdeep
+R
+the
+diver
+swims with turtles and
+P
+discovers a world of wonder.
 
 R
 O
@@ -111,14 +556,15 @@ F
 A
 R
 T
-DPage 5: ILeo's
+DGentle and
 N
-Dream Big journey.
+caring, Yasfa the vet
+I
 R
-Always
-follow your passion and
+looks
+after every furry, feathered,
 P
-dream big!
+and wiggly friend.
 
 R
 O
@@ -135,15 +581,18 @@ T
 F
 A
 R
-T
-DPage 6: ILeo's
+Tinkering
+andT
+dreaming, Yasfa
+Dthe inventor
 N
-Dream Big journey.
+builds wonderful
+I
 R
-Always
-follow your passion and
+machines
+that make the world a
 P
-dream big!
+little brighter.
 
 R
 O
@@ -160,15 +609,21 @@ T
 F
 A
 R
+No
+matter how
+big you dream,
 T
-DPage 7: ILeo's
+DYasfa,
 N
-Dream Big journey.
+you
+can be anything. The
+I
 R
-Always
-follow your passion and
+sky
+is
+just the beginning — so
 P
-dream big!
+dream big, little one.
 
 R
 O
@@ -176,421 +631,16 @@ O
 /
 T
 
-O
-N
-
-F
-T
-
 F
 A
 R
-T
-DPage 8: ILeo's
-N
-Dream Big journey.
+D INT
 R
-Always
-follow your passion and
 P
-dream big!
-
-R
-O
-
-/
-T
+Dream big.
 
 O
 N
-
-F
-T
-
-F
-A
-R
-T
-DPage 9: ILeo's
-N
-Dream Big journey.
-R
-Always
-follow your passion and
-P
-dream big!
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 10:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 11:ILeo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 12:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 13:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 14:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 15:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 16:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 17:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 18:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 19:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 20:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 21:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 22:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 23:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
-
-F
-T
-
-R
-O
-
-/
-T
-
-O
-N
-
-F
-A
-R
-T
-DPage 24:I Leo's
-N
-Dream Big
-R
-journey.
-Always follow your
-P
-passion and dream big!
 
 F
 T

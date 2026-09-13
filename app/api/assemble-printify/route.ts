@@ -112,6 +112,16 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  let visualApprovalsMap: Record<string, any> = {};
+  const rawVisualApprovals = form.get("visualApprovals");
+  if (typeof rawVisualApprovals === "string") {
+    try {
+      visualApprovalsMap = JSON.parse(rawVisualApprovals);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   const bookId = (form.get("bookId") as string) || undefined;
   const rawMode = ((form.get("layoutMode") as string) || (form.get("mode") as string)) || null;
   const mode = rawMode === "custom-spreads" || rawMode === "standard-single" ? rawMode : undefined;
@@ -180,6 +190,7 @@ export async function POST(request: Request): Promise<Response> {
     resolvedSlotMapping: preflightSlotMapping,
     qualityAcknowledgements,
     acknowledgeQualityWarnings,
+    visualApprovals: visualApprovalsMap,
   });
 
   if (!result.ok) {

@@ -97,8 +97,8 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       mapping.set(asset.slotId, pfFile);
     }
 
-    // Run with acknowledgeQualityWarnings: true
-    const preflight = await runPreflight({
+    // 2a. Global boolean alone is rejected in production (all 24 issues remain)
+    const preflightGlobalOnly = await runPreflight({
       child: TEST_CHILD,
       bookId: "dream-big",
       profileId: "classic-landscape-11x8",
@@ -106,6 +106,35 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       mode: "standard-single",
       resolvedSlotMapping: mapping,
       acknowledgeQualityWarnings: true,
+    });
+    expect(preflightGlobalOnly.ok).toBe(false);
+    expect(preflightGlobalOnly.issues?.length).toBe(24);
+
+    // 2b. Per-slot bound qualityAcknowledgements for the 7 213-PPI slots
+    const acks: Record<string, any> = {};
+    for (let i = 0; i < 7; i++) {
+      const asset = plan.assets[i];
+      const pfFile = files[i];
+      acks[asset.slotId] = {
+        slotId: asset.slotId,
+        sourceSha256: crypto.createHash("sha256").update(pfFile.buffer).digest("hex"),
+        bookId: "dream-big",
+        profileId: "classic-landscape-11x8",
+        layoutMode: "standard-single",
+        computedNativeEffectivePpi: 213.3,
+        destinationDimensions: asset.destinationDimensions,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    const preflight = await runPreflight({
+      child: TEST_CHILD,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      files,
+      mode: "standard-single",
+      resolvedSlotMapping: mapping,
+      qualityAcknowledgements: acks,
     });
 
     // Still not ok because 17 files are <150 PPI

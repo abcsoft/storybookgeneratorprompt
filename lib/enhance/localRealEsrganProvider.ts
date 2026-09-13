@@ -35,24 +35,42 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
 
   private customBinPath?: string;
   private customModelDir?: string;
-  private modelName: string;
+  readonly modelName: string;
   private timeoutMs: number;
 
-  constructor(config: LocalRealEsrganConfig = {}) {
-    this.customBinPath = config.binPath;
-    this.customModelDir = config.modelDir;
-    this.modelName = config.modelName || process.env.REAL_ESRGAN_MODEL || "realesrgan-x4plus";
-    this.timeoutMs = config.timeoutMs || Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 120_000;
+  constructor(
+    configOrBin?: LocalRealEsrganConfig | string,
+    maybeModelDir?: string,
+  ) {
+    if (typeof configOrBin === "string") {
+      this.customBinPath = configOrBin;
+      this.customModelDir = maybeModelDir;
+      this.modelName = process.env.REAL_ESRGAN_MODEL || "realesrgan-x4plus";
+      this.timeoutMs = Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 120_000;
+    } else {
+      const config = configOrBin || {};
+      this.customBinPath = config.binPath;
+      this.customModelDir = maybeModelDir || config.modelDir;
+      this.modelName = config.modelName || process.env.REAL_ESRGAN_MODEL || "realesrgan-x4plus";
+      this.timeoutMs = config.timeoutMs || Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 120_000;
+    }
   }
 
   /**
    * Resolves the Real-ESRGAN binary path in order:
    * 1. Explicit config or REAL_ESRGAN_BIN environment variable
-   * 2. System PATH
-   * 3. Documented application-local tools directory (tools/realesrgan/...)
+   * 2. Application-local tools directory (tools/realesrgan/...)
+   * 3. System PATH
    */
   resolveBinaryPath(): string | null {
-    const envBin = this.customBinPath || process.env.REAL_ESRGAN_BIN;
+    if (this.customBinPath !== undefined) {
+      const resolved = path.isAbsolute(this.customBinPath)
+        ? this.customBinPath
+        : path.resolve(process.cwd(), this.customBinPath);
+      return fsSync.existsSync(resolved) ? resolved : null;
+    }
+
+    const envBin = process.env.REAL_ESRGAN_BIN;
     if (envBin) {
       const resolved = path.isAbsolute(envBin) ? envBin : path.resolve(process.cwd(), envBin);
       if (fsSync.existsSync(resolved)) return resolved;
@@ -86,7 +104,14 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
    * 3. 'tools/realesrgan/models'
    */
   resolveModelDir(binPath: string): string | null {
-    const envDir = this.customModelDir || process.env.REAL_ESRGAN_MODEL_DIR;
+    if (this.customModelDir !== undefined) {
+      const resolved = path.isAbsolute(this.customModelDir)
+        ? this.customModelDir
+        : path.resolve(process.cwd(), this.customModelDir);
+      return fsSync.existsSync(resolved) ? resolved : null;
+    }
+
+    const envDir = process.env.REAL_ESRGAN_MODEL_DIR;
     if (envDir) {
       const resolved = path.isAbsolute(envDir) ? envDir : path.resolve(process.cwd(), envDir);
       if (fsSync.existsSync(resolved)) return resolved;
@@ -118,7 +143,8 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
   }
 
   /**
-   * Performs an active startup health check verifying the binary is runnable.
+   * Performs an active startup health check verifying the binary and Vulkan model inference.
+   * Runs a small real model inference to confirm Vulkan acceleration and model integrity.
    */
   async checkHealth(): Promise<{ ok: boolean; error?: string; binPath?: string; modelDir?: string }> {
     const binPath = this.resolveBinaryPath();
@@ -138,22 +164,64 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
       };
     }
 
-    try {
-      // Running with -h outputs help information
-      await execFileAsync(binPath, ["-h"], { timeout: 10_000 });
-      return { ok: true, binPath, modelDir };
-    } catch (err: any) {
-      // On some builds, -h exits with code 1 after printing help; verify stdout/stderr mentions realesrgan
-      const combined = `${err?.stdout || ""} ${err?.stderr || ""}`;
-      if (combined.toLowerCase().includes("realesrgan")) {
-        return { ok: true, binPath, modelDir };
-      }
+    const testModelFile = path.join(modelDir, "realesrgan-x4plus.bin");
+    const testParamFile = path.join(modelDir, "realesrgan-x4plus.param");
+    if (!fsSync.existsSync(testModelFile) || !fsSync.existsSync(testParamFile)) {
       return {
         ok: false,
         binPath,
         modelDir,
-        error: `Health check failed executing "${binPath}": ${err?.message || String(err)}`,
+        error: `Photorealistic model files (realesrgan-x4plus.bin / param) not found in "${modelDir}".`,
       };
+    }
+
+    const smokeDir = await fs.mkdtemp(path.join(os.tmpdir(), "realesrgan-health-"));
+    const smokeIn = path.join(smokeDir, "smoke_in.png");
+    const smokeOut = path.join(smokeDir, "smoke_out.png");
+
+    try {
+      // Create tiny 32x32 test buffer for real inference smoke test
+      await sharp({
+        create: { width: 32, height: 32, channels: 3, background: { r: 100, g: 150, b: 200 } },
+      })
+        .png()
+        .toFile(smokeIn);
+
+      await execFileAsync(
+        binPath,
+        ["-i", smokeIn, "-o", smokeOut, "-n", "realesrgan-x4plus", "-s", "4", "-m", modelDir],
+        { timeout: 20_000, windowsHide: true },
+      );
+
+      if (!fsSync.existsSync(smokeOut)) {
+        return {
+          ok: false,
+          binPath,
+          modelDir,
+          error: "Real-ESRGAN health check failed: inference did not produce output image.",
+        };
+      }
+
+      const outMeta = await sharp(smokeOut).metadata();
+      if (outMeta.width !== 128 || outMeta.height !== 128) {
+        return {
+          ok: false,
+          binPath,
+          modelDir,
+          error: `Real-ESRGAN health check output dimension mismatch: expected 128x128, got ${outMeta.width}x${outMeta.height}.`,
+        };
+      }
+
+      return { ok: true, binPath, modelDir };
+    } catch (smokeErr: any) {
+      return {
+        ok: false,
+        binPath,
+        modelDir,
+        error: `Real-ESRGAN Vulkan model inference failed: ${smokeErr?.stderr || smokeErr?.message || String(smokeErr)}. Check Vulkan driver support.`,
+      };
+    } finally {
+      await fs.rm(smokeDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 
@@ -174,95 +242,117 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
 
     const { inputBuffer, sourceDimensions, targetDimensions, physicalInches, filename } = options;
 
-    // Determine scale factor needed (e.g. 2, 3, or 4)
-    const requiredScaleX = targetDimensions.width / Math.max(1, sourceDimensions.width);
-    const requiredScaleY = targetDimensions.height / Math.max(1, sourceDimensions.height);
-    const maxRequiredScale = Math.max(requiredScaleX, requiredScaleY);
+    // Architectural constraint: realesrgan-x4plus is an exact 4x neural network.
+    // For photorealistic children's book illustrations, never automatically switch to anime-video models.
+    // Running -s 2 or -s 3 on an x4 model creates tensor coordinate mismatch and tile seam corruption.
+    // Always run inference at the model's native 4x scale, then proportionally downsample.
+    const selectedModel = this.modelName || "realesrgan-x4plus";
+    const nativeScale = 4;
+    const originalSha256 = calculateSha256(inputBuffer);
+    const cacheDir = path.resolve(process.cwd(), ".cache", "realesrgan");
+    const cacheKey = `${originalSha256}_${targetDimensions.width}x${targetDimensions.height}_${selectedModel}.png`;
+    const cacheFilePath = path.join(cacheDir, cacheKey);
 
-    let scale = 4;
-    if (maxRequiredScale <= 2.05) {
-      scale = 2;
-    } else if (maxRequiredScale <= 3.05) {
-      scale = 3;
-    } else {
-      scale = 4;
-    }
-
-    // Verify model files exist for this scale
-    let selectedModel = this.modelName;
-    if (scale === 2) {
-      const anime2x = path.join(modelDir, "realesr-animevideov3-x2.bin");
-      if (fsSync.existsSync(anime2x)) {
-        selectedModel = "realesr-animevideov3";
+    let enhancedBuffer: Buffer | null = null;
+    if (fsSync.existsSync(cacheFilePath)) {
+      try {
+        const cached = await fs.readFile(cacheFilePath);
+        const { validateEnhancedImageQuality } = await import("./imageQualityValidator");
+        const check = await validateEnhancedImageQuality(cached, { targetDimensions, inputBuffer });
+        if (check.valid) {
+          enhancedBuffer = cached;
+        }
+      } catch {
+        enhancedBuffer = null;
       }
     }
 
-    // Create isolated temporary working directory
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "storybook-realesrgan-"));
-    const tempInputPath = path.join(tempDir, "input.png");
-    const tempAiOutputPath = path.join(tempDir, "ai_upscaled.png");
-
-    try {
-      // Normalize input to PNG in temp directory
-      await sharp(inputBuffer).png().toFile(tempInputPath);
-
-      // Execute Real-ESRGAN using execFile with safe argument array (never shell string)
-      const args = [
-        "-i",
-        tempInputPath,
-        "-o",
-        tempAiOutputPath,
-        "-n",
-        selectedModel,
-        "-s",
-        String(scale),
-        "-m",
-        modelDir,
-      ];
+    if (!enhancedBuffer) {
+      // Create isolated temporary working directory
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "storybook-realesrgan-"));
+      const tempInputPath = path.join(tempDir, "input.png");
+      const tempAiOutputPath = path.join(tempDir, "ai_upscaled.png");
 
       try {
-        await execFileAsync(binPath, args, {
-          timeout: this.timeoutMs,
-          windowsHide: true,
-        });
-      } catch (execErr: any) {
-        if (execErr.killed || execErr.signal === "SIGTERM") {
+        // Normalize input to PNG in temp directory
+        await sharp(inputBuffer).png().toFile(tempInputPath);
+
+        // Execute Real-ESRGAN using execFile with safe argument array (never shell string)
+        const args = [
+          "-i",
+          tempInputPath,
+          "-o",
+          tempAiOutputPath,
+          "-n",
+          selectedModel,
+          "-s",
+          String(nativeScale),
+          "-m",
+          modelDir,
+        ];
+
+        try {
+          await execFileAsync(binPath, args, {
+            timeout: this.timeoutMs,
+            windowsHide: true,
+          });
+        } catch (execErr: any) {
+          if (execErr.killed || execErr.signal === "SIGTERM") {
+            throw new Error(
+              `Local Real-ESRGAN enhancement timed out after ${Math.round(this.timeoutMs / 1000)} seconds.`,
+            );
+          }
           throw new Error(
-            `Local Real-ESRGAN enhancement timed out after ${Math.round(this.timeoutMs / 1000)} seconds.`,
+            `Local Real-ESRGAN execution failed: ${execErr.stderr || execErr.message || String(execErr)}`,
           );
         }
-        throw new Error(
-          `Local Real-ESRGAN execution failed: ${execErr.stderr || execErr.message || String(execErr)}`,
-        );
+
+        if (!fsSync.existsSync(tempAiOutputPath)) {
+          throw new Error("Local Real-ESRGAN finished but did not produce an output image.");
+        }
+
+        const upscaledBuffer = await fs.readFile(tempAiOutputPath);
+
+        // Verify AI upscaled dimensions
+        const upscaledMeta = await sharp(upscaledBuffer).metadata();
+        if (!upscaledMeta.width || !upscaledMeta.height) {
+          throw new Error("Local Real-ESRGAN output is not decodable as an image.");
+        }
+
+        // Step 2: Proportionally downsample AI upscaled image to authoritative destination dimensions
+        // Using Sharp with Lanczos3 filter — strictly destination dimensions without non-uniform stretching or cropping
+        // Never use fit: 'cover' where it can crop source artwork
+        enhancedBuffer = await sharp(upscaledBuffer)
+          .resize(targetDimensions.width, targetDimensions.height, {
+            fit: "contain",
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+            kernel: sharp.kernel.lanczos3,
+          })
+          .png()
+          .toBuffer();
+
+        // Step 3: Validate image quality (reject blank output, severe tile seams, border clipping)
+        const { validateEnhancedImageQuality } = await import("./imageQualityValidator");
+        const qualityCheck = await validateEnhancedImageQuality(enhancedBuffer, {
+          targetDimensions,
+          inputBuffer,
+        });
+        if (!qualityCheck.valid) {
+          throw new Error(`Real-ESRGAN output failed image quality gate: ${qualityCheck.error}`);
+        }
+
+        // Persist to local cache
+        await fs.mkdir(cacheDir, { recursive: true }).catch(() => {});
+        await fs.writeFile(cacheFilePath, enhancedBuffer).catch(() => {});
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       }
-
-      if (!fsSync.existsSync(tempAiOutputPath)) {
-        throw new Error("Local Real-ESRGAN finished but did not produce an output image.");
-      }
-
-      const upscaledBuffer = await fs.readFile(tempAiOutputPath);
-
-      // Verify AI upscaled dimensions
-      const upscaledMeta = await sharp(upscaledBuffer).metadata();
-      if (!upscaledMeta.width || !upscaledMeta.height) {
-        throw new Error("Local Real-ESRGAN output is not decodable as an image.");
-      }
-
-      // Step 2: Proportionally downsample AI upscaled image to authoritative destination dimensions
-      // Using Sharp with Lanczos3 filter — strictly destination dimensions without non-uniform stretching
-      const enhancedBuffer = await sharp(upscaledBuffer)
-        .resize(targetDimensions.width, targetDimensions.height, {
-          fit: "cover",
-          kernel: sharp.kernel.lanczos3,
-        })
-        .png()
-        .toBuffer();
+    }
 
       const nativeEffectivePpi = computeEffectivePpi(sourceDimensions, physicalInches);
       const upscaleFactor = Number(
         (targetDimensions.width / Math.max(1, sourceDimensions.width)).toFixed(3),
       );
-      const originalSha256 = calculateSha256(inputBuffer);
       const enhancedSha256 = calculateSha256(enhancedBuffer);
 
       const provenance: ImageProvenanceMetadata = {
@@ -282,18 +372,14 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
         originalFilename: filename,
       };
 
-      return {
-        enhancedBuffer,
-        mimeType: "image/png",
-        outputDimensions: targetDimensions,
-        method: "local-realesrgan",
-        providerClass: "local-ai",
-        upscaleFactor,
-        provenance,
-      };
-    } finally {
-      // Guaranteed cleanup of isolated temp directory
-      await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
+    return {
+      enhancedBuffer,
+      mimeType: "image/png",
+      outputDimensions: targetDimensions,
+      method: "local-realesrgan",
+      providerClass: "local-ai",
+      upscaleFactor,
+      provenance,
+    };
   }
 }

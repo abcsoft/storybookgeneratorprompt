@@ -5,7 +5,7 @@ import { runPreflight } from "../print/preflight";
 import { resolveLayoutPlan } from "../story/layoutPlan";
 import { processBatchEnhancement } from "./batchProcessor";
 import { enhancementRegistry } from "./registry";
-import { signEnhancementReceipt } from "./receipt";
+import { signEnhancementReceipt, signVisualApprovalRecord } from "./receipt";
 import type { ImageProvenanceMetadata } from "./provenance";
 import type { ResolutionEnhancementProvider } from "./types";
 
@@ -225,14 +225,17 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
 
     // 5b. Unapproved Genuine AI enhancement with valid receipt: blocks with ENHANCEMENT_APPROVAL_REQUIRED
     const validReceipt = signEnhancementReceipt({
+      receiptVersion: "1.0",
       receiptId: "rcpt-5b",
       slotId: singleSlot.slotId,
+      bookId: "dream-big",
       profileId: "classic-landscape-11x8",
       layoutMode: "standard-single",
       originalSha256: "dummy-orig-sha",
       originalPixelDimensions: { width: 1200, height: 880 },
       enhancedSha256: crypto.createHash("sha256").update(buf3375).digest("hex"),
       enhancedPixelDimensions: { width: 3375, height: 2475 },
+      destinationDimensions: { width: 3375, height: 2475 },
       nativeEffectivePpi: 107,
       enhancedEffectivePpi: 300,
       trustedProviderId: "external-ai-super-res",
@@ -271,11 +274,24 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
     expect(approvalIssue).toBeDefined();
     expect(approvalIssue?.message).toContain("requires explicit visual approval before production export");
 
-    // 5c. Approved Genuine AI enhancement with valid receipt: passes production export
+    // 5c. Approved Genuine AI enhancement with valid receipt & server-signed visual approval record: passes production export
+    const approvalRecord = signVisualApprovalRecord({
+      approvalId: "appr-5c",
+      bookId: "dream-big",
+      slotId: singleSlot.slotId,
+      profileId: "classic-landscape-11x8",
+      layoutMode: "standard-single",
+      enhancedSha256: crypto.createHash("sha256").update(buf3375).digest("hex"),
+      destinationDimensions: { width: 3375, height: 2475 },
+      action: "approved_visual_review",
+      approvedAt: new Date().toISOString(),
+    });
+
     const approvedProvenance: ImageProvenanceMetadata = {
       ...unapprovedProvenance,
       enhancementStatus: "approved",
       approvedAt: new Date().toISOString(),
+      approvalRecord,
     };
 
     const resApproved = await runPreflight({
@@ -305,6 +321,7 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
 
     // 2400x1760 on 11.25x8.25" canvas yields 213.3 PPI (between 150 and 299 PPI)
     const buf2400 = await makeImage(2400, 1760);
+    const sha2400 = crypto.createHash("sha256").update(buf2400).digest("hex");
 
     // 6a. Unacknowledged production export: returns QUALITY_WARNING_UNACKNOWLEDGED
     const resUnack = await runPreflight({
@@ -321,13 +338,36 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
     expect(unackIssue).toBeDefined();
     expect(unackIssue?.message).toContain("between 150 and 299 PPI");
 
-    // 6b. Acknowledged production export: passes with warning
-    const resAck = await runPreflight({
+    // 6b. Global boolean acknowledgeQualityWarnings: true alone is REJECTED in production
+    const resGlobalBool = await runPreflight({
       bookId: "dream-big",
       profileId: "classic-landscape-11x8",
       child,
       draft: false,
       acknowledgeQualityWarnings: true,
+      files: [{ filename: singleSlot.filename, buffer: buf2400 }],
+    });
+    expect(resGlobalBool.ok).toBe(false);
+    expect((resGlobalBool.issues ?? []).some((i) => i.type === "QUALITY_WARNING_UNACKNOWLEDGED")).toBe(true);
+
+    // 6c. Valid per-slot bound acknowledgement: passes with warning
+    const ackRecord = {
+      slotId: singleSlot.slotId,
+      sourceSha256: sha2400,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      layoutMode: "standard-single",
+      computedNativeEffectivePpi: 213.3,
+      destinationDimensions: singleSlot.destinationDimensions,
+      timestamp: new Date().toISOString(),
+    };
+
+    const resAck = await runPreflight({
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      child,
+      draft: false,
+      qualityAcknowledgements: { [singleSlot.slotId]: ackRecord },
       files: [{ filename: singleSlot.filename, buffer: buf2400 }],
     });
 

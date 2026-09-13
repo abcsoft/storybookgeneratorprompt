@@ -48,3 +48,4 @@ artifacts/*
 !artifacts/real-local-super-res-proofs/
 scratch/
 tools/
+.cache/

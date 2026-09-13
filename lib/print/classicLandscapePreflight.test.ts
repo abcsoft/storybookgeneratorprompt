@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
+import crypto from "crypto";
 import { runPreflight } from "./preflight";
 import { assembleFromImages } from "../manual/assemble";
 import { resolveLayoutPlan } from "../story/layoutPlan";
@@ -33,7 +34,7 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     const files = await Promise.all(
       plan.assets.map(async (slot, idx) => ({
         filename: slot.legacyAliases[0] ?? `${String(idx + 1).padStart(2, "0")}.png`,
-        buffer: await makeImage(1800, 1320),
+        buffer: await makeImage(3375, 2475),
       })),
     );
 
@@ -44,7 +45,6 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       mode: "standard-single",
       files,
       allowLowResolutionForTesting: false,
-      acknowledgeQualityWarnings: true,
     });
 
     expect(preflight.ok).toBe(true);
@@ -160,13 +160,34 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
   });
 
   // Test 2d: Intermediate resolution (150 to < 300 PPI) PASSES with explicit acknowledgement
-  it("2d. Intermediate resolution (150 to < 300 PPI) passes production with acknowledgeQualityWarnings", async () => {
-    const files = await Promise.all(
-      Array.from({ length: 24 }, async (_, idx) => ({
-        filename: `${String(idx + 1).padStart(2, "0")}.png`,
-        buffer: await makeImage(2000, 1500),
-      })),
-    );
+  it("2d. Intermediate resolution (150 to < 300 PPI) passes production with bound qualityAcknowledgements", async () => {
+    const plan = resolveLayoutPlan({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
+    const rawImage = await makeImage(2000, 1500);
+    const imageSha = crypto.createHash("sha256").update(rawImage).digest("hex");
+
+    const files = plan.assets.map((slot, idx) => ({
+      filename: slot.legacyAliases[0] ?? `${String(idx + 1).padStart(2, "0")}.png`,
+      buffer: rawImage,
+    }));
+
+    const acks: Record<string, any> = {};
+    for (const slot of plan.assets) {
+      acks[slot.slotId] = {
+        slotId: slot.slotId,
+        bookId: "dream-big",
+        profileId: "classic-landscape-11x8",
+        layoutMode: "standard-single",
+        sourceSha256: imageSha,
+        computedNativeEffectivePpi: 177.8,
+        destinationDimensions: slot.destinationDimensions,
+        timestamp: new Date().toISOString(),
+      };
+    }
 
     const preflight = await runPreflight({
       child,
@@ -176,7 +197,7 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       files,
       allowLowResolutionForTesting: false,
       draft: false,
-      acknowledgeQualityWarnings: true,
+      qualityAcknowledgements: acks,
     });
 
     expect(preflight.ok).toBe(true);

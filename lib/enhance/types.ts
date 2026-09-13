@@ -11,6 +11,7 @@ export interface EnhancementCostEstimate {
 }
 
 export interface EnhancementReceiptPayload {
+  receiptVersion?: string;
   receiptId: string;
   slotId: string;
   bookId?: string;
@@ -23,6 +24,7 @@ export interface EnhancementReceiptPayload {
   destinationDimensions?: { width: number; height: number };
   trustedProviderId: string;
   providerClass: ProviderClass;
+  enhancementMethod?: string;
   nativeEffectivePpi: number;
   enhancedEffectivePpi: number;
   createdAt: string;
@@ -31,6 +33,23 @@ export interface EnhancementReceiptPayload {
 
 export interface SignedEnhancementReceipt {
   payload: EnhancementReceiptPayload;
+  signature: string;
+}
+
+export interface EnhancementApprovalPayload {
+  approvalId: string;
+  bookId: string;
+  slotId: string;
+  profileId: string;
+  layoutMode: string;
+  enhancedSha256: string;
+  destinationDimensions: { width: number; height: number };
+  action: string;
+  approvedAt: string;
+}
+
+export interface SignedEnhancementApprovalRecord {
+  payload: EnhancementApprovalPayload;
   signature: string;
 }
 

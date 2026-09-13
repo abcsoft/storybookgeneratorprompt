@@ -1,5 +1,5 @@
 {
   "ok": true,
-  "binPath": "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
-  "modelDir": "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\tools\\realesrgan\\models"
+  "binPath": "tools/realesrgan/realesrgan-ncnn-vulkan.exe",
+  "modelDir": "tools/realesrgan/models"
 }

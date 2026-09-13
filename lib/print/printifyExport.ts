@@ -54,6 +54,7 @@ export interface PrintifyExportOptions {
   resolvedSlotMapping?: Map<string, PreflightFile>;
   qualityAcknowledgements?: Record<string, import("./preflight").QualityAcknowledgementRecord>;
   acknowledgeQualityWarnings?: boolean;
+  visualApprovals?: Record<string, import("../enhance/types").SignedEnhancementApprovalRecord>;
 }
 
 export interface PrintifyExportResult {
@@ -382,6 +383,7 @@ export async function exportPrintifyBook(
     resolvedSlotMapping: opts.resolvedSlotMapping,
     qualityAcknowledgements: opts.qualityAcknowledgements,
     acknowledgeQualityWarnings: opts.acknowledgeQualityWarnings,
+    visualApprovals: opts.visualApprovals,
   });
   if (!preflight.ok) {
     return { ok: false, dir: null, files: [], preflight };

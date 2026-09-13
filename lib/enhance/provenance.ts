@@ -1,4 +1,5 @@
-import type { ProviderClass, SignedEnhancementReceipt } from "./types";
+import type { ProviderClass, SignedEnhancementReceipt, SignedEnhancementApprovalRecord } from "./types";
+export type { SignedEnhancementApprovalRecord };
 
 export type EnhancementMethod =
   | "none"
@@ -40,6 +41,8 @@ export interface ImageProvenanceMetadata {
   originalFilename?: string;
   /** Cryptographically signed enhancement receipt issued by the server */
   receipt?: SignedEnhancementReceipt;
+  /** Server-signed visual approval record proving explicit user approval */
+  approvalRecord?: SignedEnhancementApprovalRecord;
   /** True if image slot was reassigned via legacy content-remap recovery */
   legacyRecovered?: boolean;
 }

@@ -14,8 +14,8 @@ import {
   computeAuthoritativePhysicalDimensionsIn,
   type ImageProvenanceMetadata,
 } from "../enhance/provenance";
-import { verifyEnhancementReceipt } from "../enhance/receipt";
-import type { SignedEnhancementReceipt } from "../enhance/types";
+import { verifyEnhancementReceipt, verifyVisualApprovalRecord } from "../enhance/receipt";
+import type { SignedEnhancementReceipt, SignedEnhancementApprovalRecord } from "../enhance/types";
 
 export interface PreflightFile {
   filename: string;
@@ -46,10 +46,16 @@ export interface PreflightAssetReport {
 }
 export interface QualityAcknowledgementRecord {
   slotId: string;
-  imageSha256: string;
-  nativeEffectivePpi: number;
+  sourceSha256?: string;
+  imageSha256?: string;
+  bookId?: string;
   profileId: string;
-  layoutMode: string;
+  layout?: string;
+  layoutMode?: string;
+  computedNativeEffectivePpi?: number;
+  nativeEffectivePpi?: number;
+  destinationDimensions?: { width: number; height: number };
+  timestamp?: string;
   acknowledgedAt?: string;
 }
 
@@ -67,10 +73,12 @@ export interface PreflightOptions {
   /** Pre-resolved slot-to-file mapping from authoritative import resolution.
    *  When provided, preflight skips its own matchFilesToSlots() and uses this directly. */
   resolvedSlotMapping?: Map<string, PreflightFile>;
-  /** Explicit user acknowledgement of quality warnings (150-299 PPI). */
+  /** Explicit user acknowledgement of quality warnings (150-299 PPI) - disabled in production. */
   acknowledgeQualityWarnings?: boolean;
   /** Structured, bound quality acknowledgement records keyed by slotId or filename */
   qualityAcknowledgements?: Record<string, QualityAcknowledgementRecord>;
+  /** Server-signed visual approval records keyed by slotId or filename */
+  visualApprovals?: Record<string, SignedEnhancementApprovalRecord>;
   /** Provenance metadata keyed by slotId or filename */
   provenances?: Record<string, ImageProvenanceMetadata>;
   /** Server-signed enhancement receipts keyed by slotId or filename */
@@ -538,7 +546,55 @@ export async function runPreflight(
         provenance?.enhancementMethod === "resampled" ||
         receipt?.payload?.providerClass === "resampling";
 
-      const isApproved = provenance?.enhancementStatus === "approved";
+      // ─────────────────────────────────────────────────────────────
+      // Visual Approval Verification
+      // Client-controlled enhancementStatus === "approved" is strictly NOT trusted.
+      // Must have a valid server-signed visual approval record.
+      // ─────────────────────────────────────────────────────────────
+      const currentSha = calculateSha256(file.buffer);
+      const approvalRecord =
+        file.provenance?.approvalRecord ??
+        provenance?.approvalRecord ??
+        opts.visualApprovals?.[slot.slotId] ??
+        opts.visualApprovals?.[file.filename];
+
+      let isVisualApprovalValid = false;
+      let visualApprovalError = "";
+
+      if (approvalRecord) {
+        const verifyApp = verifyVisualApprovalRecord(approvalRecord, {
+          expectedBookId: opts.bookId,
+          expectedSlotId: slot.slotId,
+          expectedProfileId: profile.id,
+          expectedLayoutMode: opts.mode || "standard-single",
+          expectedEnhancedSha256: currentSha,
+          expectedDestinationDimensions: slot.destinationDimensions,
+        });
+        isVisualApprovalValid = verifyApp.valid;
+        if (!verifyApp.valid) {
+          visualApprovalError = verifyApp.error || "Invalid visual approval record";
+        }
+      }
+
+      // If in production and client claims enhancementStatus === "approved" without a valid signed approval record:
+      if (isProduction && provenance?.enhancementStatus === "approved" && !isVisualApprovalValid) {
+        const forgedApprovalMsg = `Artwork for slot "${slot.slotId}" (${file.filename}) presents unverified client approval without a valid server-signed visual approval record: ${visualApprovalError || "No signed approval record provided"}. Production export blocked.`;
+        errors.push(forgedApprovalMsg);
+        issues.push({
+          type: "FORGED_OR_UNVERIFIED_APPROVAL",
+          code: "FORGED_OR_UNVERIFIED_APPROVAL",
+          illustrationNumber: illoNum,
+          filename: file.filename,
+          expected: "Valid server-signed visual approval record",
+          actual: visualApprovalError || "Missing or forged approval record",
+          recommendation: "Review before/after preview and approve via the visual review modal.",
+          message: forgedApprovalMsg,
+        });
+      }
+
+      const isApproved = isProduction
+        ? isVisualApprovalValid
+        : isVisualApprovalValid || provenance?.enhancementStatus === "approved";
 
       // Native effective PPI: derive from original pixel dimensions if recorded in provenance
       const originalWidth = provenance?.originalPixelDimensions?.width ?? actualWidth;
@@ -548,7 +604,7 @@ export async function runPreflight(
       const nativeEffectivePpi =
         provenance?.nativeEffectivePpi ?? Math.min(nativeEffectivePpiX, nativeEffectivePpiY);
 
-      // Detail PPI: Only verified real AI super-resolution restores 300 PPI detail
+      // Detail PPI: Only verified real/local AI super-resolution restores 300 PPI detail
       const effectivePPI = isGenuineAiEnhanced && isApproved ? 300 : nativeEffectivePpi;
       const nativeSourcePpi = nativeEffectivePpi;
       const finalRasterWidth = slot.destinationDimensions.width;
@@ -582,8 +638,8 @@ export async function runPreflight(
       //     * Plain resampled: hard error! Plain resampling cannot rewrite native 107 PPI as native 300 PPI.
       //     * Unenhanced: hard error; production export blocked. Acknowledgement cannot bypass.
       // - native PPI 150 to below 300:
-      //     * If approved AI-super-resolution: passes.
-      //     * Otherwise: warning requiring explicit user acknowledgement.
+      //     * If approved AI-super-resolution: passes directly.
+      //     * Otherwise: warning requiring per-slot explicit user acknowledgement bound to file hash and PPI.
       // - native PPI 300 or above: pass
       // - draft mode accepts lower PPI with visible DRAFT watermark
       if (nativeEffectivePpi < 150) {
@@ -685,33 +741,54 @@ export async function runPreflight(
         }
       } else if (nativeEffectivePpi < 300) {
         if (isGenuineAiEnhanced && isApproved) {
-          // Approved genuine AI-enhancement passes
+          // Approved genuine AI-enhancement passes directly with no warnings or blocking issues!
         } else {
           let isSlotQualityAcknowledged = false;
+          let ackRejectReason = "";
+
           if (opts.qualityAcknowledgements) {
-            const currentSha = calculateSha256(file.buffer);
             const rec =
               opts.qualityAcknowledgements[slot.slotId] ||
               opts.qualityAcknowledgements[file.filename];
-            if (
-              rec &&
-              rec.slotId === slot.slotId &&
-              rec.imageSha256 === currentSha &&
-              rec.profileId === profile.id &&
-              rec.layoutMode === (opts.mode || "standard-single") &&
-              rec.nativeEffectivePpi >= 150
-            ) {
-              isSlotQualityAcknowledged = true;
+
+            if (rec) {
+              const recSha = rec.sourceSha256 || rec.imageSha256;
+              const recPpi = rec.computedNativeEffectivePpi ?? rec.nativeEffectivePpi;
+              const recLayout = rec.layout || rec.layoutMode;
+              const PPI_TOLERANCE = 1.0;
+
+              if (rec.slotId !== slot.slotId) {
+                ackRejectReason = `Slot mismatch: record was for "${rec.slotId}", slot is "${slot.slotId}".`;
+              } else if (recSha !== currentSha) {
+                ackRejectReason = `Artwork hash mismatch: record hash "${recSha}" does not match current "${currentSha}".`;
+              } else if (rec.bookId && opts.bookId && rec.bookId !== opts.bookId) {
+                ackRejectReason = `Book ID mismatch: record was for "${rec.bookId}", current is "${opts.bookId}".`;
+              } else if (rec.profileId !== profile.id) {
+                ackRejectReason = `Profile mismatch: record was for "${rec.profileId}", current is "${profile.id}".`;
+              } else if (recLayout && recLayout !== (opts.mode || "standard-single")) {
+                ackRejectReason = `Layout mismatch: record was for "${recLayout}", current is "${opts.mode || "standard-single"}".`;
+              } else if (typeof recPpi !== "number" || Math.abs(recPpi - nativeEffectivePpi) > PPI_TOLERANCE) {
+                ackRejectReason = `Recorded PPI (${recPpi}) does not match current computed native PPI (${nativeEffectivePpi.toFixed(1)}) within tolerance (±${PPI_TOLERANCE} PPI).`;
+              } else if (
+                rec.destinationDimensions &&
+                (rec.destinationDimensions.width !== slot.destinationDimensions.width ||
+                  rec.destinationDimensions.height !== slot.destinationDimensions.height)
+              ) {
+                ackRejectReason = `Destination dimensions mismatch: record has ${rec.destinationDimensions.width}×${rec.destinationDimensions.height}, destination is ${slot.destinationDimensions.width}×${slot.destinationDimensions.height}.`;
+              } else {
+                isSlotQualityAcknowledged = true;
+              }
             }
-          } else if (opts.acknowledgeQualityWarnings === true) {
-            isSlotQualityAcknowledged = true;
           }
 
+          // Production export strictly rejects global acknowledgeQualityWarnings boolean.
+          // Quality acknowledgement must be per-slot and cryptographically bound.
           const needsAcknowledgement = isProduction && !isSlotQualityAcknowledged;
           if (needsAcknowledgement) {
+            const detailMsg = ackRejectReason ? ` (${ackRejectReason})` : "";
             const ackMsg =
               `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). ` +
-              `Requires explicit user acknowledgement for production export. ` +
+              `Requires explicit user acknowledgement bound to slot, file hash, and PPI for production export.${detailMsg} ` +
               `Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); ` +
               `enlargement does not create genuine native 300-PPI detail.`;
             errors.push(ackMsg);
@@ -720,14 +797,14 @@ export async function runPreflight(
               code: "QUALITY_WARNING_UNACKNOWLEDGED",
               illustrationNumber: illoNum,
               filename: file.filename,
-              expected: `Minimum 300 native effective PPI or explicit quality acknowledgement`,
+              expected: `Minimum 300 native effective PPI, verified genuine AI enhancement, or valid bound quality acknowledgement`,
               actual: `${actualWidth}×${actualHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
-              recommendation: `Provide higher-resolution images (300+ PPI) or explicitly acknowledge the quality warning.`,
+              recommendation: `Enhance with Real-ESRGAN, provide higher-resolution images (300+ PPI), or explicitly acknowledge the quality warning for this slot.`,
               message: ackMsg,
             });
           } else {
             warnings.push(
-              `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). Requires explicit user acknowledgement for production export. Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); enlargement does not create genuine native 300-PPI detail.`,
+              `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). ${isProduction ? "Quality warning acknowledged for production export." : "Allowed in draft mode."} Output grid is ${finalOutputGridPpi} PPI (${finalRasterWidth}×${finalRasterHeight} px); enlargement does not create genuine native 300-PPI detail.`,
             );
           }
         }
@@ -809,8 +886,11 @@ export async function runPreflight(
   const qualityWarnings: QualityWarningSlot[] = [];
   for (const report of assetReports) {
     const isApprovedAi =
-      (report.provenance?.providerClass === "real-ai" || report.provenance?.enhancementMethod === "ai-enhanced") &&
-      report.provenance?.enhancementStatus === "approved";
+      report.effectivePPI >= 300 &&
+      (report.provenance?.providerClass === "real-ai" ||
+        report.provenance?.providerClass === "local-ai" ||
+        report.provenance?.enhancementMethod === "ai-enhanced" ||
+        report.provenance?.enhancementMethod === "local-realesrgan");
 
     if (!isApprovedAi && report.nativeSourcePpi >= 150 && report.nativeSourcePpi < 300) {
       const slot = plan.assets.find((s) => s.slotId === report.slotId);

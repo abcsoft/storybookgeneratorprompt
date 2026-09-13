@@ -133,6 +133,16 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  let visualApprovalsMap: Record<string, any> = {};
+  const rawVisualApprovals = form.get("visualApprovals");
+  if (typeof rawVisualApprovals === "string") {
+    try {
+      visualApprovalsMap = JSON.parse(rawVisualApprovals);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   // ──────────────────────────────────────────────────
   // 1. Resolve the authoritative layout plan
   // ──────────────────────────────────────────────────
@@ -265,6 +275,7 @@ export async function POST(request: Request): Promise<Response> {
       resolvedSlotMapping: preflightSlotMapping,
       acknowledgeQualityWarnings,
       qualityAcknowledgements,
+      visualApprovals: visualApprovalsMap,
       provenances: provenancesMap,
       receipts: receiptsMap,
     });

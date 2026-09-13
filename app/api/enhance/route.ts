@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import sharp, { type Metadata } from "sharp";
 import { enhancementRegistry } from "@/lib/enhance/registry";
-import { signEnhancementReceipt } from "@/lib/enhance/receipt";
+import { signEnhancementReceipt, signVisualApprovalRecord } from "@/lib/enhance/receipt";
 import { computeAuthoritativePhysicalDimensionsIn, computeEffectivePpi } from "@/lib/enhance/provenance";
 import { resolveLayoutPlan, type LayoutMode } from "@/lib/story/layoutPlan";
 import { getPrintProfile } from "@/lib/print/registry";
@@ -65,11 +65,108 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    const contentType = request.headers.get("content-type") || "";
+
+    // ─────────────────────────────────────────────────────────────
+    // Visual Approval Signing Endpoint (JSON)
+    // ─────────────────────────────────────────────────────────────
+    if (contentType.includes("application/json")) {
+      const body = await request.json().catch(() => null);
+      if (!body) {
+        return NextResponse.json({ error: "Malformed JSON body." }, { status: 400 });
+      }
+
+      if (body.action === "approve_visual_review") {
+        const bookId = body.bookId || DEFAULT_BOOK_ID;
+        const slotId = body.slotId;
+        const profileId = body.profileId || "classic-landscape-11x8";
+        const layoutMode = body.layoutMode || "standard-single";
+        const enhancedSha256 = body.enhancedSha256;
+        const destinationDimensions = body.destinationDimensions;
+
+        if (
+          !slotId ||
+          !enhancedSha256 ||
+          !destinationDimensions ||
+          typeof destinationDimensions.width !== "number" ||
+          typeof destinationDimensions.height !== "number"
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Missing required fields for visual approval: slotId, enhancedSha256, and destinationDimensions (with width & height) are required.",
+            },
+            { status: 400 },
+          );
+        }
+
+        const signedApprovalRecord = signVisualApprovalRecord({
+          approvalId: randomUUID(),
+          bookId,
+          slotId,
+          profileId,
+          layoutMode,
+          enhancedSha256,
+          destinationDimensions: {
+            width: destinationDimensions.width,
+            height: destinationDimensions.height,
+          },
+          action: "approved_visual_review",
+          approvedAt: new Date().toISOString(),
+        });
+
+        return NextResponse.json({
+          success: true,
+          signedApprovalRecord,
+        });
+      }
+
+      return NextResponse.json({ error: `Unsupported JSON action "${body.action}".` }, { status: 400 });
+    }
+
     let formData: FormData;
     try {
       formData = await request.formData();
     } catch {
       return NextResponse.json({ error: "Malformed multipart form data." }, { status: 400 });
+    }
+
+    // Also support multipart action for visual approval
+    if (formData.get("action") === "approve_visual_review") {
+      const bookId = (formData.get("bookId") as string) || DEFAULT_BOOK_ID;
+      const slotId = formData.get("slotId") as string;
+      const profileId = (formData.get("profileId") as string) || "classic-landscape-11x8";
+      const layoutMode = (formData.get("layoutMode") as string) || "standard-single";
+      const enhancedSha256 = formData.get("enhancedSha256") as string;
+      const destWidth = Number(formData.get("destinationWidth") || 0);
+      const destHeight = Number(formData.get("destinationHeight") || 0);
+
+      if (!slotId || !enhancedSha256 || destWidth <= 0 || destHeight <= 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Missing required fields for visual approval: slotId, enhancedSha256, destinationWidth, and destinationHeight are required.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const signedApprovalRecord = signVisualApprovalRecord({
+        approvalId: randomUUID(),
+        bookId,
+        slotId,
+        profileId,
+        layoutMode,
+        enhancedSha256,
+        destinationDimensions: { width: destWidth, height: destHeight },
+        action: "approved_visual_review",
+        approvedAt: new Date().toISOString(),
+      });
+
+      return NextResponse.json({
+        success: true,
+        signedApprovalRecord,
+      });
     }
 
     const file = formData.get("file") as File | null;
@@ -234,6 +331,7 @@ export async function POST(request: Request): Promise<Response> {
     // 5. Issue Server-Signed Enhancement Receipt
     // ─────────────────────────────────────────────────────────────
     const signedReceipt = signEnhancementReceipt({
+      receiptVersion: "1.0",
       receiptId: randomUUID(),
       slotId: slot.slotId,
       bookId,
@@ -246,6 +344,7 @@ export async function POST(request: Request): Promise<Response> {
       destinationDimensions: { width: targetWidth, height: targetHeight },
       trustedProviderId: provider.id,
       providerClass: provider.providerClass,
+      enhancementMethod: result.provenance.enhancementMethod || provider.id,
       nativeEffectivePpi,
       enhancedEffectivePpi: result.provenance.enhancedEffectivePpi ?? nativeEffectivePpi,
       createdAt: new Date().toISOString(),
