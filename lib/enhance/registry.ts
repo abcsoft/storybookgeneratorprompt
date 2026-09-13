@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { ENHANCEMENT_PROVIDER_IDS } from "./constants";
+import { LocalRealEsrganProvider } from "./localRealEsrganProvider";
 import type {
   EnhanceImageOptions,
   EnhanceImageResult,
@@ -18,7 +20,7 @@ import {
  * Preserves the original native effective PPI and does not bypass low-PPI production gates.
  */
 export class ResamplingEnhancementProvider implements ResolutionEnhancementProvider {
-  readonly id = "resampled";
+  readonly id = ENHANCEMENT_PROVIDER_IDS.RESAMPLED;
   readonly name = "Plain Resampling (Lanczos/Sharp)";
   readonly providerClass: ProviderClass = "resampling";
   readonly isConfigured = true;
@@ -90,7 +92,7 @@ export class ResamplingEnhancementProvider implements ResolutionEnhancementProvi
  * Upscales to exceed destination dimensions and proportionally downsamples to exact destination.
  */
 export class MockAiSuperResolutionProvider implements ResolutionEnhancementProvider {
-  readonly id = "mocked-ai-super-res";
+  readonly id = ENHANCEMENT_PROVIDER_IDS.MOCK_AI;
   readonly name = "Mock AI Super-Resolution (Test & Proof Double Only)";
   readonly providerClass: ProviderClass = "test-mock";
   readonly isConfigured = true;
@@ -174,7 +176,7 @@ export class MockAiSuperResolutionProvider implements ResolutionEnhancementProvi
  * Credentials are never exposed to the client.
  */
 export class ExternalAiSuperResolutionProvider implements ResolutionEnhancementProvider {
-  readonly id = "external-ai-enhancer";
+  readonly id = ENHANCEMENT_PROVIDER_IDS.EXTERNAL_AI;
   readonly name = "Configured AI Super-Resolution Provider";
   readonly providerClass: ProviderClass = "real-ai";
   readonly isPaid = true;
@@ -311,6 +313,7 @@ export class ResolutionEnhancementRegistry {
       this.register(new MockAiSuperResolutionProvider());
     }
 
+    this.register(new LocalRealEsrganProvider());
     this.register(new ExternalAiSuperResolutionProvider());
   }
 
@@ -341,26 +344,39 @@ export class ResolutionEnhancementRegistry {
   /**
    * Returns the active enhancement provider.
    * NEVER defaults to mocked-ai-super-res in production.
-   * In production, returns the external provider if configured, or null if none is configured.
+   * Auto-discovery order:
+   * 1. Local Real-ESRGAN (free, local AI)
+   * 2. Configured external AI provider
+   * 3. Mock provider ONLY in test mode
+   * Otherwise returns null (fail closed).
    */
   getActiveProvider(preferredId?: string): ResolutionEnhancementProvider | null {
     if (preferredId) {
       const preferred = this.getProvider(preferredId);
-      if (preferred) return preferred;
+      if (preferred && preferred.isConfigured) return preferred;
+      return null;
     }
     const envChoice = process.env.ENHANCEMENT_PROVIDER;
     if (envChoice) {
       const envProv = this.getProvider(envChoice);
-      if (envProv) return envProv;
+      if (envProv && envProv.isConfigured) return envProv;
+      return null;
     }
 
-    const external = this.getProvider("external-ai-super-res");
+    if (process.env.REAL_ESRGAN_BIN) {
+      const local = this.getProvider(ENHANCEMENT_PROVIDER_IDS.LOCAL_REALESRGAN);
+      if (local?.isConfigured) {
+        return local;
+      }
+    }
+
+    const external = this.getProvider(ENHANCEMENT_PROVIDER_IDS.EXTERNAL_AI);
     if (external?.isConfigured) {
       return external;
     }
 
     if (this.isTestMode()) {
-      const mock = this.getProvider("mocked-ai-super-res");
+      const mock = this.getProvider(ENHANCEMENT_PROVIDER_IDS.MOCK_AI);
       if (mock && mock.isConfigured) {
         return mock;
       }

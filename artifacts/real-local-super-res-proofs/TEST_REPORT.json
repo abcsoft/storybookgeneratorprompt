@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-09-13T16:07:54.689Z",
+  "provider": {
+    "id": "local-realesrgan",
+    "class": "local-ai",
+    "isPaid": false,
+    "health": {
+      "ok": true,
+      "binPath": "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
+      "modelDir": "C:\\xampp_lite_8_3\\www\\githubstory\\sto1\\tools\\realesrgan\\models"
+    }
+  },
+  "testA_unavailable": {
+    "passed": true,
+    "autoFixDisabled": true,
+    "setupInstructionsShown": true,
+    "apiReturnsNoMock": true
+  },
+  "testB_realLocal": {
+    "passed": true,
+    "subprocessExecutionConfirmed": true,
+    "processedCount": 2,
+    "destinationDimensionsMatched": true,
+    "preflightPassedAfterApproval": true
+  },
+  "testC_tampering": {
+    "passed": true,
+    "checks": {
+      "valid_receipt_passes": true,
+      "public_default_secret_fails_closed": true,
+      "modified_enhanced_bytes_rejected": true,
+      "copied_to_another_slot_rejected": true,
+      "copied_to_another_profile_rejected": true,
+      "expired_receipt_rejected": true,
+      "resampled_provider_not_trusted_for_bypass": true,
+      "mock_provider_rejected_in_production": true
+    }
+  },
+  "testD_legacyRemap": {
+    "passed": true,
+    "proposalVerified": true,
+    "undoVerified": true,
+    "productionBlockedUntilGatesPass": true
+  },
+  "testE_finalPdfs": {
+    "passed": true,
+    "draftPdf": {
+      "pageCount": 24,
+      "watermarkFound": true,
+      "boxes": null
+    },
+    "productionPdf": {
+      "pageCount": 24,
+      "dpiGrid": [],
+      "watermarkAbsent": true,
+      "searchableText": true,
+      "boxes": null
+    }
+  }
+}

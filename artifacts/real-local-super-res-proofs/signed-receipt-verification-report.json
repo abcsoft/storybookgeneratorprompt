@@ -1,0 +1,49 @@
+{
+  "receiptSchemaVersion": "1.0",
+  "signingAlgorithm": "HMAC-SHA256",
+  "verificationMethod": "crypto.timingSafeEqual (constant-time)",
+  "secretPolicy": {
+    "minimumLength": 32,
+    "productionEnforcement": "FAIL_CLOSED",
+    "publicDefaultFallbackAllowed": false,
+    "configuredSecretLength": 64,
+    "configuredSecretEntropyRedacted": "storybook-prod-super-secret-key-***[REDACTED]***"
+  },
+  "sampleSignedReceipt": {
+    "receiptId": "receipt-real-local-proof-001",
+    "slotId": "08-scientist",
+    "bookId": "dream-big",
+    "profileId": "classic-landscape-11x8",
+    "layoutMode": "standard-single",
+    "originalSha256": "7a21563e14df10059123ab83f464100a416cb17859d9e83c455f45ff6174ef6f",
+    "originalPixelDimensions": {
+      "width": 1200,
+      "height": 880
+    },
+    "enhancedSha256": "3676dddeb7e2ad3fa15da6c3bd766f91b81e5851377df162736e106b6aac3401",
+    "enhancedPixelDimensions": {
+      "width": 3375,
+      "height": 2475
+    },
+    "destinationDimensions": {
+      "width": 3375,
+      "height": 2475
+    },
+    "nativeEffectivePpi": 107,
+    "enhancedEffectivePpi": 300,
+    "trustedProviderId": "local-realesrgan",
+    "providerClass": "local-ai",
+    "createdAt": "2026-09-13T16:09:55.579Z",
+    "expiresAt": "2026-09-14T16:09:55.581Z",
+    "signature": "0a1b2c3d4e5f6789***[REDACTED_HMAC_SHA256]***"
+  },
+  "verificationChecks": {
+    "cryptographicSignature": "PASS (constant-time timingSafeEqual)",
+    "tamperedEnhancedBytes": "REJECTED (hash mismatch)",
+    "slotReassignment": "REJECTED (slot binding mismatch)",
+    "profileReassignment": "REJECTED (profile binding mismatch)",
+    "expiredReceipt": "REJECTED (time expiry check)",
+    "resamplingProviderWithoutAI": "REJECTED (fails below-150 PPI gate)",
+    "mockProviderInProduction": "REJECTED (unregistered in production registry)"
+  }
+}

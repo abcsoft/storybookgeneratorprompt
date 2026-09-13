@@ -99,6 +99,19 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  const rawAck = form.get("acknowledgeQualityWarnings");
+  const acknowledgeQualityWarnings = rawAck === "true" || rawAck === "1";
+
+  let qualityAcknowledgements: Record<string, any> = {};
+  const rawQualityAcknowledgements = form.get("qualityAcknowledgements");
+  if (typeof rawQualityAcknowledgements === "string") {
+    try {
+      qualityAcknowledgements = JSON.parse(rawQualityAcknowledgements);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   const bookId = (form.get("bookId") as string) || undefined;
   const rawMode = ((form.get("layoutMode") as string) || (form.get("mode") as string)) || null;
   const mode = rawMode === "custom-spreads" || rawMode === "standard-single" ? rawMode : undefined;
@@ -165,6 +178,8 @@ export async function POST(request: Request): Promise<Response> {
     provenances: provenancesMap,
     receipts: receiptsMap,
     resolvedSlotMapping: preflightSlotMapping,
+    qualityAcknowledgements,
+    acknowledgeQualityWarnings,
   });
 
   if (!result.ok) {

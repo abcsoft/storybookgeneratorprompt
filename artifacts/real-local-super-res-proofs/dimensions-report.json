@@ -1,0 +1,55 @@
+{
+  "bookId": "dream-big",
+  "profileId": "classic-landscape-11x8",
+  "targetPageDimensionsPx": {
+    "width": 3375,
+    "height": 2475
+  },
+  "targetSpreadDimensionsPx": {
+    "width": 6675,
+    "height": 2475
+  },
+  "targetOutputGridPpi": 300,
+  "slots": [
+    {
+      "slotId": "01-cover",
+      "pageNumber": 1,
+      "role": "Cover",
+      "nativeDimensions": {
+        "width": 2400,
+        "height": 1760
+      },
+      "nativeEffectivePpi": 213,
+      "aspectRatio": "15:11 (1.364)",
+      "aspectStatus": "EXACT_TARGET_MATCH",
+      "enhancedDimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "enhancedOutputPpi": 300,
+      "upscaleFactor": 1.406,
+      "providerClass": "local-ai",
+      "providerId": "local-realesrgan"
+    },
+    {
+      "slotId": "08-scientist",
+      "pageNumber": 8,
+      "role": "Scientist",
+      "nativeDimensions": {
+        "width": 1200,
+        "height": 880
+      },
+      "nativeEffectivePpi": 107,
+      "aspectRatio": "15:11 (1.364)",
+      "aspectStatus": "EXACT_TARGET_MATCH",
+      "enhancedDimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "enhancedOutputPpi": 300,
+      "upscaleFactor": 2.813,
+      "providerClass": "local-ai",
+      "providerId": "local-realesrgan"
+    }
+  ]
+}

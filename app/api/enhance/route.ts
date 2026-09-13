@@ -33,6 +33,7 @@ export async function GET(request: Request): Promise<Response> {
         name: p.name,
         providerClass: p.providerClass,
         isConfigured: p.isConfigured,
+        available: p.isConfigured,
         isPaid: p.isPaid,
       })),
     });
@@ -46,6 +47,7 @@ export async function GET(request: Request): Promise<Response> {
       name: provider.name,
       providerClass: provider.providerClass,
       isConfigured: provider.isConfigured,
+      available: provider.isConfigured,
       isPaid: provider.isPaid,
     },
     isAvailable: true,
@@ -55,6 +57,7 @@ export async function GET(request: Request): Promise<Response> {
       name: p.name,
       providerClass: p.providerClass,
       isConfigured: p.isConfigured,
+      available: p.isConfigured,
       isPaid: p.isPaid,
     })),
   });
@@ -233,12 +236,14 @@ export async function POST(request: Request): Promise<Response> {
     const signedReceipt = signEnhancementReceipt({
       receiptId: randomUUID(),
       slotId: slot.slotId,
+      bookId,
       profileId: profile.id,
       layoutMode,
       originalSha256: result.provenance.originalSha256,
       originalPixelDimensions: { width: sourceWidth, height: sourceHeight },
       enhancedSha256: result.provenance.enhancedSha256 || "",
       enhancedPixelDimensions: { width: targetWidth, height: targetHeight },
+      destinationDimensions: { width: targetWidth, height: targetHeight },
       trustedProviderId: provider.id,
       providerClass: provider.providerClass,
       nativeEffectivePpi,

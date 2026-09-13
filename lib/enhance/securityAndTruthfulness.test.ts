@@ -514,24 +514,35 @@ describe("Security and Truthfulness Regression Suite", () => {
 
   // 16. Provider selection and paid confirmation are correctly bound
   it("16. External super-resolution provider requires userConfirmedPaid === true", async () => {
-    const externalProvider = enhancementRegistry.getProvider("external-ai-super-res");
-    if (externalProvider && externalProvider.isPaid) {
-      const buf = await makeImage(100, 100);
-      await expect(
-        externalProvider.enhanceImage({
-          inputBuffer: buf,
-          mimeType: "image/png",
-          filename: "test.png",
-          slotId: "slot-01",
-          profileId: "classic-landscape-11x8",
-          layoutMode: "continuous-spread",
-          sourceDimensions: { width: 100, height: 100 },
-          targetDimensions: { width: 3375, height: 2475 },
-          physicalInches: { width: 11.25, height: 8.25 },
-          method: "ai-enhanced",
-          userConfirmedPaid: false, // Not confirmed!
-        }),
-      ).rejects.toThrow(/requires explicit user confirmation/);
+    const origKey = process.env.ENHANCEMENT_API_KEY;
+    const origUrl = process.env.ENHANCEMENT_API_URL;
+    process.env.ENHANCEMENT_API_KEY = "test-key";
+    process.env.ENHANCEMENT_API_URL = "https://example.com/api";
+    try {
+      const externalProvider = enhancementRegistry.getProvider("external-ai-super-res");
+      if (externalProvider && externalProvider.isPaid) {
+        const buf = await makeImage(100, 100);
+        await expect(
+          externalProvider.enhanceImage({
+            inputBuffer: buf,
+            mimeType: "image/png",
+            filename: "test.png",
+            slotId: "slot-01",
+            profileId: "classic-landscape-11x8",
+            layoutMode: "continuous-spread",
+            sourceDimensions: { width: 100, height: 100 },
+            targetDimensions: { width: 3375, height: 2475 },
+            physicalInches: { width: 11.25, height: 8.25 },
+            method: "ai-enhanced",
+            userConfirmedPaid: false, // Not confirmed!
+          }),
+        ).rejects.toThrow(/explicit user confirmation is required/i);
+      }
+    } finally {
+      if (origKey === undefined) delete process.env.ENHANCEMENT_API_KEY;
+      else process.env.ENHANCEMENT_API_KEY = origKey;
+      if (origUrl === undefined) delete process.env.ENHANCEMENT_API_URL;
+      else process.env.ENHANCEMENT_API_URL = origUrl;
     }
   });
 

@@ -1,0 +1,127 @@
+[
+  {
+    "url": "http://127.0.0.1:3003/",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/media/fredoka_500-s.p.32igyh3v2qckk.woff2",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/1xa9gy2l39bs3.css",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/media/fredoka_600-s.p.3qd093b_yvgag.woff2",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/0nsbx92i0ugfn.css",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/media/fredoka_700-s.p.2vleai5b5ee35.woff2",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/media/nunito_400-s.p.2wff0v25g527h.woff2",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/media/nunito_700-s.p.3_3w32ku8mlvo.woff2",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/media/nunito_800-s.p.0fk28i9bscp4k.woff2",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/38kvuq-bf8wse.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/turbopack-0y68qqwey3p52.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/3ofjqw98d6xwr.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/2g05-lers809t.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/3yuy_0mj-z6x9.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/_next/static/chunks/2ug2emss4dg8o.js",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/prompts",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/c1de5018-17d1-43ec-9bf7-fba7d29f4857",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/fee7bc64-f43a-44c0-802a-8ee8772ee478",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/e249958a-dcc9-4e69-9c09-d96bb46db5fe",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://127.0.0.1:3003/api/enhance",
+    "status": 200,
+    "method": "POST"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/0afa01a5-92bf-4e39-b50b-f8336ec13293",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "blob:http://127.0.0.1:3003/c1de5018-17d1-43ec-9bf7-fba7d29f4857",
+    "status": 200,
+    "method": "GET"
+  }
+]

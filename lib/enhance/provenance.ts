@@ -1,6 +1,12 @@
 import type { ProviderClass, SignedEnhancementReceipt } from "./types";
 
-export type EnhancementMethod = "none" | "resampled" | "ai-enhanced" | "mocked-ai-super-res" | "external-ai-super-res";
+export type EnhancementMethod =
+  | "none"
+  | "resampled"
+  | "ai-enhanced"
+  | "mocked-ai-super-res"
+  | "external-ai-super-res"
+  | "local-realesrgan";
 export type EnhancementStatus = "none" | "pending" | "enhanced" | "approved" | "rejected" | "failed";
 
 export interface ImageProvenanceMetadata {
@@ -34,6 +40,8 @@ export interface ImageProvenanceMetadata {
   originalFilename?: string;
   /** Cryptographically signed enhancement receipt issued by the server */
   receipt?: SignedEnhancementReceipt;
+  /** True if image slot was reassigned via legacy content-remap recovery */
+  legacyRecovered?: boolean;
 }
 
 /**

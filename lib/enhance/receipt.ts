@@ -2,8 +2,35 @@ import crypto from "node:crypto";
 import type { EnhancementReceiptPayload, ProviderClass, SignedEnhancementReceipt } from "./types";
 import { calculateSha256 } from "./provenance";
 
-const DEFAULT_SIGNING_SECRET =
-  process.env.ENHANCEMENT_SIGNING_SECRET || "storybook-server-enhancement-secret-default";
+const TEST_SIGNING_SECRET = "storybook-test-signing-secret-entropy-32-chars-long";
+
+/**
+ * Returns the enhancement signing secret.
+ * In production, fails closed if ENHANCEMENT_SIGNING_SECRET is missing or less than 32 chars.
+ * In test mode, falls back to an explicit test secret.
+ */
+export function getSigningSecret(): string {
+  const envSecret = process.env.ENHANCEMENT_SIGNING_SECRET;
+  if (envSecret) {
+    if (
+      (envSecret.length < 32 ||
+        envSecret === "storybook-server-enhancement-secret-default" ||
+        envSecret.includes("storybook-server-enhancement-secret-default")) &&
+      process.env.NODE_ENV !== "test"
+    ) {
+      throw new Error(
+        "ENHANCEMENT_SIGNING_SECRET is missing or insecure. Public default or weak secrets are strictly prohibited in production.",
+      );
+    }
+    return envSecret;
+  }
+  if (process.env.NODE_ENV === "test") {
+    return TEST_SIGNING_SECRET;
+  }
+  throw new Error(
+    "Missing ENHANCEMENT_SIGNING_SECRET in production. Production enhancement signing must fail closed.",
+  );
+}
 
 /**
  * Creates a deterministic canonical representation of the receipt payload for signing.
@@ -12,6 +39,7 @@ export function canonicalizeReceiptPayload(payload: EnhancementReceiptPayload): 
   return JSON.stringify({
     receiptId: payload.receiptId,
     slotId: payload.slotId,
+    bookId: payload.bookId || "",
     profileId: payload.profileId,
     layoutMode: payload.layoutMode,
     originalSha256: payload.originalSha256,
@@ -20,6 +48,8 @@ export function canonicalizeReceiptPayload(payload: EnhancementReceiptPayload): 
     enhancedSha256: payload.enhancedSha256,
     enhancedWidth: payload.enhancedPixelDimensions.width,
     enhancedHeight: payload.enhancedPixelDimensions.height,
+    destinationWidth: payload.destinationDimensions?.width ?? payload.enhancedPixelDimensions.width,
+    destinationHeight: payload.destinationDimensions?.height ?? payload.enhancedPixelDimensions.height,
     trustedProviderId: payload.trustedProviderId,
     providerClass: payload.providerClass,
     nativeEffectivePpi: payload.nativeEffectivePpi,
@@ -30,14 +60,15 @@ export function canonicalizeReceiptPayload(payload: EnhancementReceiptPayload): 
 }
 
 /**
- * Computes an HMAC-SHA256 signature for a receipt payload using the server-only secret.
+ * Computes an HMAC-SHA256 signature for a receipt payload using constant-time comparison.
  */
 export function computeReceiptSignature(
   payload: EnhancementReceiptPayload,
-  secret: string = DEFAULT_SIGNING_SECRET,
+  secret?: string,
 ): string {
+  const sec = secret || getSigningSecret();
   const canonical = canonicalizeReceiptPayload(payload);
-  return crypto.createHmac("sha256", secret).update(canonical).digest("hex");
+  return crypto.createHmac("sha256", sec).update(canonical).digest("hex");
 }
 
 /**
@@ -45,7 +76,7 @@ export function computeReceiptSignature(
  */
 export function signEnhancementReceipt(
   payload: EnhancementReceiptPayload,
-  secret: string = DEFAULT_SIGNING_SECRET,
+  secret?: string,
 ): SignedEnhancementReceipt {
   const signature = computeReceiptSignature(payload, secret);
   return { payload, signature };
@@ -53,12 +84,15 @@ export function signEnhancementReceipt(
 
 export interface VerifyReceiptOptions {
   expectedSlotId?: string;
+  expectedBookId?: string;
   expectedProfileId?: string;
   expectedLayoutMode?: string;
   expectedEnhancedBuffer?: Buffer;
   expectedEnhancedSha256?: string;
   expectedDimensions?: { width: number; height: number };
+  expectedDestinationDimensions?: { width: number; height: number };
   requiredProviderClass?: ProviderClass;
+  requireProductionTrusted?: boolean;
   secret?: string;
   now?: Date;
 }
@@ -70,7 +104,7 @@ export interface ReceiptVerificationResult {
 
 /**
  * Validates a signed enhancement receipt against cryptographic signature, expiration,
- * file hash, slot, profile, and layout mode.
+ * file hash, slot, profile, layout mode, and dimensions using constant-time comparison.
  */
 export function verifyEnhancementReceipt(
   receipt: SignedEnhancementReceipt | null | undefined,
@@ -81,12 +115,27 @@ export function verifyEnhancementReceipt(
   }
 
   const { payload, signature } = receipt;
-  const secret = options.secret || DEFAULT_SIGNING_SECRET;
+  let secret: string;
+  try {
+    secret = options.secret || getSigningSecret();
+  } catch (err: any) {
+    return { valid: false, error: `Receipt verification secret error: ${err.message}` };
+  }
 
-  // 1. Verify cryptographic HMAC signature
+  // 1. Verify cryptographic HMAC signature using constant-time timingSafeEqual
   const expectedSig = computeReceiptSignature(payload, secret);
-  if (signature !== expectedSig) {
-    return { valid: false, error: "Forged or altered enhancement receipt: signature mismatch." };
+  try {
+    const sigBuf = Buffer.from(signature, "hex");
+    const expectedBuf = Buffer.from(expectedSig, "hex");
+    if (
+      sigBuf.length !== expectedBuf.length ||
+      sigBuf.length === 0 ||
+      !crypto.timingSafeEqual(sigBuf, expectedBuf)
+    ) {
+      return { valid: false, error: "Forged or altered enhancement receipt: signature mismatch." };
+    }
+  } catch {
+    return { valid: false, error: "Malformed signature format." };
   }
 
   // 2. Check expiration (default 24h lifespan)
@@ -104,7 +153,15 @@ export function verifyEnhancementReceipt(
     };
   }
 
-  // 4. Verify profile binding
+  // 4. Verify book ID binding
+  if (options.expectedBookId && payload.bookId && payload.bookId !== options.expectedBookId) {
+    return {
+      valid: false,
+      error: `Receipt book mismatch: issued for "${payload.bookId}", but presented for "${options.expectedBookId}".`,
+    };
+  }
+
+  // 5. Verify profile binding
   if (options.expectedProfileId && payload.profileId !== options.expectedProfileId) {
     return {
       valid: false,
@@ -112,7 +169,7 @@ export function verifyEnhancementReceipt(
     };
   }
 
-  // 5. Verify layout mode binding
+  // 6. Verify layout mode binding
   if (options.expectedLayoutMode && payload.layoutMode !== options.expectedLayoutMode) {
     return {
       valid: false,
@@ -120,7 +177,7 @@ export function verifyEnhancementReceipt(
     };
   }
 
-  // 6. Verify enhanced file content hash matches receipt
+  // 7. Verify enhanced file content hash matches receipt
   if (options.expectedEnhancedBuffer) {
     const actualSha = calculateSha256(options.expectedEnhancedBuffer);
     if (actualSha !== payload.enhancedSha256) {
@@ -138,7 +195,7 @@ export function verifyEnhancementReceipt(
     }
   }
 
-  // 7. Verify enhanced dimensions match
+  // 8. Verify enhanced dimensions match
   if (options.expectedDimensions) {
     if (
       payload.enhancedPixelDimensions.width !== options.expectedDimensions.width ||
@@ -151,12 +208,35 @@ export function verifyEnhancementReceipt(
     }
   }
 
-  // 8. Verify provider class if required (e.g. real-ai)
+  // 9. Verify destination dimensions match
+  if (options.expectedDestinationDimensions && payload.destinationDimensions) {
+    if (
+      payload.destinationDimensions.width !== options.expectedDestinationDimensions.width ||
+      payload.destinationDimensions.height !== options.expectedDestinationDimensions.height
+    ) {
+      return {
+        valid: false,
+        error: `Destination dimensions mismatch: receipt destination is ${payload.destinationDimensions.width}×${payload.destinationDimensions.height}, expected ${options.expectedDestinationDimensions.width}×${options.expectedDestinationDimensions.height}.`,
+      };
+    }
+  }
+
+  // 10. Verify provider class if required (e.g. real-ai or local-ai)
   if (options.requiredProviderClass && payload.providerClass !== options.requiredProviderClass) {
     return {
       valid: false,
       error: `Provider class mismatch: required "${options.requiredProviderClass}", but receipt was generated by "${payload.providerClass}".`,
     };
+  }
+
+  // 11. Enforce trusted provider class for production (reject test-mock and resampling)
+  if (options.requireProductionTrusted) {
+    if (payload.providerClass !== "local-ai" && payload.providerClass !== "real-ai") {
+      return {
+        valid: false,
+        error: `Provider class "${payload.providerClass}" is not trusted for production. Only local-ai and real-ai receipts can qualify for production export.`,
+      };
+    }
   }
 
   return { valid: true };

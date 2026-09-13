@@ -103,6 +103,16 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  let qualityAcknowledgements: Record<string, any> | undefined = undefined;
+  const rawQualityAcknowledgements = form.get("qualityAcknowledgements");
+  if (typeof rawQualityAcknowledgements === "string") {
+    try {
+      qualityAcknowledgements = JSON.parse(rawQualityAcknowledgements);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   let provenancesMap: Record<string, any> = {};
   const rawProvenances = form.get("provenances");
   if (typeof rawProvenances === "string") {
@@ -254,6 +264,7 @@ export async function POST(request: Request): Promise<Response> {
       customSpreads,
       resolvedSlotMapping: preflightSlotMapping,
       acknowledgeQualityWarnings,
+      qualityAcknowledgements,
       provenances: provenancesMap,
       receipts: receiptsMap,
     });

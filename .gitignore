@@ -45,4 +45,6 @@ storybook-out/
 artifacts/*
 !artifacts/browser-evidence/
 !artifacts/browser-reproduction/
+!artifacts/real-local-super-res-proofs/
 scratch/
+tools/

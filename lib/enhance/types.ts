@@ -1,7 +1,7 @@
 import type { EnhancementMethod, EnhancementStatus, ImageProvenanceMetadata } from "./provenance";
 export type { EnhancementMethod, EnhancementStatus, ImageProvenanceMetadata };
 
-export type ProviderClass = "real-ai" | "resampling" | "test-mock";
+export type ProviderClass = "real-ai" | "local-ai" | "resampling" | "test-mock";
 
 export interface EnhancementCostEstimate {
   estimatedCostUsd?: number;
@@ -13,12 +13,14 @@ export interface EnhancementCostEstimate {
 export interface EnhancementReceiptPayload {
   receiptId: string;
   slotId: string;
+  bookId?: string;
   profileId: string;
   layoutMode: string;
   originalSha256: string;
   originalPixelDimensions: { width: number; height: number };
   enhancedSha256: string;
   enhancedPixelDimensions: { width: number; height: number };
+  destinationDimensions?: { width: number; height: number };
   trustedProviderId: string;
   providerClass: ProviderClass;
   nativeEffectivePpi: number;
@@ -37,6 +39,7 @@ export interface EnhanceImageOptions {
   mimeType: string;
   filename?: string;
   slotId?: string;
+  bookId?: string;
   profileId?: string;
   layoutMode?: string;
   sourceDimensions: { width: number; height: number };

@@ -1,0 +1,24 @@
+Title:           Leo's Storybook
+Creator:         Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36
+Producer:        Skia/PDF m150
+CreationDate:    Sun Sep 13 22:09:07 2026 Bangladesh Standard Time
+ModDate:         Sun Sep 13 22:09:07 2026 Bangladesh Standard Time
+Custom Metadata: no
+Metadata Stream: no
+Tagged:          yes
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           24
+Encrypted:       no
+Page size:       810 x 594 pts
+Page rot:        0
+MediaBox:            0.00     0.00   810.00   594.00
+CropBox:             0.00     0.00   810.00   594.00
+BleedBox:            0.00     0.00   810.00   594.00
+TrimBox:             9.00     9.00   801.00   585.00
+ArtBox:              0.00     0.00   810.00   594.00
+File size:       1699819 bytes
+Optimized:       no
+PDF version:     1.4

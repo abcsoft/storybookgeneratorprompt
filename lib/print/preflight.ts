@@ -10,6 +10,7 @@ import { getEditionForProfile } from "../story/editions";
 import type { ChildProfile } from "../story/types";
 import type { PrintProfile } from "./types";
 import {
+  calculateSha256,
   computeAuthoritativePhysicalDimensionsIn,
   type ImageProvenanceMetadata,
 } from "../enhance/provenance";
@@ -43,9 +44,17 @@ export interface PreflightAssetReport {
   finalOutputGridPpi: number;
   provenance?: ImageProvenanceMetadata;
 }
+export interface QualityAcknowledgementRecord {
+  slotId: string;
+  imageSha256: string;
+  nativeEffectivePpi: number;
+  profileId: string;
+  layoutMode: string;
+  acknowledgedAt?: string;
+}
 
 export interface PreflightOptions {
-  child: ChildProfile;
+  child?: ChildProfile;
   bookId?: string;
   profileId?: string;
   files: PreflightFile[];
@@ -60,6 +69,8 @@ export interface PreflightOptions {
   resolvedSlotMapping?: Map<string, PreflightFile>;
   /** Explicit user acknowledgement of quality warnings (150-299 PPI). */
   acknowledgeQualityWarnings?: boolean;
+  /** Structured, bound quality acknowledgement records keyed by slotId or filename */
+  qualityAcknowledgements?: Record<string, QualityAcknowledgementRecord>;
   /** Provenance metadata keyed by slotId or filename */
   provenances?: Record<string, ImageProvenanceMetadata>;
   /** Server-signed enhancement receipts keyed by slotId or filename */
@@ -225,7 +236,7 @@ export async function runPreflight(
   let plan;
   try {
     plan = resolveLayoutPlan({
-      child: opts.child,
+      child: opts.child ?? { name: "Child", age: 4, gender: "neutral" },
       bookId,
       profileId: profile.id,
       mode: opts.mode,
@@ -483,6 +494,8 @@ export async function runPreflight(
       );
       const nominalWidthIn = physicalDimensions.width;
       const nominalHeightIn = physicalDimensions.height;
+      const isDraft = opts.draft === true;
+      const isProduction = !isDraft && !opts.allowLowResolutionForTesting;
 
       // Check provenance and receipt for enhancement method and provider class
       const receipt =
@@ -496,10 +509,13 @@ export async function runPreflight(
       if (receipt) {
         const verifyRes = verifyEnhancementReceipt(receipt, {
           expectedSlotId: slot.slotId,
+          expectedBookId: opts.bookId,
           expectedProfileId: profile.id,
           expectedLayoutMode: opts.mode || "standard-single",
           expectedEnhancedBuffer: file.buffer,
           expectedDimensions: slot.destinationDimensions,
+          expectedDestinationDimensions: slot.destinationDimensions,
+          requireProductionTrusted: isProduction,
         });
         verifiedReceiptValid = verifyRes.valid;
         if (!verifyRes.valid) {
@@ -507,10 +523,12 @@ export async function runPreflight(
         }
       }
 
-      // True AI enhancement requires verified server receipt with providerClass === "real-ai"
+      // True AI enhancement requires verified server receipt with providerClass === "real-ai" or "local-ai"
       // In test mode, allowLowResolutionForTesting allows mock provider test doubles
       const isGenuineAiEnhanced =
-        verifiedReceiptValid && receipt?.payload.providerClass === "real-ai";
+        verifiedReceiptValid &&
+        (receipt?.payload.providerClass === "real-ai" ||
+          receipt?.payload.providerClass === "local-ai");
 
       const isMockEnhanced =
         provenance?.enhancementMethod === "mocked-ai-super-res" ||
@@ -555,9 +573,6 @@ export async function runPreflight(
         }
       }
 
-      const isDraft = opts.draft === true;
-      const isProduction = !isDraft && !opts.allowLowResolutionForTesting;
-
       // Authoritative production quality policy:
       // - native PPI below 150:
       //     * Invalid/forged receipt: hard error INVALID_ENHANCEMENT_RECEIPT.
@@ -575,7 +590,8 @@ export async function runPreflight(
         if (isProduction) {
           if (
             (provenance?.enhancementMethod === "external-ai-super-res" ||
-              provenance?.enhancementMethod === "ai-enhanced") &&
+              provenance?.enhancementMethod === "ai-enhanced" ||
+              provenance?.enhancementMethod === "local-realesrgan") &&
             !receipt
           ) {
             const forgedMsg = `Artwork for slot "${slot.slotId}" (${file.filename}) claims AI super-resolution but lacks a valid, cryptographically verifiable server receipt. Production export blocked.`;
@@ -671,7 +687,27 @@ export async function runPreflight(
         if (isGenuineAiEnhanced && isApproved) {
           // Approved genuine AI-enhancement passes
         } else {
-          const needsAcknowledgement = isProduction && !opts.acknowledgeQualityWarnings;
+          let isSlotQualityAcknowledged = false;
+          if (opts.qualityAcknowledgements) {
+            const currentSha = calculateSha256(file.buffer);
+            const rec =
+              opts.qualityAcknowledgements[slot.slotId] ||
+              opts.qualityAcknowledgements[file.filename];
+            if (
+              rec &&
+              rec.slotId === slot.slotId &&
+              rec.imageSha256 === currentSha &&
+              rec.profileId === profile.id &&
+              rec.layoutMode === (opts.mode || "standard-single") &&
+              rec.nativeEffectivePpi >= 150
+            ) {
+              isSlotQualityAcknowledged = true;
+            }
+          } else if (opts.acknowledgeQualityWarnings === true) {
+            isSlotQualityAcknowledged = true;
+          }
+
+          const needsAcknowledgement = isProduction && !isSlotQualityAcknowledged;
           if (needsAcknowledgement) {
             const ackMsg =
               `"${file.filename}" native effective PPI is ${Math.round(nativeEffectivePpi)} (between 150 and 299 PPI). ` +

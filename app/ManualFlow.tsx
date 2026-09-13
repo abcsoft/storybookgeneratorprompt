@@ -33,6 +33,12 @@ import {
 } from "@/lib/enhance/provenance";
 import type { SignedEnhancementReceipt } from "@/lib/enhance/types";
 import type { SemanticValidationResult } from "@/lib/semantic/types";
+import type { QualityAcknowledgementRecord } from "@/lib/print/preflight";
+import {
+  calculateLegacyDreamBigRemap,
+  type LegacyRemapMappingEntry,
+  DREAM_BIG_CANONICAL_SLOTS,
+} from "@/lib/story/legacyRemap";
 import styles from "./page.module.css";
 
 export type { IllustrationEntry };
@@ -41,6 +47,7 @@ export interface PreflightIssueDetail {
   type?: string;
   illustrationNumber?: number;
   filename?: string;
+  slotId?: string;
   expected?: string;
   actual?: string;
   recommendation?: string;
@@ -150,16 +157,33 @@ export default function ManualFlow({
   const [preflightWarnings, setPreflightWarnings] = useState<string[]>([]);
   /** Quality warning slots requiring explicit user acknowledgement (150-299 PPI). */
   const [pendingQualityWarnings, setPendingQualityWarnings] = useState<any[] | null>(null);
-  const [acknowledgedQualityWarnings, setAcknowledgedQualityWarnings] = useState<boolean>(false);
+  const [qualityAcknowledgements, setQualityAcknowledgements] = useState<Record<string, QualityAcknowledgementRecord>>({});
   const [enhancerAvailable, setEnhancerAvailable] = useState<boolean | null>(null);
+  const [activeProvider, setActiveProvider] = useState<{
+    id: string;
+    name: string;
+    providerClass: string;
+    available: boolean;
+    isPaid: boolean;
+    estimatedCostUsd?: number;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/enhance")
       .then((r) => r.json())
       .then((data) => {
-        setEnhancerAvailable(data.isAvailable === true && data.provider !== null);
+        if (data.isAvailable === true && data.provider) {
+          setEnhancerAvailable(true);
+          setActiveProvider(data.provider);
+        } else {
+          setEnhancerAvailable(false);
+          setActiveProvider(null);
+        }
       })
-      .catch(() => setEnhancerAvailable(false));
+      .catch(() => {
+        setEnhancerAvailable(false);
+        setActiveProvider(null);
+      });
   }, []);
 
   const clearServerErrors = useCallback(() => {
@@ -171,10 +195,12 @@ export default function ManualFlow({
 
   useEffect(() => {
     clearServerErrors();
+    setQualityAcknowledgements({});
   }, [profileId, clearServerErrors]);
 
   useEffect(() => {
     clearServerErrors();
+    setQualityAcknowledgements({});
   }, [layoutMode, clearServerErrors]);
 
   const [copied, setCopied] = useState<number | null>(null);
@@ -192,12 +218,19 @@ export default function ManualFlow({
   const [batchEnhancing, setBatchEnhancing] = useState(false);
   const [batchEnhanceProgress, setBatchEnhanceProgress] = useState<{
     total: number;
+    running: number;
     completed: number;
     failed: number;
     cancelled: number;
   } | null>(null);
+  const [failedEnhanceIndices, setFailedEnhanceIndices] = useState<number[]>([]);
   const batchEnhanceCancelRef = useRef(false);
   const [batchChecking, setBatchChecking] = useState(false);
+
+  // Legacy Dream Big Content Remap states
+  const [legacyRemapOpen, setLegacyRemapOpen] = useState(false);
+  const [savedPreRemapIllustrations, setSavedPreRemapIllustrations] = useState<Record<number, IllustrationEntry> | null>(null);
+  const [isLegacyRemapped, setIsLegacyRemapped] = useState(false);
 
   // The native file input, so a destructive reset can explicitly zero its
   // value — React state alone doesn't reliably reset the browser's own
@@ -499,10 +532,25 @@ export default function ManualFlow({
     });
   }
 
+  const invalidateSlotAcknowledgement = useCallback((slotIdOrIndex: string | number) => {
+    setQualityAcknowledgements((prev) => {
+      const next = { ...prev };
+      if (typeof slotIdOrIndex === "number") {
+        const page = pages.find((p) => p.index === slotIdOrIndex);
+        const slotId = page?.resolvedSlot?.slotId ?? page?.filename;
+        if (slotId && next[slotId]) delete next[slotId];
+      } else {
+        if (next[slotIdOrIndex]) delete next[slotIdOrIndex];
+      }
+      return next;
+    });
+  }, [pages]);
+
   /** Assign or replace a file for a page — invalidates old transform metadata
    *  and clears regeneration flags, landing as "added". */
   function applyFile(index: number, file: File) {
     clearServerErrors();
+    invalidateSlotAcknowledgement(index);
     const objectUrl = URL.createObjectURL(file);
     setEntry(index, {
       status: "added",
@@ -627,6 +675,7 @@ export default function ManualFlow({
 
   function onRemove(index: number) {
     clearServerErrors();
+    invalidateSlotAcknowledgement(index);
     setEntry(index, emptyEntry());
   }
 
@@ -657,6 +706,7 @@ export default function ManualFlow({
 
   function handleUpdateTransform(index: number, transform: ArtworkTransform) {
     clearServerErrors();
+    invalidateSlotAcknowledgement(index);
     setIllustrations((cur) => {
       const entry = cur[index];
       if (!entry || entry.status === "missing") return cur;
@@ -781,9 +831,11 @@ export default function ManualFlow({
       if (!provId) {
         const provRes = await fetch("/api/enhance");
         const provData = await provRes.json().catch(() => ({}));
-        if (!provRes.ok || !provData.provider?.available) {
+        const isAvail = provRes.ok && provData.isAvailable && (provData.provider?.isConfigured || provData.provider?.available);
+        if (!isAvail) {
           const msg = provData.error ?? "Resolution enhancement provider is currently unavailable in production.";
-          if (!skipConfirm) alert(msg);
+          setEnhancerAvailable(false);
+          setActiveProvider(null);
           return { success: false, error: msg };
         }
         provId = provData.provider.id;
@@ -885,6 +937,9 @@ export default function ManualFlow({
         },
       };
     });
+    setTimeout(() => {
+      void runPreflightCheck();
+    }, 50);
   }
 
   function handleRevertEnhancement(index: number) {
@@ -1034,6 +1089,8 @@ export default function ManualFlow({
   }
 
   function handleSwapSlots(slotAIndex: number, slotBIndex: number) {
+    invalidateSlotAcknowledgement(slotAIndex);
+    invalidateSlotAcknowledgement(slotBIndex);
     setIllustrations((cur) => {
       const itemA = cur[slotAIndex];
       const itemB = cur[slotBIndex];
@@ -1046,8 +1103,8 @@ export default function ManualFlow({
     });
   }
 
-  async function onBatchAutoFix() {
-    const eligible = pages.filter((p) => {
+  const eligiblePages = useMemo(() => {
+    return pages.filter((p) => {
       const entry = illustrations[p.index];
       if (!entry || entry.status === "missing" || !entry.file) return false;
       const prov = entry.provenance;
@@ -1055,25 +1112,31 @@ export default function ManualFlow({
       if (prov.enhancementMethod === "none") return true;
       return prov.nativeEffectivePpi < 300 && prov.enhancementStatus !== "approved";
     });
+  }, [pages, illustrations]);
 
-    if (eligible.length === 0) {
-      alert("All uploaded illustrations already meet resolution standards or are enhanced.");
+  async function onBatchAutoFix(retryPages?: ManualPage[]) {
+    const targets = retryPages ?? eligiblePages;
+    if (targets.length === 0) {
       return;
     }
 
     const provRes = await fetch("/api/enhance");
     const provData = await provRes.json().catch(() => ({}));
-    if (!provData.provider?.available) {
-      alert(provData.error ?? "No super-resolution provider is currently configured or available in production.");
+    const isAvail = provData.isAvailable && (provData.provider?.isConfigured || provData.provider?.available);
+    if (!isAvail) {
+      setEnhancerAvailable(false);
+      setActiveProvider(null);
       return;
     }
+    setEnhancerAvailable(true);
+    setActiveProvider(provData.provider);
 
     let userConfirmedPaid = false;
     if (provData.provider?.isPaid) {
       const costPerImage = provData.provider.estimatedCostUsd ?? provData.costEstimate?.estimatedCostUsd ?? 0.04;
-      const totalCost = (costPerImage * eligible.length).toFixed(2);
+      const totalCost = (costPerImage * targets.length).toFixed(2);
       const proceed = window.confirm(
-        `Batch resolution enhancement will process ${eligible.length} image(s) using paid provider "${provData.provider.name}".\n` +
+        `Batch resolution enhancement will process ${targets.length} image(s) using paid provider "${provData.provider.name}".\n` +
         `Estimated cost: $${totalCost} USD ($${costPerImage}/image).\n\n` +
         `Proceed with batch enhancement?`
       );
@@ -1083,47 +1146,168 @@ export default function ManualFlow({
 
     batchEnhanceCancelRef.current = false;
     setBatchEnhancing(true);
-    setBatchEnhanceProgress({ total: eligible.length, completed: 0, failed: 0, cancelled: 0 });
+    setFailedEnhanceIndices([]);
 
+    const totalCount = targets.length;
     let completedCount = 0;
     let failedCount = 0;
     let cancelledCount = 0;
+    let runningCount = 0;
+    const failedList: number[] = [];
 
-    const queue = [...eligible];
-    while (queue.length > 0) {
-      if (batchEnhanceCancelRef.current) {
-        cancelledCount += queue.length;
-        queue.length = 0;
-        break;
+    setBatchEnhanceProgress({
+      total: totalCount,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+    });
+
+    const queue = [...targets];
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        if (batchEnhanceCancelRef.current) {
+          cancelledCount += queue.length;
+          queue.length = 0;
+          break;
+        }
+        const page = queue.shift();
+        if (!page) break;
+
+        runningCount++;
+        setBatchEnhanceProgress({
+          total: totalCount,
+          running: runningCount,
+          completed: completedCount,
+          failed: failedCount,
+          cancelled: cancelledCount,
+        });
+
+        try {
+          const result = await handleAutoFixResolution(page.index, true, userConfirmedPaid, provData.provider.id);
+          if (result.success) {
+            completedCount++;
+          } else {
+            failedCount++;
+            failedList.push(page.index);
+          }
+        } catch {
+          failedCount++;
+          failedList.push(page.index);
+        } finally {
+          runningCount--;
+          setBatchEnhanceProgress({
+            total: totalCount,
+            running: runningCount,
+            completed: completedCount,
+            failed: failedCount,
+            cancelled: cancelledCount,
+          });
+        }
       }
-      const page = queue.shift();
-      if (!page) break;
-      const result = await handleAutoFixResolution(page.index, true, userConfirmedPaid, provData.provider.id);
-      if (result.success) {
-        completedCount++;
-      } else {
-        failedCount++;
-      }
-      if (batchEnhanceCancelRef.current && queue.length > 0) {
-        cancelledCount += queue.length;
-        queue.length = 0;
-      }
-      setBatchEnhanceProgress({
-        total: eligible.length,
-        completed: completedCount,
-        failed: failedCount,
-        cancelled: cancelledCount,
-      });
-    }
+    };
+
+    // Run at most 2 concurrent workers
+    const workerCount = Math.min(2, queue.length);
+    const workers = Array.from({ length: workerCount }, () => worker());
+    await Promise.all(workers);
 
     setBatchEnhancing(false);
+    setFailedEnhanceIndices(failedList);
     setBatchEnhanceProgress({
-      total: eligible.length,
+      total: totalCount,
+      running: 0,
       completed: completedCount,
       failed: failedCount,
       cancelled: cancelledCount,
     });
     void runPreflightCheck();
+  }
+
+  function handleApplyLegacyRemap() {
+    setSavedPreRemapIllustrations(illustrations);
+
+    const currentFilesBySlot: Record<string, { filename: string; file?: File }> = {};
+    for (const p of pages) {
+      const entry = illustrations[p.index];
+      const slotId = p.resolvedSlot?.slotId ?? p.filename;
+      if (slotId && entry?.file) {
+        currentFilesBySlot[slotId] = { filename: p.filename, file: entry.file };
+      }
+    }
+
+    const { entries } = calculateLegacyDreamBigRemap(currentFilesBySlot);
+
+    setIllustrations((cur) => {
+      const next: Record<number, IllustrationEntry> = { ...cur };
+
+      for (const mapping of entries) {
+        const destPage = pages.find(
+          (p) => (p.resolvedSlot?.slotId ?? p.filename) === mapping.destinationSlotId
+        );
+        const sourcePage = pages.find(
+          (p) => (p.resolvedSlot?.slotId ?? p.filename) === mapping.sourceSlotId
+        );
+
+        if (!destPage) continue;
+
+        if (sourcePage && cur[sourcePage.index]?.file) {
+          const sourceEntry = cur[sourcePage.index];
+          next[destPage.index] = {
+            ...sourceEntry,
+            file: sourceEntry.file,
+            objectUrl: sourceEntry.objectUrl,
+            status: "added",
+            needsRegeneration: false,
+            provenance: sourceEntry.provenance ? {
+              ...sourceEntry.provenance,
+              legacyRecovered: true,
+              enhancementStatus: "none",
+              approvedAt: null,
+            } : undefined,
+          };
+        }
+      }
+
+      return next;
+    });
+
+    setQualityAcknowledgements({});
+    setIsLegacyRemapped(true);
+    setLegacyRemapOpen(false);
+
+    const generation = importGeneration.current();
+    for (const p of pages) {
+      const entry = illustrations[p.index];
+      if (entry?.file) {
+        void runClientCheck(p.index, entry.file, generation);
+      }
+    }
+
+    setTimeout(() => {
+      void runPreflightCheck({});
+    }, 100);
+  }
+
+  function handleUndoLegacyRemap() {
+    if (!savedPreRemapIllustrations) return;
+    setIllustrations(savedPreRemapIllustrations);
+    setSavedPreRemapIllustrations(null);
+    setIsLegacyRemapped(false);
+    setQualityAcknowledgements({});
+
+    const generation = importGeneration.current();
+    for (const p of pages) {
+      const entry = savedPreRemapIllustrations[p.index];
+      if (entry?.file) {
+        void runClientCheck(p.index, entry.file, generation);
+      }
+    }
+
+    setTimeout(() => {
+      void runPreflightCheck({});
+    }, 100);
   }
 
   async function onBatchCheckSemantic() {
@@ -1213,7 +1397,7 @@ export default function ManualFlow({
     const form = buildExportForm();
     if (!form) return;
     // Pass quality warning acknowledgement if user explicitly approved or already acknowledged
-    if (overrideAcknowledgeQualityWarnings === true || acknowledgedQualityWarnings) {
+    if (overrideAcknowledgeQualityWarnings === true || Object.keys(qualityAcknowledgements).length > 0) {
       form.append("acknowledgeQualityWarnings", "true");
     }
     setBusy(true);
@@ -1254,6 +1438,7 @@ export default function ManualFlow({
               type: item.type,
               illustrationNumber: item.illustrationNumber,
               filename: item.filename,
+              slotId: item.slotId,
               expected: item.expected,
               actual: item.actual,
               recommendation: item.recommendation,
@@ -1323,18 +1508,49 @@ export default function ManualFlow({
   }
 
   function handleAcknowledgeQualityWarnings() {
-    setAcknowledgedQualityWarnings(true);
-    setPreflightIssues((prev) =>
-      prev.filter((i) => i.type !== "QUALITY_WARNING_UNACKNOWLEDGED")
-    );
+    const newAcks: Record<string, QualityAcknowledgementRecord> = { ...qualityAcknowledgements };
+    const warningIssues = preflightIssues.filter((i) => i.type === "QUALITY_WARNING_UNACKNOWLEDGED");
+
+    for (const issue of warningIssues) {
+      const page = issue.illustrationNumber !== undefined
+        ? pages.find((p) => p.index === issue.illustrationNumber)
+        : pages.find((p) => p.filename === issue.filename);
+
+      const slotId = issue.slotId || page?.resolvedSlot?.slotId || page?.filename || issue.filename;
+      if (!slotId) continue;
+
+      const entry = page ? illustrations[page.index] : undefined;
+      const sha256 = entry?.provenance?.originalSha256 || "";
+      const ppiVal = issue.actual
+        ? Number(issue.actual.replace(/[^0-9.]/g, ""))
+        : (entry?.provenance?.nativeEffectivePpi ?? 213);
+
+      if (ppiVal >= 150 && ppiVal < 300) {
+        newAcks[slotId] = {
+          slotId,
+          imageSha256: sha256,
+          nativeEffectivePpi: ppiVal,
+          profileId,
+          layoutMode,
+          acknowledgedAt: new Date().toISOString(),
+        };
+      }
+    }
+
+    setQualityAcknowledgements(newAcks);
     setPendingQualityWarnings(null);
+    setTimeout(() => {
+      void runPreflightCheck(newAcks);
+    }, 50);
   }
 
-  const runPreflightCheck = useCallback(async () => {
+  const runPreflightCheck = useCallback(async (customAcks?: Record<string, QualityAcknowledgementRecord>) => {
+    const acksToUse = customAcks ?? qualityAcknowledgements;
     const form = buildExportForm();
     if (!form) return;
     form.append("preflightOnly", "true");
-    if (acknowledgedQualityWarnings) {
+    if (Object.keys(acksToUse).length > 0) {
+      form.append("qualityAcknowledgements", JSON.stringify(acksToUse));
       form.append("acknowledgeQualityWarnings", "true");
     }
     try {
@@ -1351,6 +1567,7 @@ export default function ManualFlow({
               type: item.type,
               illustrationNumber: item.illustrationNumber,
               filename: item.filename,
+              slotId: item.slotId,
               expected: item.expected,
               actual: item.actual,
               recommendation: item.recommendation,
@@ -1363,7 +1580,7 @@ export default function ManualFlow({
     } catch {
       /* ignore background preflight check failure */
     }
-  }, [buildExportForm, acknowledgedQualityWarnings]);
+  }, [buildExportForm, qualityAcknowledgements]);
 
   async function exportPrintify() {
     clearServerErrors();
@@ -1387,6 +1604,7 @@ export default function ManualFlow({
               type: item.type,
               illustrationNumber: item.illustrationNumber,
               filename: item.filename,
+              slotId: item.slotId,
               expected: item.expected,
               actual: item.actual,
               recommendation: item.recommendation,
@@ -1449,6 +1667,19 @@ export default function ManualFlow({
     }
     return map;
   }, [reviewSequence, bookId, profile]);
+
+  const legacyRemapPreview = useMemo(() => {
+    if (bookId !== "dream-big") return null;
+    const currentFilesBySlot: Record<string, { filename: string; file?: File }> = {};
+    for (const p of pages) {
+      const entry = illustrations[p.index];
+      const slotId = p.resolvedSlot?.slotId ?? p.filename;
+      if (slotId && entry?.file) {
+        currentFilesBySlot[slotId] = { filename: p.filename, file: entry.file };
+      }
+    }
+    return calculateLegacyDreamBigRemap(currentFilesBySlot);
+  }, [bookId, pages, illustrations]);
 
   const allPresent =
     pages.length > 0 &&
@@ -1696,13 +1927,13 @@ export default function ManualFlow({
               </div>
               <ul className={styles.preflightSummaryList}>
                 <li>
-                  <strong>{qualityWarningIssues.length} {qualityWarningIssues.length === 1 ? "image requires" : "images require"} quality acknowledgement</strong> (213 PPI)
-                  {acknowledgedQualityWarnings && (
+                  <strong>{qualityWarningIssues.length} {qualityWarningIssues.length === 1 ? "image requires" : "images require"} quality acknowledgement</strong> {qualityWarningIssues.length > 0 ? `(${Array.from(new Set(qualityWarningIssues.map((i) => i.actual).filter(Boolean))).join(", ")})` : ""}
+                  {Object.keys(qualityAcknowledgements).length > 0 && qualityWarningIssues.length === 0 && (
                     <span style={{ color: "#047857", fontWeight: 600, marginLeft: "6px" }}>✓ Acknowledged</span>
                   )}
                 </li>
                 <li>
-                  <strong>{lowPpiIssues.length} {lowPpiIssues.length === 1 ? "image requires" : "images require"} higher resolution or genuine AI enhancement</strong> (107 PPI)
+                  <strong>{lowPpiIssues.length} {lowPpiIssues.length === 1 ? "image requires" : "images require"} higher resolution or genuine AI enhancement</strong> {lowPpiIssues.length > 0 ? `(${Array.from(new Set(lowPpiIssues.map((i) => i.actual).filter(Boolean))).join(", ")})` : ""}
                 </li>
                 <li>
                   <strong>{aspectIssues.length} aspect-ratio {aspectIssues.length === 1 ? "problem" : "problems"}</strong>
@@ -1721,7 +1952,7 @@ export default function ManualFlow({
                     ⚠️ Quality Warning Acknowledgement Available
                   </div>
                   <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#78350f" }}>
-                    {qualityWarningIssues.length} {qualityWarningIssues.length === 1 ? "image is" : "images are"} between 150–299 native PPI (e.g. 213 PPI).
+                    {qualityWarningIssues.length} {qualityWarningIssues.length === 1 ? "image is" : "images are"} between 150–299 native PPI ({Array.from(new Set(qualityWarningIssues.map((i) => i.actual).filter(Boolean))).join(", ")}).
                     Acknowledgement allows production export with slightly reduced detail, but does <strong>not</strong> create native 300-PPI detail.
                   </p>
                   <button
@@ -1731,7 +1962,7 @@ export default function ManualFlow({
                     onClick={handleAcknowledgeQualityWarnings}
                     data-testid="acknowledge-all-quality-warnings"
                   >
-                    ✓ Acknowledge {qualityWarningIssues.length} quality {qualityWarningIssues.length === 1 ? "warning" : "warnings"} (213 PPI)
+                    ✓ Acknowledge {qualityWarningIssues.length} quality {qualityWarningIssues.length === 1 ? "warning" : "warnings"} ({Array.from(new Set(qualityWarningIssues.map((i) => i.actual).filter(Boolean))).join(", ")})
                   </button>
                 </div>
               )}
@@ -2040,16 +2271,208 @@ export default function ManualFlow({
             </div>
           )}
 
+          {/* Legacy Dream Big Content-Remap Recovery Banner */}
+          {bookId === "dream-big" && pages.length >= 22 && (
+            <div
+              style={{
+                margin: "14px 0 10px",
+                padding: "12px 16px",
+                background: "#fffbeb",
+                border: "1px solid #f59e0b",
+                borderRadius: "8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+              data-testid="legacy-dream-big-remap-banner"
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <strong style={{ color: "#b45309", fontSize: "14px" }}>
+                    🔄 Legacy Dream Big Artwork Offset Recovery
+                  </strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#78350f" }}>
+                    Older Dream Big illustration sets have a 1-page cyclic shift across pages 2–22 (Intro contains Pilot, Pilot contains Race-car, etc.).
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  {!isLegacyRemapped ? (
+                    <button
+                      type="button"
+                      className={styles.copyButton}
+                      style={{ borderColor: "#f59e0b", color: "#b45309", fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => setLegacyRemapOpen(true)}
+                      data-testid="open-legacy-remap-button"
+                    >
+                      Review & Apply Legacy Remap
+                    </button>
+                  ) : (
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "13px", color: "#047857", fontWeight: 700 }} data-testid="legacy-remapped-badge">
+                        ✓ Legacy Remap Applied
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.linkAction}
+                        style={{ color: "#dc2626", fontWeight: 700, cursor: "pointer" }}
+                        onClick={handleUndoLegacyRemap}
+                        data-testid="undo-legacy-remap-button"
+                      >
+                        Undo Remap
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.linkAction}
+                        style={{ color: "#4b5563", fontWeight: 700, cursor: "pointer" }}
+                        onClick={() => void downloadDraftPdf()}
+                        data-testid="download-remapped-draft-button"
+                      >
+                        📄 Download Remapped Draft PDF
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: "12px", color: "#92400e" }}>
+                💡 Recommendation: Child identity and style may vary across older artwork. Generating new artwork with the latest prompts is recommended even when legacy remapping is available.
+              </div>
+            </div>
+          )}
+
+          {/* Legacy Dream Big Remap Modal */}
+          {legacyRemapOpen && legacyRemapPreview && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "rgba(0,0,0,0.65)",
+                zIndex: 10000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "20px",
+              }}
+              data-testid="legacy-remap-modal"
+            >
+              <div
+                style={{
+                  background: "#ffffff",
+                  borderRadius: "12px",
+                  maxWidth: "780px",
+                  width: "100%",
+                  maxHeight: "90vh",
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                  <h3 style={{ margin: 0, fontSize: "17px", color: "#1e293b" }}>
+                    🔄 Reversible Legacy Dream Big Artwork Remap Proposal
+                  </h3>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#64748b" }}>
+                    Resolves the cyclic offset in older packages where roles are shifted across pages 2–22.
+                  </p>
+                </div>
+
+                <div style={{ padding: "16px 20px", overflowY: "auto", fontSize: "13px" }}>
+                  <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px 14px", borderRadius: "6px", marginBottom: "14px", color: "#1e40af" }}>
+                    <strong>Canonical Shift Mapping:</strong>
+                    <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                      <li><strong>Destination 02-intro</strong> receives old source <code>22-inventor.png</code> (generic dream artwork).</li>
+                      <li><strong>Destinations 03 through 22</strong>: Destination N receives old source N−1 (restores correct roles).</li>
+                      <li><strong>01-cover, 23-closing, and 24-backcover</strong> remain unchanged.</li>
+                    </ul>
+                  </div>
+
+                  <div style={{ background: "#fef3c7", border: "1px solid #fde68a", padding: "10px 14px", borderRadius: "6px", marginBottom: "14px", color: "#92400e" }}>
+                    <strong>⚠️ Important Safety Rules:</strong>
+                    <div>• <strong>Reversible:</strong> Original files and state are preserved; click "Undo Remap" anytime to revert.</div>
+                    <div>• <strong>Manual Visual Review Required:</strong> We do not claim automated semantic verification without a real Vision provider. Re-mapped pages must be visually reviewed and approved before production export.</div>
+                    <div>• <strong>Watermarked Draft:</strong> You can download a watermarked draft PDF to verify the remapped sequence before production.</div>
+                  </div>
+
+                  <h4 style={{ margin: "12px 0 6px", fontSize: "14px" }}>Complete Source → Destination Mapping Preview:</h4>
+                  <div style={{ maxHeight: "240px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "6px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "12px" }}>
+                      <thead style={{ background: "#f1f5f9", position: "sticky", top: 0 }}>
+                        <tr>
+                          <th style={{ padding: "6px 8px" }}>Dest Page</th>
+                          <th style={{ padding: "6px 8px" }}>Dest Slot / Expected Role</th>
+                          <th style={{ padding: "6px 8px" }}>Source Slot / Role</th>
+                          <th style={{ padding: "6px 8px" }}>Source File</th>
+                          <th style={{ padding: "6px 8px" }}>Shift Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {legacyRemapPreview.entries.map((m) => (
+                          <tr key={m.destinationSlotId} style={{ borderBottom: "1px solid #f1f5f9", background: m.isChanged ? "#fefce8" : "#ffffff" }}>
+                            <td style={{ padding: "6px 8px", fontWeight: 700 }}>Page {m.destinationPageNumber}</td>
+                            <td style={{ padding: "6px 8px" }}>{m.destinationSlotId} ({m.destinationRoleName})</td>
+                            <td style={{ padding: "6px 8px" }}>{m.sourceSlotId} ({m.sourceOriginalRole})</td>
+                            <td style={{ padding: "6px 8px", fontFamily: "monospace" }}>{m.sourceFilename}</td>
+                            <td style={{ padding: "6px 8px", color: m.isChanged ? "#b45309" : "#64748b", fontWeight: m.isChanged ? 600 : 400 }}>
+                              {m.destinationSlotId === "02-intro" ? "Shifted from Page 22" : m.isChanged ? "Shifted from N−1" : "Unchanged"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div style={{ padding: "14px 20px", borderTop: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setLegacyRemapOpen(false)}
+                    data-testid="cancel-legacy-remap-button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.button}
+                    style={{ background: "#f59e0b", color: "#1c1440", fontWeight: 700, margin: 0 }}
+                    onClick={handleApplyLegacyRemap}
+                    data-testid="confirm-legacy-remap-button"
+                  >
+                    Apply Legacy Remap
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {pages.length > 0 && (
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", margin: "14px 0 10px", alignItems: "center" }}>
-              <button
-                className={styles.copyButton}
-                style={{ borderColor: "#8b5cf6", color: "#6d28d9", fontWeight: 700 }}
-                onClick={() => void onBatchAutoFix()}
-                disabled={batchEnhancing || batchChecking}
-              >
-                {batchEnhancing ? "✨ Auto-fixing images…" : "✨ Auto-fix all eligible images"}
-              </button>
+              {enhancerAvailable === false || activeProvider === null ? (
+                <button
+                  className={styles.copyButton}
+                  style={{ borderColor: "#9ca3af", color: "#6b7280", fontWeight: 700, cursor: "not-allowed" }}
+                  disabled={true}
+                  data-testid="batch-auto-fix-button"
+                  title="No genuine super-resolution provider configured"
+                >
+                  ✨ Auto-fix unavailable (No real AI provider configured)
+                </button>
+              ) : (
+                <button
+                  className={styles.copyButton}
+                  style={{ borderColor: "#8b5cf6", color: "#6d28d9", fontWeight: 700 }}
+                  onClick={() => void onBatchAutoFix()}
+                  disabled={batchEnhancing || batchChecking || eligiblePages.length === 0}
+                  data-testid="batch-auto-fix-button"
+                >
+                  {batchEnhancing
+                    ? `✨ Auto-fixing images (${batchEnhanceProgress?.running ?? 0} running, ${batchEnhanceProgress?.completed ?? 0}/${batchEnhanceProgress?.total ?? 0})…`
+                    : `✨ Auto-fix all eligible (${eligiblePages.length} images via ${activeProvider.name} [${activeProvider.isPaid ? "Paid" : "Free Local AI"}])`}
+                </button>
+              )}
               <button
                 className={styles.copyButton}
                 style={{ borderColor: "#0284c7", color: "#0369a1", fontWeight: 700 }}
@@ -2061,6 +2484,23 @@ export default function ManualFlow({
             </div>
           )}
 
+          {/* Super-Resolution Setup Instructions when Provider Unavailable */}
+          {enhancerAvailable === false && (
+            <div className={styles.instructions} style={{ borderLeft: "4px solid #f59e0b", margin: "10px 0" }} data-testid="provider-setup-instructions">
+              <div style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px" }}>
+                ⚠️ Super-Resolution Provider Setup Instructions
+              </div>
+              <div style={{ fontSize: "13px", color: "#78350f" }}>
+                No genuine production super-resolution provider is currently available.
+                <ul style={{ margin: "4px 0 0 16px" }}>
+                  <li><strong>Free Local AI (Recommended):</strong> Place <code>realesrgan-ncnn-vulkan</code> executable and models into <code>tools/realesrgan/</code>, or set the <code>REAL_ESRGAN_BIN</code> environment variable in <code>.env.local</code>.</li>
+                  <li><strong>Configured External AI:</strong> Set <code>ENHANCEMENT_API_URL</code> and <code>ENHANCEMENT_API_KEY</code> in <code>.env.local</code>.</li>
+                </ul>
+                Bicubic/Lanczos resizing and mock providers are strictly prohibited in production.
+              </div>
+            </div>
+          )}
+
           {batchEnhanceProgress && (
             <div className={styles.batchProgressCard} data-testid="batch-progress-card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
@@ -2068,21 +2508,33 @@ export default function ManualFlow({
                   {batchEnhancing ? "Batch Resolution Enhancement in Progress…" : "Batch Enhancement Complete"}
                 </strong>
                 <span data-testid="batch-counts-summary">
+                  <span data-testid="batch-running-count">{batchEnhanceProgress.running}</span> running,{" "}
                   <span data-testid="batch-completed-count">{batchEnhanceProgress.completed}</span> completed,{" "}
                   <span data-testid="batch-failed-count">{batchEnhanceProgress.failed}</span> failed,{" "}
                   <span data-testid="batch-cancelled-count">{batchEnhanceProgress.cancelled}</span> cancelled
-                  {" "}of {batchEnhanceProgress.total} total
+                  {" "}of <span data-testid="batch-total-count">{batchEnhanceProgress.total}</span> total
                 </span>
               </div>
               <div className={styles.batchProgressBar}>
                 <div
                   className={styles.batchProgressFill}
                   style={{
-                    width: `${Math.round(((batchEnhanceProgress.completed + batchEnhanceProgress.failed + batchEnhanceProgress.cancelled) / batchEnhanceProgress.total) * 100)}%`,
+                    width: `${Math.round(((batchEnhanceProgress.completed + batchEnhanceProgress.failed + batchEnhanceProgress.cancelled) / Math.max(1, batchEnhanceProgress.total)) * 100)}%`,
                   }}
                 />
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", alignItems: "center" }}>
+                {failedEnhanceIndices.length > 0 && !batchEnhancing && (
+                  <button
+                    type="button"
+                    className={styles.linkAction}
+                    style={{ color: "#b91c1c", fontWeight: 700, cursor: "pointer" }}
+                    onClick={() => void onBatchAutoFix(failedEnhanceIndices.map((idx) => pages[idx]).filter(Boolean))}
+                    data-testid="retry-failed-batch-button"
+                  >
+                    Retry {failedEnhanceIndices.length} failed
+                  </button>
+                )}
                 {batchEnhancing ? (
                   <button
                     type="button"
@@ -2100,7 +2552,10 @@ export default function ManualFlow({
                     type="button"
                     className={styles.linkAction}
                     style={{ color: "#4b5563", cursor: "pointer" }}
-                    onClick={() => setBatchEnhanceProgress(null)}
+                    onClick={() => {
+                      setBatchEnhanceProgress(null);
+                      setFailedEnhanceIndices([]);
+                    }}
                     data-testid="dismiss-batch-button"
                   >
                     Dismiss

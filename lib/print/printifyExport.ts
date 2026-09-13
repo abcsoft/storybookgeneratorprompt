@@ -52,6 +52,8 @@ export interface PrintifyExportOptions {
   provenances?: Record<string, ImageProvenanceMetadata>;
   receipts?: Record<string, SignedEnhancementReceipt>;
   resolvedSlotMapping?: Map<string, PreflightFile>;
+  qualityAcknowledgements?: Record<string, import("./preflight").QualityAcknowledgementRecord>;
+  acknowledgeQualityWarnings?: boolean;
 }
 
 export interface PrintifyExportResult {
@@ -378,6 +380,8 @@ export async function exportPrintifyBook(
     provenances: opts.provenances,
     receipts: opts.receipts,
     resolvedSlotMapping: opts.resolvedSlotMapping,
+    qualityAcknowledgements: opts.qualityAcknowledgements,
+    acknowledgeQualityWarnings: opts.acknowledgeQualityWarnings,
   });
   if (!preflight.ok) {
     return { ok: false, dir: null, files: [], preflight };

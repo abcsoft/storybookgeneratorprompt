@@ -6,6 +6,7 @@ export interface PopplerTools {
   pdfinfo: string;
   pdfimages: string;
   pdftoppm: string;
+  pdftotext: string;
 }
 
 /**
@@ -29,8 +30,9 @@ export function discoverPopplerTools(): PopplerTools {
     const info = path.join(dir, `pdfinfo${exeSuffix}`);
     const images = path.join(dir, `pdfimages${exeSuffix}`);
     const ppm = path.join(dir, `pdftoppm${exeSuffix}`);
-    if (fs.existsSync(info) && fs.existsSync(images) && fs.existsSync(ppm)) {
-      return { pdfinfo: info, pdfimages: images, pdftoppm: ppm };
+    const text = path.join(dir, `pdftotext${exeSuffix}`);
+    if (fs.existsSync(info) && fs.existsSync(images) && fs.existsSync(ppm) && fs.existsSync(text)) {
+      return { pdfinfo: info, pdfimages: images, pdftoppm: ppm, pdftotext: text };
     }
   }
 
@@ -52,9 +54,10 @@ export function discoverPopplerTools(): PopplerTools {
   const pathPdfinfo = tryInPath(`pdfinfo${exeSuffix}`) || tryInPath("pdfinfo");
   const pathPdfimages = tryInPath(`pdfimages${exeSuffix}`) || tryInPath("pdfimages");
   const pathPdftoppm = tryInPath(`pdftoppm${exeSuffix}`) || tryInPath("pdftoppm");
+  const pathPdftotext = tryInPath(`pdftotext${exeSuffix}`) || tryInPath("pdftotext");
 
-  if (pathPdfinfo && pathPdfimages && pathPdftoppm) {
-    return { pdfinfo: pathPdfinfo, pdfimages: pathPdfimages, pdftoppm: pathPdftoppm };
+  if (pathPdfinfo && pathPdfimages && pathPdftoppm && pathPdftotext) {
+    return { pdfinfo: pathPdfinfo, pdfimages: pathPdfimages, pdftoppm: pathPdftoppm, pdftotext: pathPdftotext };
   }
 
   // 3. Windows WinGet local package fallback
@@ -74,6 +77,7 @@ export function discoverPopplerTools(): PopplerTools {
                   pdfinfo: path.join(cand, "pdfinfo.exe"),
                   pdfimages: path.join(cand, "pdfimages.exe"),
                   pdftoppm: path.join(cand, "pdftoppm.exe"),
+                  pdftotext: path.join(cand, "pdftotext.exe"),
                 };
               }
             }
@@ -86,6 +90,7 @@ export function discoverPopplerTools(): PopplerTools {
                   pdfinfo: path.join(nestedCand, "pdfinfo.exe"),
                   pdfimages: path.join(nestedCand, "pdfimages.exe"),
                   pdftoppm: path.join(nestedCand, "pdftoppm.exe"),
+                  pdftotext: path.join(nestedCand, "pdftotext.exe"),
                 };
               }
             }
