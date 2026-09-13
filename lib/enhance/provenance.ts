@@ -1,4 +1,6 @@
-export type EnhancementMethod = "none" | "resampled" | "ai-enhanced" | "mocked-ai-super-res";
+import type { ProviderClass, SignedEnhancementReceipt } from "./types";
+
+export type EnhancementMethod = "none" | "resampled" | "ai-enhanced" | "mocked-ai-super-res" | "external-ai-super-res";
 export type EnhancementStatus = "none" | "pending" | "enhanced" | "approved" | "rejected" | "failed";
 
 export interface ImageProvenanceMetadata {
@@ -8,7 +10,7 @@ export interface ImageProvenanceMetadata {
   nativeEffectivePpi: number;
   /** Dimensions of the enhanced asset in pixels (if enhanced) */
   enhancedPixelDimensions?: { width: number; height: number };
-  /** Effective PPI after enhancement */
+  /** Effective detail PPI after enhancement (stays native PPI for resampled/mock; 300 for verified real AI) */
   enhancedEffectivePpi?: number;
   /** Authoritative print output grid PPI (always 300 for production) */
   outputGridPpi: number;
@@ -16,6 +18,8 @@ export interface ImageProvenanceMetadata {
   upscaleFactor: number;
   /** Method used: 'none', 'resampled' (plain Sharp/Lanczos), 'ai-enhanced', or 'mocked-ai-super-res' */
   enhancementMethod: EnhancementMethod;
+  /** Trusted provider class classification: 'real-ai' | 'resampling' | 'test-mock' */
+  providerClass?: ProviderClass;
   /** Lifecycle status of the enhancement */
   enhancementStatus: EnhancementStatus;
   /** SHA-256 hash of the original input file */
@@ -28,6 +32,8 @@ export interface ImageProvenanceMetadata {
   approvedAt?: string | null;
   /** Original filename for provenance trace */
   originalFilename?: string;
+  /** Cryptographically signed enhancement receipt issued by the server */
+  receipt?: SignedEnhancementReceipt;
 }
 
 /**
@@ -46,6 +52,25 @@ export function calculateSha256(buffer: Buffer | Uint8Array | ArrayBuffer): stri
 }
 
 /**
+ * Authoritative physical placement dimensions in inches derived strictly from
+ * destination canvas pixels and profile DPI.
+ *
+ * Example Classic Landscape:
+ * - Single page: 3375 x 2475 / 300 = 11.25 x 8.25"
+ * - Continuous spread: 6675 x 2475 / 300 = 22.25 x 8.25"
+ */
+export function computeAuthoritativePhysicalDimensionsIn(
+  destinationDimensions: { width: number; height: number },
+  dpi: number = 300,
+): { width: number; height: number } {
+  const safeDpi = dpi > 0 ? dpi : 300;
+  return {
+    width: Number((destinationDimensions.width / safeDpi).toFixed(4)),
+    height: Number((destinationDimensions.height / safeDpi).toFixed(4)),
+  };
+}
+
+/**
  * Compute native effective PPI for an image against physical destination dimensions.
  */
 export function computeEffectivePpi(
@@ -56,6 +81,18 @@ export function computeEffectivePpi(
   const ppiX = dimensions.width / physicalInches.width;
   const ppiY = dimensions.height / physicalInches.height;
   return Number(Math.min(ppiX, ppiY).toFixed(1));
+}
+
+/**
+ * Authoritative native effective PPI derived directly from source pixels, destination canvas, and profile DPI.
+ */
+export function computeNativeEffectivePpi(
+  sourceDimensions: { width: number; height: number },
+  destinationDimensions: { width: number; height: number },
+  dpi: number = 300,
+): number {
+  const phys = computeAuthoritativePhysicalDimensionsIn(destinationDimensions, dpi);
+  return computeEffectivePpi(sourceDimensions, phys);
 }
 
 /**
@@ -85,17 +122,22 @@ export function createSourceProvenance(options: {
   buffer: Buffer;
   destinationWidth: number;
   destinationHeight: number;
-  physicalInches: { width: number; height: number };
+  physicalInches?: { width: number; height: number };
+  dpi?: number;
   filename?: string;
 }): ImageProvenanceMetadata {
-  const { width, height, buffer, physicalInches, filename } = options;
-  const nativeEffectivePpi = computeEffectivePpi({ width, height }, physicalInches);
+  const { width, height, buffer, destinationWidth, destinationHeight, dpi = 300, filename } = options;
+  const nativeEffectivePpi = computeNativeEffectivePpi(
+    { width, height },
+    { width: destinationWidth, height: destinationHeight },
+    dpi,
+  );
   const sha256 = calculateSha256(buffer);
 
   return {
     originalPixelDimensions: { width, height },
     nativeEffectivePpi,
-    outputGridPpi: 300,
+    outputGridPpi: dpi,
     upscaleFactor: 1.0,
     enhancementMethod: "none",
     enhancementStatus: "none",

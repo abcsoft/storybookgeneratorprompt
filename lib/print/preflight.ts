@@ -9,12 +9,18 @@ import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection, type Re
 import { getEditionForProfile } from "../story/editions";
 import type { ChildProfile } from "../story/types";
 import type { PrintProfile } from "./types";
-import type { ImageProvenanceMetadata } from "../enhance/provenance";
+import {
+  computeAuthoritativePhysicalDimensionsIn,
+  type ImageProvenanceMetadata,
+} from "../enhance/provenance";
+import { verifyEnhancementReceipt } from "../enhance/receipt";
+import type { SignedEnhancementReceipt } from "../enhance/types";
 
 export interface PreflightFile {
   filename: string;
   buffer: Buffer;
   provenance?: ImageProvenanceMetadata;
+  receipt?: SignedEnhancementReceipt;
 }
 
 export interface PreflightAssetReport {
@@ -56,6 +62,8 @@ export interface PreflightOptions {
   acknowledgeQualityWarnings?: boolean;
   /** Provenance metadata keyed by slotId or filename */
   provenances?: Record<string, ImageProvenanceMetadata>;
+  /** Server-signed enhancement receipts keyed by slotId or filename */
+  receipts?: Record<string, SignedEnhancementReceipt>;
 }
 
 export interface PreflightIssue {
@@ -468,18 +476,50 @@ export async function runPreflight(
       }
 
       // 2. Effective PPI calculation and resolution policy
-      // Placement dimensions across full bleed leaf before enlargement
-      const nominalWidthIn =
-        slot.assetKind === "spread"
-          ? (profile.finalPageIn?.width ? profile.finalPageIn.width * 2 : profile.nominalSizeIn.width * 2)
-          : (profile.finalPageIn?.width ?? profile.nominalSizeIn.width);
-      const nominalHeightIn = profile.finalPageIn?.height ?? profile.nominalSizeIn.height;
+      // Authoritative physical placement dimensions derived strictly from destination pixels and profile DPI
+      const physicalDimensions = computeAuthoritativePhysicalDimensionsIn(
+        slot.destinationDimensions,
+        profile.dpi,
+      );
+      const nominalWidthIn = physicalDimensions.width;
+      const nominalHeightIn = physicalDimensions.height;
 
-      // Check provenance for original dimensions and enhancement method
-      const isAiEnhanced =
-        provenance?.enhancementMethod === "ai-enhanced" ||
-        provenance?.enhancementMethod === "mocked-ai-super-res";
-      const isResampledOnly = provenance?.enhancementMethod === "resampled";
+      // Check provenance and receipt for enhancement method and provider class
+      const receipt =
+        file.receipt ??
+        opts.receipts?.[slot.slotId] ??
+        opts.receipts?.[file.filename] ??
+        provenance?.receipt;
+
+      let verifiedReceiptValid = false;
+      let receiptVerificationError = "";
+      if (receipt) {
+        const verifyRes = verifyEnhancementReceipt(receipt, {
+          expectedSlotId: slot.slotId,
+          expectedProfileId: profile.id,
+          expectedLayoutMode: opts.mode || "standard-single",
+          expectedEnhancedBuffer: file.buffer,
+          expectedDimensions: slot.destinationDimensions,
+        });
+        verifiedReceiptValid = verifyRes.valid;
+        if (!verifyRes.valid) {
+          receiptVerificationError = verifyRes.error || "Invalid receipt";
+        }
+      }
+
+      // True AI enhancement requires verified server receipt with providerClass === "real-ai"
+      // In test mode, allowLowResolutionForTesting allows mock provider test doubles
+      const isGenuineAiEnhanced =
+        verifiedReceiptValid && receipt?.payload.providerClass === "real-ai";
+
+      const isMockEnhanced =
+        provenance?.enhancementMethod === "mocked-ai-super-res" ||
+        receipt?.payload?.providerClass === "test-mock";
+
+      const isResampledOnly =
+        provenance?.enhancementMethod === "resampled" ||
+        receipt?.payload?.providerClass === "resampling";
+
       const isApproved = provenance?.enhancementStatus === "approved";
 
       // Native effective PPI: derive from original pixel dimensions if recorded in provenance
@@ -489,14 +529,16 @@ export async function runPreflight(
       const nativeEffectivePpiY = originalHeight / nominalHeightIn;
       const nativeEffectivePpi =
         provenance?.nativeEffectivePpi ?? Math.min(nativeEffectivePpiX, nativeEffectivePpiY);
-      const effectivePPI = isAiEnhanced && isApproved ? 300 : nativeEffectivePpi;
+
+      // Detail PPI: Only verified real AI super-resolution restores 300 PPI detail
+      const effectivePPI = isGenuineAiEnhanced && isApproved ? 300 : nativeEffectivePpi;
       const nativeSourcePpi = nativeEffectivePpi;
       const finalRasterWidth = slot.destinationDimensions.width;
       const finalRasterHeight = slot.destinationDimensions.height;
       const finalOutputGridPpi = 300;
 
       // Fail-closed check: if enhanced, dimensions must match destination canvas exactly
-      if (isAiEnhanced) {
+      if (isGenuineAiEnhanced || isMockEnhanced || isResampledOnly) {
         if (actualWidth !== finalRasterWidth || actualHeight !== finalRasterHeight) {
           const dimMsg = `Enhanced illustration "${file.filename}" dimensions ${actualWidth}×${actualHeight} do not match destination canvas ${finalRasterWidth}×${finalRasterHeight}.`;
           errors.push(dimMsg);
@@ -518,10 +560,12 @@ export async function runPreflight(
 
       // Authoritative production quality policy:
       // - native PPI below 150:
-      //     * If approved AI-super-resolution: passes directly.
-      //     * If unapproved AI-super-resolution: blocks with ENHANCEMENT_APPROVAL_REQUIRED.
-      //     * If plain resampled: hard error! Plain resampling cannot rewrite native 107 PPI as native 300 PPI.
-      //     * If unenhanced: hard error; production export blocked. Acknowledgement cannot bypass.
+      //     * Invalid/forged receipt: hard error INVALID_ENHANCEMENT_RECEIPT.
+      //     * Verified genuine AI super-resolution + approved: passes directly.
+      //     * Verified genuine AI super-resolution + unapproved: blocks with ENHANCEMENT_APPROVAL_REQUIRED.
+      //     * Mock AI enhancement: ALWAYS rejected in production export (even if approved!).
+      //     * Plain resampled: hard error! Plain resampling cannot rewrite native 107 PPI as native 300 PPI.
+      //     * Unenhanced: hard error; production export blocked. Acknowledgement cannot bypass.
       // - native PPI 150 to below 300:
       //     * If approved AI-super-resolution: passes.
       //     * Otherwise: warning requiring explicit user acknowledgement.
@@ -529,9 +573,39 @@ export async function runPreflight(
       // - draft mode accepts lower PPI with visible DRAFT watermark
       if (nativeEffectivePpi < 150) {
         if (isProduction) {
-          if (isAiEnhanced && isApproved) {
-            // Approved AI-super-resolution passes
-          } else if (isAiEnhanced && !isApproved) {
+          if (
+            (provenance?.enhancementMethod === "external-ai-super-res" ||
+              provenance?.enhancementMethod === "ai-enhanced") &&
+            !receipt
+          ) {
+            const forgedMsg = `Artwork for slot "${slot.slotId}" (${file.filename}) claims AI super-resolution but lacks a valid, cryptographically verifiable server receipt. Production export blocked.`;
+            errors.push(forgedMsg);
+            issues.push({
+              type: "FORGED_OR_UNVERIFIED_ENHANCEMENT",
+              code: "FORGED_OR_UNVERIFIED_ENHANCEMENT",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: "Valid, server-signed enhancement receipt",
+              actual: "No receipt provided for claimed AI enhancement",
+              recommendation: "Process artwork through authoritative server enhancement API.",
+              message: forgedMsg,
+            });
+          } else if (receipt && !verifiedReceiptValid) {
+            const forgedMsg = `Enhanced artwork for slot "${slot.slotId}" (${file.filename}) failed cryptographic receipt verification: ${receiptVerificationError}.`;
+            errors.push(forgedMsg);
+            issues.push({
+              type: "INVALID_ENHANCEMENT_RECEIPT",
+              code: "INVALID_ENHANCEMENT_RECEIPT",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: "Valid server-signed enhancement receipt matching uploaded bytes and slot",
+              actual: receiptVerificationError,
+              recommendation: "Re-run enhancement through the authoritative server API.",
+              message: forgedMsg,
+            });
+          } else if (isGenuineAiEnhanced && isApproved) {
+            // Approved genuine AI super-resolution passes
+          } else if (isGenuineAiEnhanced && !isApproved) {
             const unapprovedMsg = `AI-enhanced illustration "${file.filename}" (native ${Math.round(nativeEffectivePpi)} PPI) requires explicit visual approval before production export.`;
             errors.push(unapprovedMsg);
             issues.push({
@@ -543,6 +617,19 @@ export async function runPreflight(
               actual: "Unapproved enhancement",
               recommendation: "Review before/after preview and explicitly approve the enhanced illustration.",
               message: unapprovedMsg,
+            });
+          } else if (isMockEnhanced) {
+            const mockMsg = `Illustration "${file.filename}" has native ${Math.round(nativeEffectivePpi)} PPI. Mocked or test-double enhancement cannot satisfy production print quality gates. Production export requires genuine approved AI super-resolution or higher-resolution source artwork.`;
+            errors.push(mockMsg);
+            issues.push({
+              type: "MOCKED_ENHANCEMENT_REJECTED",
+              code: "MOCKED_ENHANCEMENT_REJECTED",
+              illustrationNumber: illoNum,
+              filename: file.filename,
+              expected: `Genuine AI super-resolution or minimum 150 native effective PPI (${Math.round(nominalWidthIn * 150)}×${Math.round(nominalHeightIn * 150)} px)`,
+              actual: `Mocked AI super-resolution (native ${Math.round(nativeEffectivePpi)} PPI)`,
+              recommendation: "Use a configured genuine AI super-resolution provider or upload higher-resolution source images.",
+              message: mockMsg,
             });
           } else if (isResampledOnly) {
             const resampledMsg = `Source "${file.filename}" has native ${Math.round(nativeEffectivePpi)} PPI. Plain pixel resampling cannot rewrite native low-resolution artwork as print quality. Production export requires genuine AI enhancement or higher-resolution source artwork.`;
@@ -581,8 +668,8 @@ export async function runPreflight(
           );
         }
       } else if (nativeEffectivePpi < 300) {
-        if (isAiEnhanced && isApproved) {
-          // Approved AI-enhancement passes
+        if (isGenuineAiEnhanced && isApproved) {
+          // Approved genuine AI-enhancement passes
         } else {
           const needsAcknowledgement = isProduction && !opts.acknowledgeQualityWarnings;
           if (needsAcknowledgement) {
@@ -641,8 +728,8 @@ export async function runPreflight(
         destinationPages: slot.physicalPages,
         willCropOrExtend,
         cropOrExtendNote,
-        nativeSourceWidth: actualWidth,
-        nativeSourceHeight: actualHeight,
+        nativeSourceWidth: originalWidth,
+        nativeSourceHeight: originalHeight,
         nativeEffectivePpiX: Number(nativeEffectivePpiX.toFixed(1)),
         nativeEffectivePpiY: Number(nativeEffectivePpiY.toFixed(1)),
         finalRasterWidth,
@@ -686,8 +773,7 @@ export async function runPreflight(
   const qualityWarnings: QualityWarningSlot[] = [];
   for (const report of assetReports) {
     const isApprovedAi =
-      (report.provenance?.enhancementMethod === "ai-enhanced" ||
-        report.provenance?.enhancementMethod === "mocked-ai-super-res") &&
+      (report.provenance?.providerClass === "real-ai" || report.provenance?.enhancementMethod === "ai-enhanced") &&
       report.provenance?.enhancementStatus === "approved";
 
     if (!isApprovedAi && report.nativeSourcePpi >= 150 && report.nativeSourcePpi < 300) {

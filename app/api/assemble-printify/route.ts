@@ -14,6 +14,8 @@ import { z } from "zod";
 import { indexFromFilename, type ProvidedImage } from "@/lib/manual/assemble";
 import { exportPrintifyBook } from "@/lib/print/printifyExport";
 import { sanitizeTransform, type ArtworkTransform } from "@/lib/print/artworkTransform";
+import { resolveLayoutPlan } from "@/lib/story/layoutPlan";
+import { matchImportedFiles } from "@/lib/manual/importMatch";
 import type { ChildProfile } from "@/lib/story/types";
 
 export const runtime = "nodejs";
@@ -77,24 +79,24 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
-  const rawFiles: { filename: string; buffer: Buffer }[] = [];
-  const images = new Map<number, ProvidedImage>();
-  for (const file of files) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    rawFiles.push({ filename: file.name, buffer });
-    const index = indexFromFilename(file.name);
-    if (index === null) continue;
-    images.set(index, {
-      buffer,
-      mimeType: file.type || "image/png",
-      transform: transformsMap[index] ? sanitizeTransform(transformsMap[index]) : undefined,
-    });
+  let provenancesMap: Record<string, any> = {};
+  const rawProvenances = form.get("provenances");
+  if (typeof rawProvenances === "string") {
+    try {
+      provenancesMap = JSON.parse(rawProvenances);
+    } catch {
+      /* ignore invalid JSON */
+    }
   }
-  if (images.size === 0) {
-    return NextResponse.json(
-      { error: "Couldn't match any images to pages. Name them 01.png, 02.png, …" },
-      { status: 400 },
-    );
+
+  let receiptsMap: Record<string, any> = {};
+  const rawReceipts = form.get("receipts");
+  if (typeof rawReceipts === "string") {
+    try {
+      receiptsMap = JSON.parse(rawReceipts);
+    } catch {
+      /* ignore invalid JSON */
+    }
   }
 
   const bookId = (form.get("bookId") as string) || undefined;
@@ -110,6 +112,48 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  const plan = resolveLayoutPlan({
+    child,
+    bookId: bookId ?? "dream-big",
+    profileId,
+    mode,
+    customSpreads,
+  });
+
+  const filenames = files.map((f) => f.name);
+  const importReport = matchImportedFiles(filenames, plan.assets, { bookId });
+
+  const fileByName = new Map<string, File>(files.map((f) => [f.name, f]));
+  const images = new Map<number, ProvidedImage>();
+  const rawFiles: { filename: string; buffer: Buffer }[] = [];
+  const preflightSlotMapping = new Map<string, any>();
+
+  for (const [slotId, filename] of importReport.bySlotId) {
+    const file = fileByName.get(filename);
+    if (!file) continue;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const slot = plan.assets.find((s: any) => s.slotId === slotId);
+    const slotIndex = slot ? slot.illustrationIndex : -1;
+    const prov = provenancesMap[slotId] ?? provenancesMap[filename];
+    const receipt = receiptsMap[slotId] ?? receiptsMap[filename] ?? prov?.receipt;
+
+    rawFiles.push({ filename, buffer });
+    if (slotIndex >= 0) {
+      images.set(slotIndex, {
+        buffer,
+        mimeType: file.type || "image/png",
+        transform: transformsMap[slotIndex] ? sanitizeTransform(transformsMap[slotIndex]) : undefined,
+      });
+    }
+
+    preflightSlotMapping.set(slotId, {
+      filename,
+      buffer,
+      provenance: prov,
+      receipt,
+    });
+  }
+
   const result = await exportPrintifyBook({
     child,
     bookId,
@@ -118,6 +162,9 @@ export async function POST(request: Request): Promise<Response> {
     rawFiles,
     mode,
     customSpreads,
+    provenances: provenancesMap,
+    receipts: receiptsMap,
+    resolvedSlotMapping: preflightSlotMapping,
   });
 
   if (!result.ok) {

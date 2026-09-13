@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
+import crypto from "crypto";
 import { runPreflight } from "../print/preflight";
 import { resolveLayoutPlan } from "../story/layoutPlan";
 import { processBatchEnhancement } from "./batchProcessor";
 import { enhancementRegistry } from "./registry";
+import { signEnhancementReceipt } from "./receipt";
 import type { ImageProvenanceMetadata } from "./provenance";
 import type { ResolutionEnhancementProvider } from "./types";
 
@@ -194,7 +196,51 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
     const singleSlot = plan.assets.find((s) => s.assetKind === "single-page")!;
     const buf3375 = await makeImage(3375, 2475);
 
-    // 5a. Unapproved AI enhancement: blocks production export with ENHANCEMENT_APPROVAL_REQUIRED
+    // 5a. Approved Mock AI enhancement: MUST FAIL production export (mock is production-ineligible)
+    const mockApprovedProvenance: ImageProvenanceMetadata = {
+      originalPixelDimensions: { width: 1200, height: 880 },
+      nativeEffectivePpi: 107,
+      enhancedPixelDimensions: { width: 3375, height: 2475 },
+      enhancedEffectivePpi: 107,
+      outputGridPpi: 300,
+      upscaleFactor: 2.8125,
+      enhancementMethod: "mocked-ai-super-res",
+      enhancementStatus: "approved",
+      originalSha256: "dummy-orig-sha",
+      enhancedSha256: crypto.createHash("sha256").update(buf3375).digest("hex"),
+      approvalRequired: true,
+      approvedAt: new Date().toISOString(),
+      originalFilename: singleSlot.filename,
+    };
+
+    const resMock = await runPreflight({
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      child,
+      draft: false,
+      files: [{ filename: singleSlot.filename, buffer: buf3375, provenance: mockApprovedProvenance }],
+    });
+    expect(resMock.ok).toBe(false);
+    expect((resMock.issues ?? []).some((i) => i.type === "MOCKED_ENHANCEMENT_REJECTED" || i.type === "QUALITY_GATE_FAILED")).toBe(true);
+
+    // 5b. Unapproved Genuine AI enhancement with valid receipt: blocks with ENHANCEMENT_APPROVAL_REQUIRED
+    const validReceipt = signEnhancementReceipt({
+      receiptId: "rcpt-5b",
+      slotId: singleSlot.slotId,
+      profileId: "classic-landscape-11x8",
+      layoutMode: "standard-single",
+      originalSha256: "dummy-orig-sha",
+      originalPixelDimensions: { width: 1200, height: 880 },
+      enhancedSha256: crypto.createHash("sha256").update(buf3375).digest("hex"),
+      enhancedPixelDimensions: { width: 3375, height: 2475 },
+      nativeEffectivePpi: 107,
+      enhancedEffectivePpi: 300,
+      trustedProviderId: "external-ai-super-res",
+      providerClass: "real-ai",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+    });
+
     const unapprovedProvenance: ImageProvenanceMetadata = {
       originalPixelDimensions: { width: 1200, height: 880 },
       nativeEffectivePpi: 107,
@@ -202,10 +248,10 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
       enhancedEffectivePpi: 300,
       outputGridPpi: 300,
       upscaleFactor: 2.8125,
-      enhancementMethod: "mocked-ai-super-res",
+      enhancementMethod: "external-ai-super-res",
       enhancementStatus: "enhanced", // not yet approved!
       originalSha256: "dummy-orig-sha",
-      enhancedSha256: "dummy-enh-sha",
+      enhancedSha256: crypto.createHash("sha256").update(buf3375).digest("hex"),
       approvalRequired: true,
       approvedAt: null,
       originalFilename: singleSlot.filename,
@@ -217,6 +263,7 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
       child,
       draft: false,
       files: [{ filename: singleSlot.filename, buffer: buf3375, provenance: unapprovedProvenance }],
+      receipts: { [singleSlot.slotId]: validReceipt },
     });
 
     expect(resUnapproved.ok).toBe(false);
@@ -224,7 +271,7 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
     expect(approvalIssue).toBeDefined();
     expect(approvalIssue?.message).toContain("requires explicit visual approval before production export");
 
-    // 5b. Approved AI enhancement: passes production export
+    // 5c. Approved Genuine AI enhancement with valid receipt: passes production export
     const approvedProvenance: ImageProvenanceMetadata = {
       ...unapprovedProvenance,
       enhancementStatus: "approved",
@@ -237,10 +284,11 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
       child,
       draft: false,
       files: [{ filename: singleSlot.filename, buffer: buf3375, provenance: approvedProvenance }],
+      receipts: { [singleSlot.slotId]: validReceipt },
     });
 
     const lowPpiOrApproval = (resApproved.issues ?? []).find(
-      (i) => i.type === "LOW_PPI" || i.type === "ENHANCEMENT_APPROVAL_REQUIRED",
+      (i) => i.type === "LOW_PPI" || i.type === "ENHANCEMENT_APPROVAL_REQUIRED" || i.type === "MOCKED_ENHANCEMENT_REJECTED",
     );
     expect(lowPpiOrApproval).toBeUndefined();
   });
@@ -302,6 +350,7 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
     const failingProvider: ResolutionEnhancementProvider = {
       id: "test-partial-fail",
       name: "Test Partial Fail Provider",
+      providerClass: "test-mock",
       isConfigured: true,
       isPaid: false,
       async enhanceImage(options) {
@@ -313,6 +362,7 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
           enhancedBuffer: Buffer.alloc(100),
           outputDimensions: { width: 3375, height: 2475 },
           method: "mocked-ai-super-res",
+          providerClass: "test-mock",
           upscaleFactor: 2.8125,
           provenance: {} as any,
           mimeType: "image/png",

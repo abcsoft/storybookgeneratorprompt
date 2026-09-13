@@ -26,7 +26,12 @@ import type { PrintProfile } from "@/lib/print/types";
 import { getEditionForProfile } from "@/lib/story/editions";
 import type { ArtworkTransform } from "@/lib/print/artworkTransform";
 import type { LayoutMode, CustomSpreadSelection, ResolvedAssetSlot } from "@/lib/story/layoutPlan";
-import type { ImageProvenanceMetadata } from "@/lib/enhance/provenance";
+import {
+  computeAuthoritativePhysicalDimensionsIn,
+  computeEffectivePpi,
+  type ImageProvenanceMetadata,
+} from "@/lib/enhance/provenance";
+import type { SignedEnhancementReceipt } from "@/lib/enhance/types";
 import type { SemanticValidationResult } from "@/lib/semantic/types";
 import styles from "./page.module.css";
 
@@ -434,11 +439,9 @@ export default function ManualFlow({
     let sha256 = "";
 
     if (width > 0 && height > 0) {
-      const nominalWidthIn = page.resolvedSlot?.assetKind === "spread"
-        ? (profile.finalPageIn?.width ? profile.finalPageIn.width * 2 : profile.nominalSizeIn.width * 2)
-        : (profile.finalPageIn?.width ?? profile.nominalSizeIn.width);
-      const nominalHeightIn = profile.finalPageIn?.height ?? profile.nominalSizeIn.height;
-      nativeEffectivePpi = Math.min(width / nominalWidthIn, height / nominalHeightIn);
+      const destDims = page.resolvedSlot?.destinationDimensions ?? profile.canvasPx;
+      const physicalDimensions = computeAuthoritativePhysicalDimensionsIn(destDims, profile.dpi);
+      nativeEffectivePpi = computeEffectivePpi({ width, height }, physicalDimensions);
     }
 
     try {
@@ -744,23 +747,42 @@ export default function ManualFlow({
 
   // ---------- Resolution Enhancement & Semantic Validation Handlers ----------
 
-  async function handleAutoFixResolution(index: number, skipConfirm = false) {
+  async function handleAutoFixResolution(
+    index: number,
+    skipConfirm = false,
+    confirmedPaid = false,
+    selectedProviderId?: string,
+  ): Promise<{ success: boolean; error?: string }> {
     const page = pages.find((p) => p.index === index);
     const entry = illustrations[index];
-    if (!page || !entry?.file) return;
+    if (!page || !entry?.file) return { success: false, error: "No illustration image found." };
 
     try {
-      if (!skipConfirm) {
+      let provId = selectedProviderId;
+      let userConfirmedPaid = confirmedPaid;
+
+      // Check provider availability & costs if not supplied
+      if (!provId) {
         const provRes = await fetch("/api/enhance");
         const provData = await provRes.json().catch(() => ({}));
-        if (provData.provider?.isPaid) {
-          const proceed = window.confirm(
-            `Resolution enhancement uses paid provider "${provData.provider.name}".\n` +
-            `Estimated operations: 1.\n` +
-            `Estimated cost: ${provData.costEstimate?.estimatedTotalCostUsd ? "$" + provData.costEstimate.estimatedTotalCostUsd : "Standard API rate"}.\n\n` +
-            `Proceed with enhancement?`
-          );
-          if (!proceed) return;
+        if (!provRes.ok || !provData.provider?.available) {
+          const msg = provData.error ?? "Resolution enhancement provider is currently unavailable in production.";
+          if (!skipConfirm) alert(msg);
+          return { success: false, error: msg };
+        }
+        provId = provData.provider.id;
+
+        if (provData.provider?.isPaid && !userConfirmedPaid) {
+          if (!skipConfirm) {
+            const cost = provData.provider.estimatedCostUsd ?? provData.costEstimate?.estimatedCostUsd ?? 0.04;
+            const proceed = window.confirm(
+              `Resolution enhancement uses paid provider "${provData.provider.name}".\n` +
+              `Estimated cost: $${cost} USD per image.\n\n` +
+              `Proceed with enhancement?`
+            );
+            if (!proceed) return { success: false, error: "User cancelled confirmation." };
+            userConfirmedPaid = true;
+          }
         }
       }
 
@@ -770,20 +792,24 @@ export default function ManualFlow({
       const form = new FormData();
       form.append("file", fileToEnhance);
       form.append("slotId", page.resolvedSlot?.slotId ?? `slot-${page.page}`);
-      form.append("targetWidth", String(page.resolvedSlot?.destinationDimensions?.width ?? 3375));
-      form.append("targetHeight", String(page.resolvedSlot?.destinationDimensions?.height ?? 2475));
-      form.append("physicalWidthIn", String(profile.nominalSizeIn.width));
-      form.append("physicalHeightIn", String(profile.nominalSizeIn.height));
-      form.append("userConfirmedPaid", "true");
+      form.append("bookId", bookId);
+      form.append("profileId", profileId);
+      form.append("layoutMode", layoutMode);
+      if (provId) form.append("providerId", provId);
+      if (userConfirmedPaid) form.append("userConfirmedPaid", "true");
 
       const res = await fetch("/api/enhance", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error ?? "Resolution enhancement failed.");
-        return;
+        const errMsg = data.error ?? "Resolution enhancement failed.";
+        if (!skipConfirm) alert(errMsg);
+        return { success: false, error: errMsg };
       }
 
-      const byteCharacters = atob(data.enhancedBase64.split(",")[1]);
+      const rawB64 = data.enhancedBase64.includes(",")
+        ? data.enhancedBase64.split(",")[1]
+        : data.enhancedBase64;
+      const byteCharacters = atob(rawB64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -796,7 +822,7 @@ export default function ManualFlow({
       setIllustrations((cur) => {
         const prev = cur[index];
         if (!prev) return cur;
-        const needsApproval = data.provenance.approvalRequired;
+        const needsApproval = data.provenance?.approvalRequired ?? false;
         return {
           ...cur,
           [index]: {
@@ -806,12 +832,17 @@ export default function ManualFlow({
             originalFile: prev.originalFile ?? prev.file,
             originalObjectUrl: prev.originalObjectUrl ?? prev.objectUrl,
             provenance: data.provenance,
+            receipt: data.receipt ?? null,
             status: needsApproval ? "added" : "approved",
           },
         };
       });
+
+      return { success: true };
     } catch (err: any) {
-      alert(`Enhancement error: ${err.message ?? String(err)}`);
+      const errMsg = `Enhancement error: ${err.message ?? String(err)}`;
+      if (!skipConfirm) alert(errMsg);
+      return { success: false, error: errMsg };
     } finally {
       setEnhancingIndices((cur) => {
         const next = new Set(cur);
@@ -853,6 +884,7 @@ export default function ManualFlow({
           ...prev,
           file: prev.originalFile,
           objectUrl: prev.originalObjectUrl,
+          receipt: null,
           provenance: prev.provenance
             ? {
                 ...prev.provenance,
@@ -910,9 +942,52 @@ export default function ManualFlow({
             },
           };
         });
+      } else {
+        // Network/provider failures must persist and display CHECK_FAILED; do not swallow them!
+        setIllustrations((cur) => {
+          const prev = cur[index];
+          if (!prev) return cur;
+          return {
+            ...cur,
+            [index]: {
+              ...prev,
+              semanticValidation: {
+                status: "CHECK_FAILED",
+                slotId: page.resolvedSlot?.slotId ?? `slot-${page.page}`,
+                filename: prev.file?.name ?? `page-${index}.png`,
+                expectedRole: page.role ?? page.roleSlug ?? page.kind,
+                detectedContent: "Unable to inspect image",
+                confidence: 0,
+                explanation: data.error ?? "HTTP " + res.status,
+                analysisMethod: "none",
+                checkedAt: new Date().toISOString(),
+              },
+            },
+          };
+        });
       }
-    } catch {
-      /* ignore */
+    } catch (err: any) {
+      setIllustrations((cur) => {
+        const prev = cur[index];
+        if (!prev) return cur;
+        return {
+          ...cur,
+          [index]: {
+            ...prev,
+            semanticValidation: {
+              status: "CHECK_FAILED",
+              slotId: page.resolvedSlot?.slotId ?? `slot-${page.page}`,
+              filename: prev.file?.name ?? `page-${index}.png`,
+              expectedRole: page.role ?? page.roleSlug ?? page.kind,
+              detectedContent: "Unable to inspect image",
+              confidence: 0,
+              explanation: `Semantic check error: ${err.message ?? String(err)}`,
+              analysisMethod: "none",
+              checkedAt: new Date().toISOString(),
+            },
+          },
+        };
+      });
     } finally {
       setCheckingSemanticIndices((cur) => {
         const next = new Set(cur);
@@ -922,7 +997,7 @@ export default function ManualFlow({
     }
   }
 
-  function handleApproveSemantic(index: number) {
+  function handleApproveSemantic(index: number, reason?: string) {
     setIllustrations((cur) => {
       const prev = cur[index];
       if (!prev || !prev.semanticValidation) return cur;
@@ -932,8 +1007,10 @@ export default function ManualFlow({
           ...prev,
           semanticValidation: {
             ...prev.semanticValidation,
-            status: "MATCH",
+            // Preserve original status (e.g. POSSIBLE_MISMATCH) — do not rewrite to MATCH!
             userApprovedManualOverride: true,
+            overrideTimestamp: new Date().toISOString(),
+            overrideReason: reason || "User confirmed visual alignment",
           },
         },
       };
@@ -970,13 +1047,22 @@ export default function ManualFlow({
 
     const provRes = await fetch("/api/enhance");
     const provData = await provRes.json().catch(() => ({}));
+    if (!provData.provider?.available) {
+      alert(provData.error ?? "No super-resolution provider is currently configured or available in production.");
+      return;
+    }
+
+    let userConfirmedPaid = false;
     if (provData.provider?.isPaid) {
+      const costPerImage = provData.provider.estimatedCostUsd ?? provData.costEstimate?.estimatedCostUsd ?? 0.04;
+      const totalCost = (costPerImage * eligible.length).toFixed(2);
       const proceed = window.confirm(
         `Batch resolution enhancement will process ${eligible.length} image(s) using paid provider "${provData.provider.name}".\n` +
-        `Estimated cost: ${provData.costEstimate?.estimatedTotalCostUsd ? "$" + (provData.costEstimate.estimatedTotalCostUsd * eligible.length).toFixed(2) : "Standard API rates"}.\n\n` +
+        `Estimated cost: $${totalCost} USD ($${costPerImage}/image).\n\n` +
         `Proceed with batch enhancement?`
       );
       if (!proceed) return;
+      userConfirmedPaid = true;
     }
 
     batchEnhanceCancelRef.current = false;
@@ -992,10 +1078,10 @@ export default function ManualFlow({
         if (batchEnhanceCancelRef.current) break;
         const page = queue.shift();
         if (!page) break;
-        try {
-          await handleAutoFixResolution(page.index, true);
+        const result = await handleAutoFixResolution(page.index, true, userConfirmedPaid, provData.provider.id);
+        if (result.success) {
           completedCount++;
-        } catch {
+        } else {
           failedCount++;
         }
         setBatchEnhanceProgress({ total: eligible.length, completed: completedCount, failed: failedCount });
@@ -1007,7 +1093,7 @@ export default function ManualFlow({
     setBatchEnhancing(false);
     setBatchEnhanceProgress(null);
     if (failedCount > 0) {
-      alert(`Batch enhancement completed with ${completedCount} succeeded and ${failedCount} failed.`);
+      alert(`Batch enhancement finished: ${completedCount} succeeded, ${failedCount} failed.`);
     }
   }
 
@@ -1070,6 +1156,7 @@ export default function ManualFlow({
       form.append("transforms", JSON.stringify(transformsObj));
     }
     const provenancesObj: Record<string, ImageProvenanceMetadata> = {};
+    const receiptsObj: Record<string, SignedEnhancementReceipt> = {};
     for (const p of pages) {
       const entry = illustrations[p.index];
       if (entry?.provenance) {
@@ -1077,9 +1164,17 @@ export default function ManualFlow({
         provenancesObj[slotId] = entry.provenance;
         provenancesObj[p.filename] = entry.provenance;
       }
+      if (entry?.receipt) {
+        const slotId = p.resolvedSlot?.slotId ?? p.filename;
+        receiptsObj[slotId] = entry.receipt;
+        receiptsObj[p.filename] = entry.receipt;
+      }
     }
     if (Object.keys(provenancesObj).length > 0) {
       form.append("provenances", JSON.stringify(provenancesObj));
+    }
+    if (Object.keys(receiptsObj).length > 0) {
+      form.append("receipts", JSON.stringify(receiptsObj));
     }
     return form;
   }

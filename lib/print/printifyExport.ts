@@ -35,6 +35,8 @@ import type { PrintProfile, PxSize } from "./types";
 
 import { getEditionForProfile, resolvePhysicalPageText } from "../story/editions";
 import { resolveLayoutPlan, type LayoutMode, type CustomSpreadSelection } from "../story/layoutPlan";
+import type { ImageProvenanceMetadata } from "../enhance/provenance";
+import type { SignedEnhancementReceipt } from "../enhance/types";
 
 export interface PrintifyExportOptions {
   child: ChildProfile;
@@ -47,6 +49,9 @@ export interface PrintifyExportOptions {
   allowLowResolutionForTesting?: boolean;
   mode?: LayoutMode;
   customSpreads?: CustomSpreadSelection[];
+  provenances?: Record<string, ImageProvenanceMetadata>;
+  receipts?: Record<string, SignedEnhancementReceipt>;
+  resolvedSlotMapping?: Map<string, PreflightFile>;
 }
 
 export interface PrintifyExportResult {
@@ -340,19 +345,27 @@ export async function exportPrintifyBook(
     customSpreads: opts.customSpreads,
   });
 
-  const filesForPreflight =
+  const filesForPreflight: PreflightFile[] =
     opts.rawFiles && opts.rawFiles.length > 0
-      ? opts.rawFiles
-      : plan.assets
-          .map((slot, index) => {
+      ? opts.rawFiles.map((rf) => ({
+          filename: rf.filename,
+          buffer: rf.buffer,
+          provenance: opts.provenances?.[rf.filename],
+          receipt: opts.receipts?.[rf.filename],
+        }))
+      : (plan.assets
+          .map((slot, index): PreflightFile | null => {
             const img = opts.images.get(slot.sourceSceneIndex) ?? opts.images.get(index);
             if (!img) return null;
+            const fname = slot.legacyAliases[0] ?? slot.filename;
             return {
-              filename: slot.legacyAliases[0] ?? slot.filename,
+              filename: fname,
               buffer: img.buffer,
+              provenance: opts.provenances?.[slot.slotId] ?? opts.provenances?.[fname],
+              receipt: opts.receipts?.[slot.slotId] ?? opts.receipts?.[fname],
             };
           })
-          .filter((f): f is PreflightFile => f !== null);
+          .filter((f): f is PreflightFile => f !== null));
 
   const preflight = await runPreflight({
     child: opts.child,
@@ -362,6 +375,9 @@ export async function exportPrintifyBook(
     allowLowResolutionForTesting: opts.allowLowResolutionForTesting,
     mode: opts.mode,
     customSpreads: opts.customSpreads,
+    provenances: opts.provenances,
+    receipts: opts.receipts,
+    resolvedSlotMapping: opts.resolvedSlotMapping,
   });
   if (!preflight.ok) {
     return { ok: false, dir: null, files: [], preflight };

@@ -3,6 +3,7 @@ import type {
   EnhanceImageOptions,
   EnhanceImageResult,
   ResolutionEnhancementProvider,
+  ProviderClass,
 } from "./types";
 import {
   calculateSha256,
@@ -19,11 +20,13 @@ import {
 export class ResamplingEnhancementProvider implements ResolutionEnhancementProvider {
   readonly id = "resampled";
   readonly name = "Plain Resampling (Lanczos/Sharp)";
+  readonly providerClass: ProviderClass = "resampling";
   readonly isConfigured = true;
   readonly isPaid = false;
 
   estimateCost(imageCount: number) {
     return {
+      estimatedCostUsd: 0,
       operationCount: imageCount,
       costDescription: "Free (local CPU resampling)",
       isPaid: false,
@@ -58,6 +61,7 @@ export class ResamplingEnhancementProvider implements ResolutionEnhancementProvi
       outputGridPpi: 300,
       upscaleFactor,
       enhancementMethod: "resampled",
+      providerClass: "resampling",
       enhancementStatus: "enhanced",
       originalSha256,
       enhancedSha256,
@@ -71,6 +75,7 @@ export class ResamplingEnhancementProvider implements ResolutionEnhancementProvi
       mimeType: "image/png",
       outputDimensions: targetDimensions,
       method: "resampled",
+      providerClass: "resampling",
       upscaleFactor,
       provenance,
     };
@@ -79,20 +84,23 @@ export class ResamplingEnhancementProvider implements ResolutionEnhancementProvi
 
 /**
  * Deterministic Mock AI Super-Resolution Provider.
- * Used for testing, proof generation, and demonstration without external paid APIs.
- * Clearly labelled as 'mocked-ai-super-res' — does not claim real visual detail recovery.
- * Upscales to exceed destination dimensions and proportionally downsamples to exact destination (e.g. 3375x2475).
+ * ONLY registered and available when NODE_ENV === 'test' or ALLOW_TEST_MOCK_PROVIDERS === 'true'.
+ * Clearly labelled as 'mocked-ai-super-res' / 'test-mock' providerClass.
+ * Does NOT set enhancedEffectivePpi to 300 (preserves native detail PPI).
+ * Upscales to exceed destination dimensions and proportionally downsamples to exact destination.
  */
 export class MockAiSuperResolutionProvider implements ResolutionEnhancementProvider {
   readonly id = "mocked-ai-super-res";
-  readonly name = "Mock AI Super-Resolution (Deterministic No-API Proof Mode)";
+  readonly name = "Mock AI Super-Resolution (Test & Proof Double Only)";
+  readonly providerClass: ProviderClass = "test-mock";
   readonly isConfigured = true;
   readonly isPaid = false;
 
   estimateCost(imageCount: number) {
     return {
+      estimatedCostUsd: 0,
       operationCount: imageCount,
-      costDescription: "Free (Deterministic local proof mode, no external API calls)",
+      costDescription: "Free (Deterministic local test double, no external API calls)",
       isPaid: false,
     };
   }
@@ -134,11 +142,13 @@ export class MockAiSuperResolutionProvider implements ResolutionEnhancementProvi
       originalPixelDimensions: sourceDimensions,
       nativeEffectivePpi,
       enhancedPixelDimensions: targetDimensions,
-      enhancedEffectivePpi: 300,
+      // Retains original effective detail PPI — does not falsely claim 300 PPI
+      enhancedEffectivePpi: nativeEffectivePpi,
       outputGridPpi: 300,
       upscaleFactor,
       enhancementMethod: "mocked-ai-super-res",
-      enhancementStatus: "pending", // Requires explicit user visual approval!
+      providerClass: "test-mock",
+      enhancementStatus: "pending",
       originalSha256,
       enhancedSha256,
       approvalRequired: true,
@@ -151,6 +161,7 @@ export class MockAiSuperResolutionProvider implements ResolutionEnhancementProvi
       mimeType: "image/png",
       outputDimensions: targetDimensions,
       method: "mocked-ai-super-res",
+      providerClass: "test-mock",
       upscaleFactor,
       provenance,
     };
@@ -158,19 +169,19 @@ export class MockAiSuperResolutionProvider implements ResolutionEnhancementProvi
 }
 
 /**
- * Adapter for external AI super-resolution services.
- * Disabled by default unless ENHANCEMENT_API_KEY is configured.
- * Strictly requires explicit user confirmation before any paid call.
+ * Real configurable external AI super-resolution provider.
+ * Uses server-only ENHANCEMENT_API_URL and ENHANCEMENT_API_KEY.
+ * Credentials are never exposed to the client.
  */
-export class ExternalAiEnhancementProviderAdapter implements ResolutionEnhancementProvider {
+export class ExternalAiSuperResolutionProvider implements ResolutionEnhancementProvider {
   readonly id = "external-ai-enhancer";
   readonly name = "Configured AI Super-Resolution Provider";
+  readonly providerClass: ProviderClass = "real-ai";
+  readonly isPaid = true;
 
   get isConfigured(): boolean {
-    return Boolean(process.env.ENHANCEMENT_API_KEY);
+    return Boolean(process.env.ENHANCEMENT_API_KEY && process.env.ENHANCEMENT_API_URL);
   }
-
-  readonly isPaid = true;
 
   estimateCost(imageCount: number) {
     const costPerImage = 0.04;
@@ -186,7 +197,7 @@ export class ExternalAiEnhancementProviderAdapter implements ResolutionEnhanceme
     if (!this.isConfigured) {
       throw new Error(
         "No external AI resolution enhancement provider configured. " +
-          "Configure ENHANCEMENT_API_KEY or use Replace / Regenerate image to provide higher-resolution artwork.",
+          "Configure ENHANCEMENT_API_URL and ENHANCEMENT_API_KEY or use Replace / Regenerate image.",
       );
     }
 
@@ -196,56 +207,173 @@ export class ExternalAiEnhancementProviderAdapter implements ResolutionEnhanceme
       );
     }
 
-    // When an external service is configured and confirmed:
-    // Future external HTTP call implementation goes here.
-    throw new Error("External AI enhancement provider endpoint not reachable.");
+    const apiUrl = process.env.ENHANCEMENT_API_URL!;
+    const apiKey = process.env.ENHANCEMENT_API_KEY!;
+
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(options.inputBuffer)], { type: options.mimeType });
+    formData.append("image", blob, options.filename || "input.png");
+    formData.append("target_width", String(options.targetDimensions.width));
+    formData.append("target_height", String(options.targetDimensions.height));
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(
+        `External AI enhancement API returned error HTTP ${response.status}: ${errText.slice(0, 200)}`,
+      );
+    }
+
+    const responseMime = response.headers.get("content-type") || "image/png";
+    if (!responseMime.startsWith("image/")) {
+      throw new Error(`External AI enhancement API returned invalid non-image MIME: "${responseMime}".`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const enhancedBuffer = Buffer.from(arrayBuffer);
+
+    // Validate returned image bytes using Sharp
+    const meta = await sharp(enhancedBuffer).metadata();
+    if (!meta.width || !meta.height) {
+      throw new Error("External AI enhancement API returned undecodable image data.");
+    }
+
+    if (
+      meta.width !== options.targetDimensions.width ||
+      meta.height !== options.targetDimensions.height
+    ) {
+      throw new Error(
+        `External AI enhancement API returned dimensions ${meta.width}×${meta.height}, expected exact destination ${options.targetDimensions.width}×${options.targetDimensions.height}.`,
+      );
+    }
+
+    const nativeEffectivePpi = computeEffectivePpi(options.sourceDimensions, options.physicalInches);
+    const upscaleFactor = Number(
+      (options.targetDimensions.width / Math.max(1, options.sourceDimensions.width)).toFixed(3),
+    );
+    const originalSha256 = calculateSha256(options.inputBuffer);
+    const enhancedSha256 = calculateSha256(enhancedBuffer);
+
+    const provenance: ImageProvenanceMetadata = {
+      originalPixelDimensions: options.sourceDimensions,
+      nativeEffectivePpi,
+      enhancedPixelDimensions: options.targetDimensions,
+      enhancedEffectivePpi: 300, // Genuine real AI super-resolution restores 300 PPI detail
+      outputGridPpi: 300,
+      upscaleFactor,
+      enhancementMethod: "ai-enhanced",
+      providerClass: "real-ai",
+      enhancementStatus: "pending", // Still requires user visual approval before production export
+      originalSha256,
+      enhancedSha256,
+      approvalRequired: true,
+      approvedAt: null,
+      originalFilename: options.filename,
+    };
+
+    return {
+      enhancedBuffer,
+      mimeType: responseMime,
+      outputDimensions: options.targetDimensions,
+      method: "ai-enhanced",
+      providerClass: "real-ai",
+      upscaleFactor,
+      provenance,
+    };
   }
 }
 
 /**
  * Central registry for resolution enhancement providers.
  */
-class ResolutionEnhancementRegistry {
+export class ResolutionEnhancementRegistry {
   private providers = new Map<string, ResolutionEnhancementProvider>();
 
   constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.providers.clear();
     this.register(new ResamplingEnhancementProvider());
-    this.register(new MockAiSuperResolutionProvider());
-    this.register(new ExternalAiEnhancementProviderAdapter());
+
+    const isTest =
+      process.env.NODE_ENV === "test" ||
+      process.env.ALLOW_TEST_MOCK_PROVIDERS === "true";
+    if (isTest) {
+      this.register(new MockAiSuperResolutionProvider());
+    }
+
+    this.register(new ExternalAiSuperResolutionProvider());
   }
 
   register(provider: ResolutionEnhancementProvider) {
     this.providers.set(provider.id, provider);
   }
 
+  private isTestMode(): boolean {
+    return (
+      process.env.NODE_ENV === "test" ||
+      process.env.ALLOW_TEST_MOCK_PROVIDERS === "true"
+    );
+  }
+
   get(id: string): ResolutionEnhancementProvider | undefined {
-    return this.providers.get(id);
+    return this.getProvider(id);
   }
 
   getProvider(id: string): ResolutionEnhancementProvider | undefined {
-    return this.providers.get(id);
+    const provider = this.providers.get(id);
+    if (!provider) return undefined;
+    if (provider.providerClass === "test-mock" && !this.isTestMode()) {
+      return undefined;
+    }
+    return provider;
   }
 
   /**
-   * Returns the best active enhancement provider.
-   * If ENHANCEMENT_PROVIDER env var is set, uses that.
-   * Defaults to mock provider if test/proof mode or no external key, otherwise external if configured.
+   * Returns the active enhancement provider.
+   * NEVER defaults to mocked-ai-super-res in production.
+   * In production, returns the external provider if configured, or null if none is configured.
    */
-  getActiveProvider(preferredId?: string): ResolutionEnhancementProvider {
-    if (preferredId && this.providers.has(preferredId)) {
-      return this.providers.get(preferredId)!;
+  getActiveProvider(preferredId?: string): ResolutionEnhancementProvider | null {
+    if (preferredId) {
+      const preferred = this.getProvider(preferredId);
+      if (preferred) return preferred;
     }
     const envChoice = process.env.ENHANCEMENT_PROVIDER;
-    if (envChoice && this.providers.has(envChoice)) {
-      return this.providers.get(envChoice)!;
+    if (envChoice) {
+      const envProv = this.getProvider(envChoice);
+      if (envProv) return envProv;
     }
-    const external = this.get("external-ai-enhancer");
-    if (external?.isConfigured) return external;
-    return this.get("mocked-ai-super-res")!;
+
+    const external = this.getProvider("external-ai-super-res");
+    if (external?.isConfigured) {
+      return external;
+    }
+
+    if (this.isTestMode()) {
+      const mock = this.getProvider("mocked-ai-super-res");
+      if (mock && mock.isConfigured) {
+        return mock;
+      }
+    }
+
+    // In production without a configured AI provider, return null (unavailable)
+    return null;
   }
 
   listProviders(): ResolutionEnhancementProvider[] {
-    return Array.from(this.providers.values());
+    return Array.from(this.providers.values()).filter(
+      (p) => p.providerClass !== "test-mock" || this.isTestMode(),
+    );
   }
 }
 

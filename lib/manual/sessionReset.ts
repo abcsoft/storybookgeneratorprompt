@@ -18,6 +18,8 @@ import type { ArtworkTransform } from "../print/artworkTransform";
 import type { ImageProvenanceMetadata } from "../enhance/provenance";
 import type { SemanticValidationResult } from "../semantic/types";
 
+import type { SignedEnhancementReceipt } from "../enhance/types";
+
 /** One illustration's session-scoped state. Never becomes "approved"
  *  automatically — see illustrationStatus.ts. */
 export interface IllustrationEntry {
@@ -29,6 +31,8 @@ export interface IllustrationEntry {
   transform?: ArtworkTransform;
   /** Resolution quality provenance and enhancement state */
   provenance?: ImageProvenanceMetadata;
+  /** Cryptographically signed enhancement receipt */
+  receipt?: SignedEnhancementReceipt | null;
   /** Preserved original file before any enhancement, enabling clean revert */
   originalFile?: File | null;
   originalObjectUrl?: string | null;

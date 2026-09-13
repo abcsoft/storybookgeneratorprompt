@@ -214,16 +214,56 @@ export default function IllustrationCard({
         {entry.semanticValidation && entry.semanticValidation.status === "MATCH" && (
           <div className={styles.semanticMatchCard}>
             ✅ Story match verified: aligns with <strong>{entry.semanticValidation.expectedRole}</strong>
+            {entry.semanticValidation.analysisMethod && (
+              <span style={{ fontSize: "11px", opacity: 0.85, marginLeft: "6px" }}>
+                ({entry.semanticValidation.analysisMethod})
+              </span>
+            )}
+          </div>
+        )}
+
+        {entry.semanticValidation && entry.semanticValidation.status === "NOT_CHECKED" && (
+          <div
+            style={{
+              fontSize: "12px",
+              color: "var(--ink-muted, #4b5563)",
+              background: "var(--surface-2, #f9fafb)",
+              padding: "6px 10px",
+              borderRadius: "6px",
+              margin: "6px 0",
+              border: "1px dashed var(--border, #d1d5db)",
+            }}
+          >
+            ℹ️ Story match not verified: {entry.semanticValidation.explanation ?? "No AI vision provider configured"}
           </div>
         )}
 
         {entry.semanticValidation && entry.semanticValidation.status === "POSSIBLE_MISMATCH" && (
           <div className={styles.semanticMismatchCard}>
-            <div className={styles.semanticTitle}>⚠️ Possible Story Mismatch Detected</div>
+            <div className={styles.semanticTitle}>
+              ⚠️ Possible Story Mismatch Detected
+              {entry.semanticValidation.userApprovedManualOverride && (
+                <span style={{ marginLeft: "8px", fontSize: "12px", color: "#047857", fontWeight: "normal" }}>
+                  (Manually Approved)
+                </span>
+              )}
+            </div>
             <div className={styles.semanticDetails}>
               <div><strong>Expected:</strong> {entry.semanticValidation.expectedRole}</div>
-              <div><strong>Detected:</strong> {entry.semanticValidation.detectedContent}</div>
-              <div><strong>Discrepancy:</strong> {entry.semanticValidation.explanation}</div>
+              {entry.semanticValidation.detectedContent && (
+                <div><strong>Detected:</strong> {entry.semanticValidation.detectedContent}</div>
+              )}
+              <div><strong>Analysis:</strong> {entry.semanticValidation.explanation}</div>
+              {entry.semanticValidation.analysisMethod && (
+                <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                  Method: {entry.semanticValidation.analysisMethod}
+                </div>
+              )}
+              {entry.semanticValidation.userApprovedManualOverride && (
+                <div style={{ marginTop: "6px", color: "#065f46", fontSize: "12px", background: "#ecfdf5", padding: "4px 8px", borderRadius: "4px" }}>
+                  ✔️ <strong>User Override:</strong> {entry.semanticValidation.overrideReason ?? "Visual match confirmed by user"}
+                </div>
+              )}
             </div>
             <div className={styles.semanticActions}>
               {onSwapSlot && availableSwapPages && availableSwapPages.length > 0 && (
@@ -271,7 +311,7 @@ export default function IllustrationCard({
               >
                 ⚡ Mark needs regeneration
               </button>
-              {onApproveSemantic && (
+              {onApproveSemantic && !entry.semanticValidation.userApprovedManualOverride && (
                 <button
                   className={styles.semanticActionBtn}
                   style={{ borderColor: "#10b981", color: "#047857" }}
@@ -285,8 +325,11 @@ export default function IllustrationCard({
         )}
 
         {entry.semanticValidation && entry.semanticValidation.status === "CHECK_FAILED" && (
-          <div className={styles.semanticMismatchCard}>
-            ⚠️ Semantic check failed: {entry.semanticValidation.explanation}
+          <div className={styles.semanticMismatchCard} style={{ borderColor: "#ef4444", background: "#fef2f2" }}>
+            <div className={styles.semanticTitle} style={{ color: "#b91c1c" }}>⚠️ Story Match Verification Failed</div>
+            <div className={styles.semanticDetails} style={{ color: "#7f1d1d" }}>
+              {entry.semanticValidation.explanation ?? entry.semanticValidation.detectedContent ?? "Verification check encountered an error."}
+            </div>
           </div>
         )}
 

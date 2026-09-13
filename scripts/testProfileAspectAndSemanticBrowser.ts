@@ -1,6 +1,9 @@
 import { chromium } from "playwright";
 import path from "node:path";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
+import sharp from "sharp";
+import { signEnhancementReceipt } from "../lib/enhance/receipt";
 
 const ARTIFACTS_DIR = path.resolve(process.cwd(), "artifacts/profile-aspect-semantic-proofs");
 
@@ -14,6 +17,8 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err));
 
   try {
     // 1. Navigate to localhost:3000
@@ -93,8 +98,109 @@ async function main() {
       console.log("Saved browser-card21-semantic-mismatch.png");
     }
 
-    // 6. Test Auto-fix resolution
-    console.log("6. Testing Auto-fix resolution on card 21...");
+    // 6. Test Auto-fix resolution (Mocked at Boundary with signed receipt)
+    console.log("6. Testing Auto-fix resolution on card 21 with mocked-at-boundary provider...");
+    const enhSharp = await sharp({
+      create: {
+        width: 3375,
+        height: 2475,
+        channels: 4,
+        background: { r: 30, g: 58, b: 138, alpha: 1 },
+      },
+    }).png().toBuffer();
+
+    const origBytes = await fs.readFile(vetFixturePath);
+    const origHash = crypto.createHash("sha256").update(origBytes).digest("hex");
+    const enhHash = crypto.createHash("sha256").update(enhSharp).digest("hex");
+
+    const receipt = signEnhancementReceipt({
+      receiptId: "browser-e2e-receipt",
+      slotId: "21-veterinarian",
+      profileId: "classic-landscape-11x8",
+      layoutMode: "standard-single",
+      originalSha256: origHash,
+      originalPixelDimensions: { width: 1200, height: 880 },
+      enhancedSha256: enhHash,
+      enhancedPixelDimensions: { width: 3375, height: 2475 },
+      nativeEffectivePpi: 107,
+      enhancedEffectivePpi: 300,
+      trustedProviderId: "external-ai-enhancer",
+      providerClass: "real-ai",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+    });
+
+    page.on("dialog", async (dialog) => {
+      console.log(`DIALOG [${dialog.type()}]: ${dialog.message()}`);
+      await dialog.accept();
+    });
+
+    await page.route("**/api/enhance*", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            provider: {
+              id: "external-ai-enhancer",
+              name: "Configured AI Super-Resolution Provider",
+              providerClass: "real-ai",
+              available: true,
+              isConfigured: true,
+              isPaid: false,
+              estimatedCostUsd: 0,
+            },
+            isAvailable: true,
+            availableProviders: [
+              {
+                id: "external-ai-enhancer",
+                name: "Configured AI Super-Resolution Provider",
+                providerClass: "real-ai",
+                available: true,
+                isConfigured: true,
+                isPaid: false,
+                estimatedCostUsd: 0,
+              },
+            ],
+          }),
+        });
+      } else if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: "success",
+            enhancedBase64: enhSharp.toString("base64"),
+            mimeType: "image/png",
+            outputDimensions: { width: 3375, height: 2475 },
+            method: "ai-super-resolution",
+            providerClass: "real-ai",
+            upscaleFactor: 2.8125,
+            provenance: {
+              originalPixelDimensions: { width: 1200, height: 880 },
+              nativeEffectivePpi: 107,
+              enhancedPixelDimensions: { width: 3375, height: 2475 },
+              enhancedEffectivePpi: 300,
+              outputGridPpi: 300,
+              upscaleFactor: 2.8125,
+              enhancementMethod: "ai-super-resolution",
+              providerClass: "real-ai",
+              enhancementStatus: "pending",
+              originalSha256: origHash,
+              enhancedSha256: enhHash,
+              approvalRequired: true,
+              approvedAt: null,
+              originalFilename: "21-veterinarian.png",
+              receipt,
+            },
+            receipt,
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     const autoFixBtn = card21.locator('button:has-text("Auto-fix resolution")');
     if ((await autoFixBtn.count()) > 0) {
       await autoFixBtn.click();

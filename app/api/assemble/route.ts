@@ -112,6 +112,16 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
+  let receiptsMap: Record<string, any> = {};
+  const rawReceipts = form.get("receipts");
+  if (typeof rawReceipts === "string") {
+    try {
+      receiptsMap = JSON.parse(rawReceipts);
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+
   // ──────────────────────────────────────────────────
   // 1. Resolve the authoritative layout plan
   // ──────────────────────────────────────────────────
@@ -223,10 +233,12 @@ export async function POST(request: Request): Promise<Response> {
 
     for (const [slotId, entry] of resolvedSlotFileMapping) {
       const prov = provenancesMap[slotId] ?? provenancesMap[entry.filename];
+      const receipt = receiptsMap[slotId] ?? receiptsMap[entry.filename] ?? prov?.receipt;
       const pfFile: PreflightFile = {
         filename: entry.filename,
         buffer: entry.buffer,
         provenance: prov,
+        receipt,
       };
       preflightFiles.push(pfFile);
       preflightSlotMapping.set(slotId, pfFile);
@@ -242,6 +254,7 @@ export async function POST(request: Request): Promise<Response> {
       resolvedSlotMapping: preflightSlotMapping,
       acknowledgeQualityWarnings,
       provenances: provenancesMap,
+      receipts: receiptsMap,
     });
 
     // HTTP 409: Quality warnings require explicit acknowledgement
