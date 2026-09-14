@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-13T21:09:53.221Z",
+  "timestamp": "2026-09-14T15:46:01.938Z",
   "provider": {
     "id": "local-realesrgan",
     "class": "local-ai",
@@ -21,13 +21,13 @@
     "passed": true,
     "subprocessExecutionConfirmed": true,
     "realImagesImportedCount": 24,
-    "processedCount": 30,
+    "processedCount": 34,
     "destinationDimensionsMatched": true,
     "preflightPassedAfterApproval": true,
     "productionExportConfirmed": true,
     "networkLogSummary": {
-      "totalEnhancementRequests": 30,
-      "successfulEnhancementResponses": 30,
+      "totalEnhancementRequests": 34,
+      "successfulEnhancementResponses": 34,
       "productionAssembleSuccess": true
     }
   },
@@ -42,7 +42,8 @@
       "expired_receipt_rejected": true,
       "resampled_provider_not_trusted_for_bypass": true,
       "mock_provider_rejected_in_production": true
-    }
+    },
+    "matrixCount": 18
   },
   "testD_legacyRemap": {
     "passed": true,

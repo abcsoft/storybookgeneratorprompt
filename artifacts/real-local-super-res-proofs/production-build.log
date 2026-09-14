@@ -1,0 +1,186 @@
+
+> storybook-generator@0.1.0 build
+> next build
+
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Turbopack build encountered 7 warnings:
+./lib/enhance/localRealEsrganProvider.ts:69:11
+The file pattern ('/ROOT/' <dynamic> | '/ROOT' <dynamic>) matches 20550 files in [project]/
+  67 |       const resolved = path.isAbsolute(this.customBinPath)
+  68 |         ? this.customBinPath
+> 69 |         : path.resolve(process.cwd(), this.customBinPath);
+     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  70 |       return fsSync.existsSync(resolved) ? resolved : null;
+  71 |     }
+  72 |
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import traces:
+  #1 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+  #2 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/enhance/registry.ts
+    ./app/api/enhance/route.ts
+
+
+./lib/enhance/localRealEsrganProvider.ts:75:59
+The file pattern ('/ROOT/' <dynamic> | '/ROOT' <dynamic>) matches 20550 files in [project]/
+  73 | ...EAL_ESRGAN_BIN;
+  74 | ...
+> 75 | ...solute(envBin) ? envBin : path.resolve(process.cwd(), envBin);
+     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  76 | ...lved)) return resolved;
+  77 | ...
+  78 | ...
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import traces:
+  #1 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+  #2 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/enhance/registry.ts
+    ./app/api/enhance/route.ts
+
+
+./lib/enhance/localRealEsrganProvider.ts:110:11
+The file pattern ('/ROOT/' <dynamic> | '/ROOT' <dynamic>) matches 20550 files in [project]/
+  108 |       const resolved = path.isAbsolute(this.customModelDir)
+  109 |         ? this.customModelDir
+> 110 |         : path.resolve(process.cwd(), this.customModelDir);
+      |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  111 |       return fsSync.existsSync(resolved) ? resolved : null;
+  112 |     }
+  113 |
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import traces:
+  #1 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+  #2 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/enhance/registry.ts
+    ./app/api/enhance/route.ts
+
+
+./lib/enhance/localRealEsrganProvider.ts:116:59
+The file pattern ('/ROOT/' <dynamic> | '/ROOT' <dynamic>) matches 20550 files in [project]/
+  114 | ...EAL_ESRGAN_MODEL_DIR;
+  115 | ...
+> 116 | ...solute(envDir) ? envDir : path.resolve(process.cwd(), envDir);
+      |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  117 | ...lved)) return resolved;
+  118 | ...
+  119 | ...
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import traces:
+  #1 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+  #2 [App Route]:
+    ./lib/enhance/localRealEsrganProvider.ts
+    ./lib/enhance/registry.ts
+    ./app/api/enhance/route.ts
+
+
+./lib/print/printifyExport.ts:268:25
+The file pattern (<dynamic> '/proof.pdf' | <dynamic> 'proof.pdf' | <dynamic> '/prompts.md' | <dynamic> 'prompts.md' | <dynamic> '/order-info.txt' | <dynamic> 'order-info.txt' | <dynamic> '/' <dynamic> | <dynamic>) matches 10275 files in [project]/
+  266 |       const filePath = path.join(dir, reqFile);
+  267 |       try {
+> 268 |         const s = await stat(filePath);
+      |                         ^^^^^^^^^^^^^^
+  269 |         if (s.size === 0) {
+  270 |           errors.push(`Exported file "${reqFile}" is empty (0 bytes).`);
+  271 |         }
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import trace:
+  App Route:
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+
+./lib/print/printifyExport.ts:266:24
+The file pattern (<dynamic> '/proof.pdf' | <dynamic> 'proof.pdf' | <dynamic> '/prompts.md' | <dynamic> 'prompts.md' | <dynamic> '/order-info.txt' | <dynamic> 'order-info.txt' | <dynamic> '/' <dynamic> | <dynamic>) matches 20537 files in [project]/
+  264 |     for (const reqFile of ["proof.pdf", "prompts.md", "order-info.txt"]) {
+  265 |       const { stat } = await import("node:fs/promises");
+> 266 |       const filePath = path.join(dir, reqFile);
+      |                        ^^^^^^^^^^^^^^^^^^^^^^^
+  267 |       try {
+  268 |         const s = await stat(filePath);
+  269 |         if (s.size === 0) {
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import trace:
+  App Route:
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+
+./next.config.ts
+Encountered unexpected file in NFT list
+A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+- filesystem operations (like path.join, path.resolve or fs.readFile), or
+- very dynamic requires (like require('./' + foo)).
+To resolve this, you can
+- remove them if possible, or
+- only use them in development, or
+- make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+- add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+
+Import trace:
+  App Route:
+    ./next.config.ts
+    ./lib/print/printifyExport.ts
+    ./app/api/assemble-printify/route.ts
+
+
+✓ Compiled successfully in 6.9s
+  Running TypeScript ...
+  Finished TypeScript in 11.7s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/4) ...
+  Generating static pages using 7 workers (1/4) 
+  Generating static pages using 7 workers (2/4) 
+  Generating static pages using 7 workers (3/4) 
+✓ Generating static pages using 7 workers (4/4) in 329ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/assemble
+├ ƒ /api/assemble-printify
+├ ƒ /api/enhance
+├ ƒ /api/generate
+├ ƒ /api/jobs/[id]
+├ ƒ /api/jobs/[id]/pdf
+├ ƒ /api/prompts
+└ ƒ /api/semantic-check
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

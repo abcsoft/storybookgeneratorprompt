@@ -1,0 +1,453 @@
+{
+  "testedAt": "2026-09-14T15:47:52.311Z",
+  "negativeRegressionFixture": {
+    "fixtureFile": "test-fixtures/corrupted-realesrgan-fixture.png",
+    "dimensions": {
+      "width": 3375,
+      "height": 2475
+    },
+    "rejected": true,
+    "detectedError": "Tile seam or horizontal phase discontinuity detected across tile boundaries.",
+    "metrics": {
+      "width": 3375,
+      "height": 2475,
+      "isNonBlank": true,
+      "hasSeamArtifacts": true,
+      "edgeIntegrityPreserved": true
+    }
+  },
+  "enhanced24ProductionImages": [
+    {
+      "page": 1,
+      "slotId": "01-cover",
+      "filename": "01.jpg",
+      "sha256": "d8cb6eafc86772f8518987723629c19753635ecaa103e3a004a85f661e3e040f",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 2,
+      "slotId": "02-intro",
+      "filename": "22.jpg",
+      "sha256": "398f983d9c536b0cc1efe081d742db8e8ae817091b0828420363a21875f5945f",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 3,
+      "slotId": "03-pilot",
+      "filename": "02.jpg",
+      "sha256": "e07b3c932192549bb274672fe6ca3c6f874e8993b2ebb6b6e2620acfb25738d6",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 4,
+      "slotId": "04-race-car-driver",
+      "filename": "03.jpg",
+      "sha256": "f27f67759b1f08b9b3ae7cc217001aa3de651bf0c45461d256c9e62282ff93af",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 5,
+      "slotId": "05-astronaut",
+      "filename": "04.jpg",
+      "sha256": "1986a7757df9dc5069b0f1b8c99779aefb1b2d48065453785898b76d539226d3",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 6,
+      "slotId": "06-doctor",
+      "filename": "05.jpg",
+      "sha256": "346364f9f86cc77cf3b8673a8a0fcff39ca41273b9ba798729c0fbe17100a914",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 7,
+      "slotId": "07-firefighter",
+      "filename": "06.jpg",
+      "sha256": "83754e4d698c92a39a059de41f71c7cf5c66e599eefb002929b11d1b2845e679",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 8,
+      "slotId": "08-scientist",
+      "filename": "07.jpg",
+      "sha256": "4f44c8d0561c7343b3e4e58fd76e167ce33ba75446392194afde78b496ccff84",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 9,
+      "slotId": "09-army-officer",
+      "filename": "08.jpg",
+      "sha256": "26cb56e5b9a5e350ab97889d0ff8cbd7ae7d7034542b01a2b29b0938324765a4",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 10,
+      "slotId": "10-soccer-player",
+      "filename": "09.jpg",
+      "sha256": "64f4abef9b37fd7254b7ee2a3c616cf41d69319372c2e7c6b3192714daf5b7bc",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 11,
+      "slotId": "11-karate-master",
+      "filename": "10.jpg",
+      "sha256": "a293fc4027ef48c5428d45ce57e7dfa008f8bea38040866adb6d6d4f582b44af",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 12,
+      "slotId": "12-detective",
+      "filename": "11.jpg",
+      "sha256": "0417869e6e509102b7b20d4942ea13bd29fdbc1185353b7e21168e91bfa023bf",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 13,
+      "slotId": "13-magician",
+      "filename": "12.jpg",
+      "sha256": "803572f7447358a8fe5d0f0888883d30349bd6e30b3b329435187e94f8016edf",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 14,
+      "slotId": "14-chef",
+      "filename": "13.jpg",
+      "sha256": "5e341a4ea2ab059a5271147d4594f567e0b767b105dc4de7c4e5cc4e360d2737",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 15,
+      "slotId": "15-rockstar",
+      "filename": "14.jpg",
+      "sha256": "8d9f2b4aa072980d83a2d088e1c2fbe616fe8eae3f8a5e592124898c5b4ef5c7",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 16,
+      "slotId": "16-artist",
+      "filename": "15.jpg",
+      "sha256": "7c3e3b974930419435a67ad8287d1058289a34296f0d4736554f0c7f0ba92449",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 17,
+      "slotId": "17-teacher",
+      "filename": "16.jpg",
+      "sha256": "b9b88a45ef24a877a5385f10cadfc1b55ef01e6d4af810cb1c3b689566707c18",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 18,
+      "slotId": "18-explorer",
+      "filename": "17.jpg",
+      "sha256": "4ab826acea79d54517de40fd35d657365791976e7b88ef56fb7cd9909b33f45e",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 19,
+      "slotId": "19-photographer",
+      "filename": "18.jpg",
+      "sha256": "4379b65af692b2911f99534ea1d45a73e2a555244b33eb4812fefd90df63ebe2",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 20,
+      "slotId": "20-deep-sea-diver",
+      "filename": "19.jpg",
+      "sha256": "069ab5b6ed4fd3bf7983c95260018eaaa3b71ed9dfcc0d668eec680b4b9b8b42",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 21,
+      "slotId": "21-veterinarian",
+      "filename": "20.jpg",
+      "sha256": "f7e13c4160e85dae15804e69668cb92333f7d40a996e763a869dc7cc7a8c87bd",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 22,
+      "slotId": "22-inventor",
+      "filename": "21.jpg",
+      "sha256": "87732c98baf4be49c98f8676150fd9b7a1af22047c3b1d0e123c27f628928d99",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 23,
+      "slotId": "23-closing",
+      "filename": "23.jpg",
+      "sha256": "a9448991a1502a08290a044df69f0475b59bb6b62f2de086fb11d9921040ac0f",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    },
+    {
+      "page": 24,
+      "slotId": "24-backcover",
+      "filename": "24.jpg",
+      "sha256": "8090d0cec94b257a24e2a22b4d6176289fb634f44a4ed45be211fb38effc3bdc",
+      "dimensions": {
+        "width": 3375,
+        "height": 2475
+      },
+      "valid": true,
+      "metrics": {
+        "width": 3375,
+        "height": 2475,
+        "isNonBlank": true,
+        "hasSeamArtifacts": false,
+        "edgeIntegrityPreserved": true
+      }
+    }
+  ]
+}

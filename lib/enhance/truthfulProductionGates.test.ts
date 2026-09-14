@@ -49,6 +49,25 @@ describe("Truthful Production Gates & Regression Tests (Req 9)", () => {
     expect(check.error).toContain("Tile seam or horizontal phase discontinuity detected");
   });
 
+  it("1b. Rejects committed known-corrupted Real-ESRGAN output fixture despite correct dimensions", async () => {
+    const fixturePath = path.resolve(process.cwd(), "test-fixtures/corrupted-realesrgan-fixture.png");
+    if (fs.existsSync(fixturePath)) {
+      const corruptedBuf = fs.readFileSync(fixturePath);
+      const meta = await sharp(corruptedBuf).metadata();
+      // Confirm dimension correctness: exactly 3375x2475
+      expect(meta.width).toBe(3375);
+      expect(meta.height).toBe(2475);
+
+      const check = await validateEnhancedImageQuality(corruptedBuf, {
+        targetDimensions: { width: 3375, height: 2475 },
+      });
+      // Dimension correctness alone must never approve visual quality
+      expect(check.valid).toBe(false);
+      expect(check.error).toContain("Tile seam or horizontal phase discontinuity detected");
+      expect(check.metrics?.hasSeamArtifacts).toBe(true);
+    }
+  });
+
   // 2. Missing-model health-check failure
   it("2. Missing-model health check failure returns ok: false with actionable message", async () => {
     const provider = new LocalRealEsrganProvider(undefined, "C:\\nonexistent_models_dir_xyz");
@@ -98,8 +117,8 @@ describe("Truthful Production Gates & Regression Tests (Req 9)", () => {
     expect(result.outputDimensions.height).toBe(247);
   });
 
-  // 6. All required receipt fields missing individually
-  it("6. Rejects enhancement receipt when any required field is missing individually", () => {
+  // 6. All 18 required receipt fields missing individually (fail-closed negative tests)
+  it("6. Rejects enhancement receipt when any of the 18 required fields is missing individually", () => {
     const basePayload: EnhancementReceiptPayload = {
       receiptVersion: "1.0",
       receiptId: "rcpt-test-1",
@@ -123,18 +142,23 @@ describe("Truthful Production Gates & Regression Tests (Req 9)", () => {
 
     const requiredFields = [
       "receiptVersion",
-      "trustedProviderId",
-      "providerClass",
+      "receiptId",
       "slotId",
+      "bookId",
       "profileId",
       "layoutMode",
       "originalSha256",
-      "enhancedSha256",
       "originalPixelDimensions",
+      "enhancedSha256",
       "enhancedPixelDimensions",
       "destinationDimensions",
+      "trustedProviderId",
+      "providerClass",
       "enhancementMethod",
+      "nativeEffectivePpi",
+      "enhancedEffectivePpi",
       "createdAt",
+      "expiresAt",
     ];
 
     for (const field of requiredFields) {

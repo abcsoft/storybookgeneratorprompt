@@ -18,6 +18,7 @@ export interface ContactSheetPageMeta {
 export async function createContactSheet(
   pagesMeta: ContactSheetPageMeta[],
   outputPath: string,
+  customHeader?: { title: string; subtitle: string },
 ): Promise<void> {
   const cols = 6;
   const rows = 4;
@@ -33,15 +34,18 @@ export async function createContactSheet(
   // Create composite operations
   const composites: OverlayOptions[] = [];
 
+  const title = customHeader?.title || "DREAM BIG — 24-PAGE PRODUCTION CONTACT SHEET &amp; TRUTHFUL RECOVERY PROOF";
+  const subtitle = customHeader?.subtitle || "Full 24-image workflow: Real-ESRGAN x4plus super-resolution, confirmed legacy shift remap, 300 DPI output placement (3375×2475)";
+
   // Header SVG
   const headerSvg = `
     <svg width="${totalW}" height="${headerH}">
       <rect width="100%" height="100%" fill="#090d16" />
       <text x="30" y="42" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#38bdf8">
-        DREAM BIG — 24-PAGE PRODUCTION CONTACT SHEET &amp; TRUTHFUL RECOVERY PROOF
+        ${title}
       </text>
       <text x="30" y="76" font-family="Arial, sans-serif" font-size="16" fill="#94a3b8">
-        Full 24-image workflow: Real-ESRGAN x4plus super-resolution, confirmed legacy shift remap, 300 DPI output placement (3375×2475)
+        ${subtitle}
       </text>
     </svg>
   `;

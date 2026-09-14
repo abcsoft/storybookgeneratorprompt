@@ -46,13 +46,13 @@ export class LocalRealEsrganProvider implements ResolutionEnhancementProvider {
       this.customBinPath = configOrBin;
       this.customModelDir = maybeModelDir;
       this.modelName = process.env.REAL_ESRGAN_MODEL || "realesrgan-x4plus";
-      this.timeoutMs = Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 120_000;
+      this.timeoutMs = Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 300_000;
     } else {
       const config = configOrBin || {};
       this.customBinPath = config.binPath;
       this.customModelDir = maybeModelDir || config.modelDir;
       this.modelName = config.modelName || process.env.REAL_ESRGAN_MODEL || "realesrgan-x4plus";
-      this.timeoutMs = config.timeoutMs || Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 120_000;
+      this.timeoutMs = config.timeoutMs || Number(process.env.REAL_ESRGAN_TIMEOUT_MS) || 300_000;
     }
   }
 

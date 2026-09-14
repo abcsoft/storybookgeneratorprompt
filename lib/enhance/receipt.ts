@@ -99,6 +99,7 @@ export function signEnhancementReceipt(
     receiptVersion: payload.receiptVersion ?? "1.0",
     enhancementMethod: payload.enhancementMethod ?? payload.trustedProviderId,
     destinationDimensions: payload.destinationDimensions ?? payload.enhancedPixelDimensions,
+    bookId: payload.bookId ?? "",
   };
   const signature = computeReceiptSignature(normalizedPayload, secret);
   return { payload: normalizedPayload, signature };
@@ -146,18 +147,18 @@ export function verifyEnhancementReceipt(
 
   const { payload, signature } = receipt;
 
-  // Verify presence of all required fields in the payload (fail closed if absent)
+  // Verify presence of all 18 required fields in the payload (fail closed if any is absent)
   if (!payload.receiptVersion) {
     return { valid: false, error: "Receipt is missing required field: receiptVersion." };
   }
-  if (!payload.trustedProviderId) {
-    return { valid: false, error: "Receipt is missing required field: trustedProviderId." };
-  }
-  if (!payload.providerClass) {
-    return { valid: false, error: "Receipt is missing required field: providerClass." };
+  if (!payload.receiptId) {
+    return { valid: false, error: "Receipt is missing required field: receiptId." };
   }
   if (!payload.slotId) {
     return { valid: false, error: "Receipt is missing required field: slotId." };
+  }
+  if (payload.bookId === undefined || payload.bookId === null) {
+    return { valid: false, error: "Receipt is missing required field: bookId." };
   }
   if (!payload.profileId) {
     return { valid: false, error: "Receipt is missing required field: profileId." };
@@ -168,15 +169,15 @@ export function verifyEnhancementReceipt(
   if (!payload.originalSha256) {
     return { valid: false, error: "Receipt is missing required field: originalSha256." };
   }
-  if (!payload.enhancedSha256) {
-    return { valid: false, error: "Receipt is missing required field: enhancedSha256." };
-  }
   if (
     !payload.originalPixelDimensions ||
     typeof payload.originalPixelDimensions.width !== "number" ||
     typeof payload.originalPixelDimensions.height !== "number"
   ) {
     return { valid: false, error: "Receipt is missing required field: originalPixelDimensions." };
+  }
+  if (!payload.enhancedSha256) {
+    return { valid: false, error: "Receipt is missing required field: enhancedSha256." };
   }
   if (
     !payload.enhancedPixelDimensions ||
@@ -192,11 +193,26 @@ export function verifyEnhancementReceipt(
   ) {
     return { valid: false, error: "Receipt is missing required field: destinationDimensions." };
   }
+  if (!payload.trustedProviderId) {
+    return { valid: false, error: "Receipt is missing required field: trustedProviderId." };
+  }
+  if (!payload.providerClass) {
+    return { valid: false, error: "Receipt is missing required field: providerClass." };
+  }
   if (!payload.enhancementMethod) {
     return { valid: false, error: "Receipt is missing required field: enhancementMethod." };
   }
+  if (typeof payload.nativeEffectivePpi !== "number") {
+    return { valid: false, error: "Receipt is missing required field: nativeEffectivePpi." };
+  }
+  if (typeof payload.enhancedEffectivePpi !== "number") {
+    return { valid: false, error: "Receipt is missing required field: enhancedEffectivePpi." };
+  }
   if (!payload.createdAt) {
     return { valid: false, error: "Receipt is missing required field: createdAt." };
+  }
+  if (!payload.expiresAt) {
+    return { valid: false, error: "Receipt is missing required field: expiresAt." };
   }
 
   let secret: string;

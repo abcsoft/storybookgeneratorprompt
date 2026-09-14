@@ -10,7 +10,7 @@ R
 D INT
 R
 P
-Yasfa's Dream Big Adventure
+Mikka's Dream Big Adventure
 
 F
 T
@@ -34,10 +34,10 @@ N
 F
 T
 
-Once upon a time there was a girl
-named Yasfa, who could be
-anything she dreamed. Turn the
-page and let's find out who Yasfa
+Once upon a time there was a boy
+named Mikka, who could be
+anything he dreamed. Turn the
+page and let's find out who Mikka
 can be!
 
 R
@@ -57,7 +57,7 @@ A
 R
 Up,
 and away!
-Yasfa the pilot
+Mikka the pilot
 T
 Dsoarsup,through
 N
@@ -86,7 +86,7 @@ A
 R
 Vroom,
 vroom!
-Yasfa zooms
+Mikka zooms
 T
 Daround Ithe
 N
@@ -118,7 +118,7 @@ and far-off
 T
 Dmoons, Ithe
 N
-Yasfa
+Mikka
 the astronaut
 R
 explores
@@ -147,7 +147,7 @@ T
 Dtouch,a gentle
 N
 Doctor
-Yasfa helps
+Mikka helps
 I
 R
 everyone
@@ -172,7 +172,7 @@ A
 R
 Brave
 and strong,
-Yasfa the
+Mikka the
 T
 Dfirefighter
 N
@@ -180,7 +180,7 @@ races to the rescue and
 I
 R
 gives
-it her all to keep the whole
+it his all to keep the whole
 P
 town safe.
 
@@ -202,7 +202,7 @@ R
 Mixing,
 full of wonder —
 T
-DYasfa theItesting,
+DMikka theItesting,
 N
 scientist discovers how
 R
@@ -229,17 +229,15 @@ A
 R
 Standing
 tall and
-proud, Yasfa the
+proud, Mikka
 T
-Dofficer leads
-N
-with honor and
-I
+Dthe officerI N
+leads with honor and
 R
 courage,
-protecting the people
+protecting the people he
 P
-she loves.
+loves.
 
 R
 O
@@ -258,7 +256,7 @@ A
 R
 On
 field and
-on the ball, Yasfa
+on the ball, Mikka
 T
 Dthe the
 N
@@ -288,7 +286,7 @@ A
 R
 Focused
 and T
-fearless, Yasfa the
+fearless, Mikka the
 Dkarate champion
 N
 is strong, kind,
@@ -320,7 +318,7 @@ step by step,
 T
 DDetective
 N
-Yasfa solves the
+Mikka solves the
 I
 R
 mystery
@@ -344,7 +342,7 @@ F
 A
 R
 Abracadabra!
-Yasfa the magician
+Mikka the magician
 T
 Dfills the Iroom
 N
@@ -373,7 +371,7 @@ R
 DA pinchIofNthis,Ta dash of that —
 R
 Chef
-Yasfa cooks up yummy
+Mikka cooks up yummy
 P
 treats to share with everyone.
 
@@ -399,10 +397,10 @@ sing, let the music ring
 I
 R
 —
-Yasfa
-the rockstar lights up the
+Mikka
+the rockstar lights up
 P
-stage and everybody dances!
+the stage and everybody dances!
 
 R
 O
@@ -426,7 +424,7 @@ brushstroke and
 I
 R
 bright
-color, Yasfa the artist
+color, Mikka the artist
 P
 paints a world full of imagination.
 
@@ -447,7 +445,7 @@ A
 R
 Patient
 kind,
-Yasfa the
+Mikka the
 T
 Dteacherand
 N
@@ -479,7 +477,7 @@ Over
 and
 through the trees,
 T
-DYasfarivers
+DMikkarivers
 N
 the
 explorer discovers
@@ -506,7 +504,7 @@ F
 A
 R
 T
-DClick! Yasfa
+DClick! Mikka
 N
 the photographer
 I
@@ -531,7 +529,7 @@ T
 F
 A
 R
-T blue sea, Yasfa
+T blue sea, Mikka
 DDown inItheNdeep
 R
 the
@@ -558,7 +556,7 @@ R
 T
 DGentle and
 N
-caring, Yasfa the vet
+caring, Mikka the vet
 I
 R
 looks
@@ -583,7 +581,7 @@ A
 R
 Tinkering
 andT
-dreaming, Yasfa
+dreaming, Mikka
 Dthe inventor
 N
 builds wonderful
@@ -613,7 +611,7 @@ No
 matter how
 big you dream,
 T
-DYasfa,
+DMikka,
 N
 you
 can be anything. The

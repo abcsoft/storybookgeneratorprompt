@@ -1,0 +1,128 @@
+[
+  {
+    "missingField": "receiptVersion",
+    "expectedRejectionCode": "Receipt is missing required field: receiptVersion.",
+    "actualRejectionCode": "Receipt is missing required field: receiptVersion.",
+    "testName": "verifyEnhancementReceipt fails closed when missing receiptVersion",
+    "passed": true
+  },
+  {
+    "missingField": "receiptId",
+    "expectedRejectionCode": "Receipt is missing required field: receiptId.",
+    "actualRejectionCode": "Receipt is missing required field: receiptId.",
+    "testName": "verifyEnhancementReceipt fails closed when missing receiptId",
+    "passed": true
+  },
+  {
+    "missingField": "slotId",
+    "expectedRejectionCode": "Receipt is missing required field: slotId.",
+    "actualRejectionCode": "Receipt is missing required field: slotId.",
+    "testName": "verifyEnhancementReceipt fails closed when missing slotId",
+    "passed": true
+  },
+  {
+    "missingField": "bookId",
+    "expectedRejectionCode": "Receipt is missing required field: bookId.",
+    "actualRejectionCode": "Receipt is missing required field: bookId.",
+    "testName": "verifyEnhancementReceipt fails closed when missing bookId",
+    "passed": true
+  },
+  {
+    "missingField": "profileId",
+    "expectedRejectionCode": "Receipt is missing required field: profileId.",
+    "actualRejectionCode": "Receipt is missing required field: profileId.",
+    "testName": "verifyEnhancementReceipt fails closed when missing profileId",
+    "passed": true
+  },
+  {
+    "missingField": "layoutMode",
+    "expectedRejectionCode": "Receipt is missing required field: layoutMode.",
+    "actualRejectionCode": "Receipt is missing required field: layoutMode.",
+    "testName": "verifyEnhancementReceipt fails closed when missing layoutMode",
+    "passed": true
+  },
+  {
+    "missingField": "originalSha256",
+    "expectedRejectionCode": "Receipt is missing required field: originalSha256.",
+    "actualRejectionCode": "Receipt is missing required field: originalSha256.",
+    "testName": "verifyEnhancementReceipt fails closed when missing originalSha256",
+    "passed": true
+  },
+  {
+    "missingField": "originalPixelDimensions",
+    "expectedRejectionCode": "Receipt is missing required field: originalPixelDimensions.",
+    "actualRejectionCode": "Receipt is missing required field: originalPixelDimensions.",
+    "testName": "verifyEnhancementReceipt fails closed when missing originalPixelDimensions",
+    "passed": true
+  },
+  {
+    "missingField": "enhancedSha256",
+    "expectedRejectionCode": "Receipt is missing required field: enhancedSha256.",
+    "actualRejectionCode": "Receipt is missing required field: enhancedSha256.",
+    "testName": "verifyEnhancementReceipt fails closed when missing enhancedSha256",
+    "passed": true
+  },
+  {
+    "missingField": "enhancedPixelDimensions",
+    "expectedRejectionCode": "Receipt is missing required field: enhancedPixelDimensions.",
+    "actualRejectionCode": "Receipt is missing required field: enhancedPixelDimensions.",
+    "testName": "verifyEnhancementReceipt fails closed when missing enhancedPixelDimensions",
+    "passed": true
+  },
+  {
+    "missingField": "destinationDimensions",
+    "expectedRejectionCode": "Receipt is missing required field: destinationDimensions.",
+    "actualRejectionCode": "Receipt is missing required field: destinationDimensions.",
+    "testName": "verifyEnhancementReceipt fails closed when missing destinationDimensions",
+    "passed": true
+  },
+  {
+    "missingField": "trustedProviderId",
+    "expectedRejectionCode": "Receipt is missing required field: trustedProviderId.",
+    "actualRejectionCode": "Receipt is missing required field: trustedProviderId.",
+    "testName": "verifyEnhancementReceipt fails closed when missing trustedProviderId",
+    "passed": true
+  },
+  {
+    "missingField": "providerClass",
+    "expectedRejectionCode": "Receipt is missing required field: providerClass.",
+    "actualRejectionCode": "Receipt is missing required field: providerClass.",
+    "testName": "verifyEnhancementReceipt fails closed when missing providerClass",
+    "passed": true
+  },
+  {
+    "missingField": "enhancementMethod",
+    "expectedRejectionCode": "Receipt is missing required field: enhancementMethod.",
+    "actualRejectionCode": "Receipt is missing required field: enhancementMethod.",
+    "testName": "verifyEnhancementReceipt fails closed when missing enhancementMethod",
+    "passed": true
+  },
+  {
+    "missingField": "nativeEffectivePpi",
+    "expectedRejectionCode": "Receipt is missing required field: nativeEffectivePpi.",
+    "actualRejectionCode": "Receipt is missing required field: nativeEffectivePpi.",
+    "testName": "verifyEnhancementReceipt fails closed when missing nativeEffectivePpi",
+    "passed": true
+  },
+  {
+    "missingField": "enhancedEffectivePpi",
+    "expectedRejectionCode": "Receipt is missing required field: enhancedEffectivePpi.",
+    "actualRejectionCode": "Receipt is missing required field: enhancedEffectivePpi.",
+    "testName": "verifyEnhancementReceipt fails closed when missing enhancedEffectivePpi",
+    "passed": true
+  },
+  {
+    "missingField": "createdAt",
+    "expectedRejectionCode": "Receipt is missing required field: createdAt.",
+    "actualRejectionCode": "Receipt is missing required field: createdAt.",
+    "testName": "verifyEnhancementReceipt fails closed when missing createdAt",
+    "passed": true
+  },
+  {
+    "missingField": "expiresAt",
+    "expectedRejectionCode": "Receipt is missing required field: expiresAt.",
+    "actualRejectionCode": "Receipt is missing required field: expiresAt.",
+    "testName": "verifyEnhancementReceipt fails closed when missing expiresAt",
+    "passed": true
+  }
+]

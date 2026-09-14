@@ -1,0 +1,11 @@
+{
+  "testedAt": "2026-09-14T15:46:12.116Z",
+  "providerId": "local-realesrgan",
+  "providerClass": "local-ai",
+  "model": "realesrgan-x4plus",
+  "binary": "tools/realesrgan/realesrgan-ncnn-vulkan.exe",
+  "modelDir": "tools/realesrgan/models",
+  "vulkanAccelerationConfirmed": true,
+  "nativeInferenceScale": "4x",
+  "healthCheck": "PASS"
+}

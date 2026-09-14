@@ -1258,8 +1258,9 @@ export default function ManualFlow({
       }
     };
 
-    // Run at most 2 concurrent workers
-    const workerCount = Math.min(2, queue.length);
+    // Run 1 worker for local GPU AI to prevent VRAM thrashing and timeouts; up to 2 for external APIs
+    const isLocal = provData.provider?.providerClass === "local-ai" || activeProvider?.providerClass === "local-ai";
+    const workerCount = isLocal ? 1 : Math.min(2, queue.length);
     const workers = Array.from({ length: workerCount }, () => worker());
     await Promise.all(workers);
 
@@ -2563,8 +2564,8 @@ export default function ManualFlow({
 
           {/* Super-Resolution Setup Instructions when Provider Unavailable */}
           {enhancerAvailable === false && (
-            <div className={styles.instructions} style={{ borderLeft: "4px solid #f59e0b", margin: "10px 0" }} data-testid="provider-setup-instructions">
-              <div style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px" }}>
+            <div className={styles.instructions} style={{ borderLeft: "4px solid #f59e0b", margin: "10px 0" }} data-testid="provider-setup-instructions" data-cy="provider-setup-instructions-card">
+              <div style={{ fontWeight: 700, color: "#b45309", marginBottom: "4px" }} data-testid="provider-setup-instructions-card">
                 ⚠️ Super-Resolution Provider Setup Instructions
               </div>
               <div style={{ fontSize: "13px", color: "#78350f" }}>

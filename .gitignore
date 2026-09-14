@@ -46,6 +46,8 @@ artifacts/*
 !artifacts/browser-evidence/
 !artifacts/browser-reproduction/
 !artifacts/real-local-super-res-proofs/
+artifacts/real-local-super-res-proofs/enhanced/
+*.zip
 scratch/
 tools/
 .cache/
