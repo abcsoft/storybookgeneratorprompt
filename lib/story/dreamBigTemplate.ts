@@ -53,6 +53,14 @@ function illustration(
     const effectiveTextSide = overrides?.textSide;
     const effectiveSubjectSide = overrides?.subjectSide;
 
+    // A career scene's costumeNote above already fully specifies this page's
+    // outfit (the career uniform). Passing "" (not undefined) suppresses
+    // wardrobeRules()'s separate "keep the SAME outfit unchanged" continuity
+    // block, which otherwise contradicts the costume change in the same
+    // prompt. Non-career pages (cover/intro/closing/backcover) keep their
+    // own explicit outfitOverride (or story.defaultOutfit) as before.
+    const effectiveOutfitOverride = isCareer ? "" : outfitOverride;
+
     return buildIllustrationPrompt({
       child: c,
       story: STORY_META,
@@ -63,7 +71,7 @@ function illustration(
       subjectSide: effectiveSubjectSide,
       profileId,
       compositionNotes,
-      outfitOverride,
+      outfitOverride: effectiveOutfitOverride,
     });
   };
 }

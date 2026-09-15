@@ -30,7 +30,12 @@ describe("print registry", () => {
   it("keeps the landscape profile on the single-pdf export path", () => {
     const profile = getPrintProfile("classic-landscape-11x8");
     expect(profile.exportMode).toBe("single-pdf");
-    expect(profile.singleAspect).toBe("3:2");
+    // 4:3 (1.333) is the mathematically closest provider preset to the
+    // 3375x2475 (15:11 = 1.364) target canvas — 3:2 (1.5) is 10% off vs 4:3's
+    // 2.2%. singleAspect must match providerPresetAspect so the UI heading
+    // never contradicts the prompt body's own aspect-preset claim.
+    expect(profile.singleAspect).toBe("4:3");
+    expect(profile.singleAspect).toBe(profile.providerPresetAspect);
     expect(profile.spreadAspect).toBe("21:9");
   });
 });

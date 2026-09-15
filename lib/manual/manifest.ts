@@ -107,10 +107,27 @@ export function renderPromptsMarkdown(
   const manifest = buildManifest(child, bookId, profileId, mode, customSpreads);
   const profile = getPrintProfile(profileId);
   const name = child.name;
+
+  const totalPhysicalLeaves = Math.max(
+    0,
+    ...manifest.flatMap((m) => m.physicalPages ?? []),
+  );
+  const spreadCount = manifest.filter((m) => m.spread).length;
+  // A spread is one image file that fills two physical pages, so the file
+  // count and the physical-page count only diverge when at least one spread
+  // is present — state both explicitly whenever that's true, so a filename
+  // like "25-backcover.png" is never left unexplained next to "24 images".
+  const leafCountNote =
+    spreadCount > 0 && totalPhysicalLeaves !== manifest.length
+      ? ` Together they fill **${totalPhysicalLeaves} physical pages** once assembled into the PDF — ` +
+        `${spreadCount} of the ${manifest.length} image files ${spreadCount === 1 ? "is a wide two-page spread" : "are wide two-page spreads"}, ` +
+        `each covering 2 physical pages instead of 1.`
+      : "";
+
   const header = `# ${name}'s ${getBook(bookId).title} — image prompts
 
-Generate these ${manifest.length} images **for free** in the Gemini app
-(Nano Banana 2), then feed them back into the storybook builder.
+Generate these **${manifest.length} image files** **for free** in the Gemini app
+(Nano Banana 2), then feed them back into the storybook builder.${leafCountNote}
 
 ## Photos to use
 Pick **2–4 clear, front-facing, well-lit close-ups of just ${name}'s face** —
@@ -148,7 +165,24 @@ This one step is what keeps every page looking like the *same* ${name}:
       const aspectLabel = m.spread ? `${m.aspect} · WIDE SPREAD` : m.aspect;
       const num = String(m.illustrationNumber).padStart(2, "0");
       const altSave = m.filename !== `${num}.png` ? ` (or save as \`${num}.png\`)` : "";
+      const slot = m.resolvedSlot;
+      const pages = (m.physicalPages ?? []).join("–");
+      const dims = slot?.destinationDimensions
+        ? `${slot.destinationDimensions.width}×${slot.destinationDimensions.height} px`
+        : "n/a";
+      const preset = slot?.providerPresetAspect ?? m.aspect;
+      const legacyAliases = (m.legacyAliases ?? []).filter((a) => a !== m.filename);
+      const metaLine =
+        `**Slot:** \`${m.slotId ?? m.filename}\` · **Physical page${(m.physicalPages ?? []).length === 1 ? "" : "s"}:** ${pages || "n/a"} · ` +
+        `**Asset kind:** ${slot?.assetKind ?? (m.spread ? "spread" : "single-page")}\n` +
+        `**Target canvas:** ${dims} · **Provider preset:** ${preset} · ` +
+        `**Text side:** ${slot?.textSide ?? "n/a"} · **Subject side:** ${slot?.subjectSide ?? "n/a"}` +
+        (legacyAliases.length > 0
+          ? `\n**Legacy aliases (older filenames some tooling may still look for — do not confuse with the canonical filename above):** ${legacyAliases.map((a) => `\`${a}\``).join(", ")}`
+          : "");
       return `### Illustration ${num} · ${label} · ${aspectLabel} → save as \`${m.filename}\`${altSave}
+
+${metaLine}
 
 **Prompt:**
 ${m.prompt}

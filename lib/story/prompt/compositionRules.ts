@@ -147,7 +147,9 @@ export function buildTargetFormatBlock(
   kind: PageKind = "scene",
 ): string {
   const profile = getPrintProfile(profileId);
-  const isCover = kind === "cover" || kind === "backcover";
+  const isFrontCover = kind === "cover";
+  const isBackCover = kind === "backcover";
+  const isCover = isFrontCover || isBackCover;
   const isSpread = layout !== "single-page";
 
   const singleWidth = profile.canvasPx.width;
@@ -190,7 +192,23 @@ export function buildTargetFormatBlock(
 
   const isSquare = profile.nominalSizeIn.width === profile.nominalSizeIn.height;
 
-  if (isCover) {
+  if (isBackCover) {
+    const coverDescriptor = isSquare
+      ? "Square 1:1 composition for the back cover."
+      : "Landscape composition for the back cover.";
+    return (
+      `TARGET ARTWORK FORMAT — back cover: ${coverDescriptor} full-bleed target canvas ${targetWidth}×${targetHeight} px ` +
+      `(${targetCanvasAspect} aspect ratio at ${profile.dpi} DPI; ` +
+      `trim ${trimW}×${trimH} in [${trimAspect} trim ratio], full-bleed ${singleBleedW}×${singleBleedH} in [${targetCanvasAspect} canvas ratio]; ` +
+      `closest provider preset: ${providerPresetAspect}). ` +
+      `Generate a full-bleed composition filling the ${targetWidth}×${targetHeight} px canvas (${targetCanvasAspect} aspect ratio). ` +
+      `Keep the composition calm and evenly balanced across the whole frame — the back cover carries no title and needs no ` +
+      `dedicated title-safe area, only the application's own required blurb/logo/barcode-safe margins added later by layout software. ` +
+      `Do not apply gutter restrictions to the cover. ${mismatchPolicy}`
+    );
+  }
+
+  if (isFrontCover) {
     const coverDescriptor = isSquare
       ? "Square 1:1 composition for the front cover."
       : "Landscape composition for the front cover.";

@@ -21,6 +21,7 @@ import { characterAnchorPrompt } from "@/lib/story/prompt/characterAnchor";
 import { getPrintProfile } from "@/lib/print/registry";
 import { resolveLayoutPlan } from "@/lib/story/layoutPlan";
 import { customSpreadsSchema, firstZodIssueMessage } from "@/lib/story/customSpreadsSchema";
+import { lintPromptContract, lintSubmittedSpreadsMatchResolved } from "@/lib/story/promptContractLint";
 import type { ChildProfile } from "@/lib/story/types";
 
 export const runtime = "nodejs";
@@ -125,6 +126,25 @@ export async function POST(request: Request): Promise<Response> {
       const pages = buildManifest(child, bookId, profileId, mode, customSpreads);
       const markdown = renderPromptsMarkdown(child, bookId, profileId, mode, customSpreads);
       const anchorPrompt = characterAnchorPrompt(child);
+
+      // Fail closed rather than hand back self-contradictory prompts: these
+      // checks catch the exact defect classes a live run previously found
+      // (front-cover text leaking into the backcover, single/spread
+      // composition mismatches, aspect-heading-vs-prompt-body contradictions,
+      // wardrobe contradictions, filename/physical-page mismatches, and a
+      // submitted spread silently vanishing or an unsubmitted one appearing).
+      const contractLint = lintPromptContract(pages);
+      const spreadLint = lintSubmittedSpreadsMatchResolved(customSpreads, pages);
+      const lintIssues = [...contractLint.issues, ...spreadLint.issues];
+      if (lintIssues.length > 0) {
+        console.error(`[api/prompts] requestId=${requestId} prompt contract violation`, lintIssues);
+        return errorResponse(
+          500,
+          "The generated prompts failed an internal consistency check and were not returned.",
+          "PROMPT_CONTRACT_VIOLATION",
+          requestId,
+        );
+      }
 
       return NextResponse.json({ pages, markdown, anchorPrompt, resolvedSlots });
     } catch (err) {

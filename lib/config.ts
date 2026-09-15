@@ -49,10 +49,14 @@ export const PROVIDER_PRESET_ASPECT_SPREAD = "21:9";
 
 export type AspectRatioPreset = "1:1" | "3:2" | "4:3" | "16:9" | "21:9" | "3:4" | "2:3" | "9:16";
 
-/** Backward-compatible alias: legacy preset for single page. */
-export const ASPECT_SINGLE: AspectRatioPreset = "3:2";
+/** Backward-compatible alias: legacy preset for single page. Aliases
+ *  PROVIDER_PRESET_ASPECT_SINGLE so the two can never diverge again — they
+ *  previously did (this was hardcoded to "3:2"), which produced prompts
+ *  whose heading said "3:2" while the prompt body and crop-safety math
+ *  assumed "4:3", the mathematically closer preset (see the comment above). */
+export const ASPECT_SINGLE: AspectRatioPreset = PROVIDER_PRESET_ASPECT_SINGLE;
 /** Backward-compatible alias: legacy preset for spread. */
-export const ASPECT_SPREAD: AspectRatioPreset = "21:9";
+export const ASPECT_SPREAD: AspectRatioPreset = PROVIDER_PRESET_ASPECT_SPREAD;
 
 /** Generated image size tier ("1K" | "2K" | "4K"). 2K balances quality vs cost. */
 export const IMAGE_SIZE = process.env.IMAGE_SIZE ?? "2K";

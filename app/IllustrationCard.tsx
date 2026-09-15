@@ -158,7 +158,7 @@ export default function IllustrationCard({
 
         <div className={styles.illoMeta}>
           {pageLabel} · {page.role ?? page.kind.toUpperCase()} ·{" "}
-          {page.spread ? `${page.aspect} spread` : (page.aspect ?? "3:2")}
+          {page.spread ? `${page.aspect} spread` : (page.aspect ?? "4:3")}
           <span className={styles.promptFile}> {page.filename}</span>
         </div>
 

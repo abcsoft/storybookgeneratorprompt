@@ -145,8 +145,27 @@ export function recalculateAndValidatePhysicalPagePlan(
   }
 
   const spreadCount = mode === "custom-spreads" ? validSpreads.length : 0;
-  const physicalPageCount = requiredPageCount;
-  const singleCount = physicalPageCount - spreadCount * 2;
+  // For a variable-page profile (no fixed profile.interiorPageCount, e.g.
+  // Classic Landscape), resolveLayoutPlan's actual asset-building loop does
+  // NOT remove any story scenes to make room for a spread — every scene is
+  // kept, and a spread simply occupies 2 physical pages for the 1 scene it
+  // carries instead of 1. So each spread adds exactly one physical page
+  // beyond the standard-single baseline (interiorSpecs.length), and the
+  // total interior physical-page count is NOT a fixed budget that a spread
+  // "spends" — it truthfully grows. (Verified against resolveLayoutPlan's
+  // own resolvedInteriorCount output; see layoutPlan.test.ts.)
+  //
+  // A fixed-page profile (profile.interiorPageCount set, e.g. a Printify
+  // edition) is a genuinely fixed budget instead — kept as before pending a
+  // proper incompatible-selection rejection for that path (not yet
+  // implemented: see the "fixed-page profile" TODO below).
+  const isVariablePageBudget = profile.interiorPageCount === undefined;
+  const physicalPageCount = isVariablePageBudget
+    ? interiorSpecs.length + spreadCount
+    : requiredPageCount;
+  const singleCount = isVariablePageBudget
+    ? interiorSpecs.length - spreadCount
+    : physicalPageCount - spreadCount * 2;
 
   let explanation: string | undefined;
   if (errors.length > 0) {
@@ -635,7 +654,12 @@ export function resolveLayoutPlan(opts: ResolveLayoutPlanOptions): ResolvedLayou
     bookId === "dream-big" &&
     (profile.interiorPageCount ?? interiorSpecsWithIndex.length) >= 24
   ) {
-    // Dream Big default editorial plan: Closing spread on facing pages 22-23
+    // Dream Big default editorial plan: a spread on facing pages 22-23.
+    // Note: whichever scene the sequential scene cursor reaches when it hits
+    // physical page 22 becomes this spread's content — for the current
+    // 22-scene Dream Big template that's the last career (Inventor), not
+    // Closing, even though this branch only fires when interiorPageCount is
+    // padded to >=24 (not classic-landscape's 22-scene, undefined-count case).
     spreadFacingPairs.set(22, {
       startPage: 22,
       endPage: 23,

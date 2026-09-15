@@ -31,7 +31,10 @@ describe("buildManifest", () => {
   });
 
   it("defaults to the classic landscape aspect ratios (no profileId passed)", () => {
-    expect(manifest.filter((m) => !m.spread).every((m) => m.aspect === "3:2")).toBe(true);
+    // 4:3, not 3:2 — the mathematically closest provider preset to the
+    // 3375x2475 (15:11) target canvas; must match what the prompt body itself
+    // claims as the "closest provider preset".
+    expect(manifest.filter((m) => !m.spread).every((m) => m.aspect === "4:3")).toBe(true);
     expect(manifest.filter((m) => m.spread).every((m) => m.aspect === "21:9")).toBe(true);
   });
 
