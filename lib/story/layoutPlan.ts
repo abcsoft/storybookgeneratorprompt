@@ -98,8 +98,12 @@ export function recalculateAndValidatePhysicalPagePlan(
 
   const errors: string[] = [];
   const requiredPageCount = profile.interiorPageCount ?? interiorSpecs.length;
+  // Facing-pair bounds are checked against the full physical book (cover +
+  // interior + backcover), not the interior-scene count alone — see
+  // assertValidFacingPair in lib/pdf/imposition.ts.
+  const totalPhysicalPages = requiredPageCount + 2;
 
-  const eligiblePairs = getEligibleFacingPairs(requiredPageCount).map(
+  const eligiblePairs = getEligibleFacingPairs(totalPhysicalPages).map(
     ([startPage, endPage]) => ({
       startPage,
       endPage,
@@ -115,10 +119,10 @@ export function recalculateAndValidatePhysicalPagePlan(
         s.startPage === 1 ||
         s.startPage % 2 !== 0 ||
         s.endPage !== s.startPage + 1 ||
-        s.endPage > requiredPageCount
+        s.endPage > totalPhysicalPages - 1
       ) {
         errors.push(
-          `Invalid facing pair ${s.startPage}–${s.endPage}. Spreads must begin on an even physical page (2, 4, ... ${requiredPageCount - 2}) and span exactly two consecutive facing pages.`,
+          `Invalid facing pair ${s.startPage}–${s.endPage}. Spreads must begin on an even physical page (2, 4, ... ${totalPhysicalPages - 2}) and span exactly two consecutive facing pages.`,
         );
       } else if (seenStarts.has(s.startPage)) {
         errors.push(
@@ -615,8 +619,11 @@ export function resolveLayoutPlan(opts: ResolveLayoutPlanOptions): ResolvedLayou
   const spreadFacingPairs = new Map<number, CustomSpreadSelection>();
   if (opts.mode === "custom-spreads") {
     const totalInterior = profile.interiorPageCount ?? interiorSpecsWithIndex.length;
+    // assertValidFacingPair's maxPages is the full physical book page count
+    // (cover + interior + backcover), not the interior-scene count alone.
+    const totalPhysicalPages = totalInterior + 2;
     for (const spread of customSpreads) {
-      assertValidFacingPair(spread.startPage, spread.endPage, totalInterior);
+      assertValidFacingPair(spread.startPage, spread.endPage, totalPhysicalPages);
       if (spreadFacingPairs.has(spread.startPage)) {
         throw new Error(`Duplicate spread configuration starting at physical page ${spread.startPage}.`);
       }

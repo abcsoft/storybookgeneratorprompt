@@ -10,6 +10,7 @@ import SpreadConfigurator from "./SpreadConfigurator";
 import { matchImportedFiles, type ImportMatchReport, type LegacyInterpretation } from "@/lib/manual/importMatch";
 import { checkImportedImage } from "@/lib/manual/clientImageCheck";
 import { evaluateExportGate } from "@/lib/manual/exportGate";
+import { fetchJson, formatApiError } from "@/lib/http/apiResponse";
 import { buildReviewSequence } from "@/lib/manual/reviewOrder";
 import {
   clearedIllustrations,
@@ -77,6 +78,14 @@ export interface ManualPage {
   pageLayout?: PageLayout;
   physicalPages?: number[];
   resolvedSlot?: ResolvedAssetSlot;
+}
+
+/** POST /api/prompts success-body shape, as returned by app/api/prompts/route.ts. */
+interface PromptsApiResponse {
+  pages: ManualPage[];
+  markdown: string;
+  anchorPrompt: string;
+  resolvedSlots?: any[];
 }
 
 type Step = "profile" | "prompts" | "review";
@@ -282,24 +291,31 @@ export default function ManualFlow({
     importGeneration.bump();
     setBusy(true);
     try {
-      const res = await fetch("/api/prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          age,
-          gender,
-          bookId: targetBookId,
-          profileId: targetProfileId,
-          mode: layoutMode,
-          customSpreads,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Could not build prompts.");
+      const result = await fetchJson<PromptsApiResponse>(
+        "/api/prompts",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            age,
+            gender,
+            bookId: targetBookId,
+            profileId: targetProfileId,
+            mode: layoutMode,
+            customSpreads,
+          }),
+        },
+        {
+          serverErrorCode: "PROMPTS_SERVER_ERROR",
+          serverErrorMessage: "The server hit an unexpected error while building your prompts.",
+        },
+      );
+      if (!result.ok) {
+        setError(formatApiError(result));
         return false;
       }
+      const data = result.data;
       collectObjectUrls(illustrations).forEach((u) => URL.revokeObjectURL(u));
       const nextPages = data.pages as ManualPage[];
       const rawSlots: any[] =
@@ -319,9 +335,6 @@ export default function ManualFlow({
       setImportReport(null);
       setPrintifyResult(null);
       return true;
-    } catch {
-      setError("Could not reach the server.");
-      return false;
     } finally {
       setBusy(false);
     }
@@ -369,24 +382,32 @@ export default function ManualFlow({
   async function resyncForProfileChange() {
     setBusy(true);
     try {
-      const res = await fetch("/api/prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          age,
-          gender,
-          bookId,
-          profileId,
-          mode: layoutMode,
-          customSpreads,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Could not refresh prompts for the new print profile.");
+      const result = await fetchJson<PromptsApiResponse>(
+        "/api/prompts",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            age,
+            gender,
+            bookId,
+            profileId,
+            mode: layoutMode,
+            customSpreads,
+          }),
+        },
+        {
+          serverErrorCode: "PROMPTS_SERVER_ERROR",
+          serverErrorMessage:
+            "The server hit an unexpected error while refreshing prompts for the new print profile.",
+        },
+      );
+      if (!result.ok) {
+        setError(formatApiError(result));
         return;
       }
+      const data = result.data;
       const nextPages = data.pages as ManualPage[];
       const nextResolvedSlots: ResolvedAssetSlot[] =
         data.resolvedSlots ??
@@ -429,8 +450,6 @@ export default function ManualFlow({
           });
         }
       }
-    } catch {
-      setError("Could not reach the server to refresh prompts for the new print profile.");
     } finally {
       setBusy(false);
     }

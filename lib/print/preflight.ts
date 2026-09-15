@@ -344,9 +344,12 @@ export async function runPreflight(
       const startPage = asset.physicalPages[0];
       const endPage = asset.physicalPages[1];
 
-      if (!isValidFacingPair(startPage, endPage, plan.interiorPageCount)) {
+      // plan.interiorPageCount excludes cover/backcover; assertValidFacingPair's
+      // maxPages is the full physical book page count.
+      const totalPhysicalPages = plan.interiorPageCount + 2;
+      if (!isValidFacingPair(startPage, endPage, totalPhysicalPages)) {
         try {
-          assertValidFacingPair(startPage, endPage, plan.interiorPageCount);
+          assertValidFacingPair(startPage, endPage, totalPhysicalPages);
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err);
           errors.push(errMsg);
