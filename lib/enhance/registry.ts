@@ -363,11 +363,9 @@ export class ResolutionEnhancementRegistry {
       return null;
     }
 
-    if (process.env.REAL_ESRGAN_BIN) {
-      const local = this.getProvider(ENHANCEMENT_PROVIDER_IDS.LOCAL_REALESRGAN);
-      if (local?.isConfigured) {
-        return local;
-      }
+    const local = this.getProvider(ENHANCEMENT_PROVIDER_IDS.LOCAL_REALESRGAN);
+    if (local?.isConfigured) {
+      return local;
     }
 
     const external = this.getProvider(ENHANCEMENT_PROVIDER_IDS.EXTERNAL_AI);

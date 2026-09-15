@@ -1,7 +1,7 @@
 {
   "_metadata": {
-    "generatingCommitSha": "f37d17400581c392bf32e1ca3b21e3aaa846d13f",
-    "remoteBranchSha": "verified-locally-only",
+    "generatingCommitSha": "4662145f77118319ec5953d1d3a3bce655d2399e",
+    "remoteBranchSha": "4662145f77118319ec5953d1d3a3bce655d2399e",
     "branch": "fix/real-super-resolution-truthful-production-proof",
     "verifiedAt": "2026-09-14T15:49:24.951Z",
     "provenanceRule": "No absolute developer paths, credentials, or fabricated PASS values"
