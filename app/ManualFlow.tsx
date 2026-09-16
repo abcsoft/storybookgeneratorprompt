@@ -124,30 +124,36 @@ export default function ManualFlow({
   const [age, setAge] = useState("4");
   const [gender, setGender] = useState<Gender>("boy");
 
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`storybook_layout_mode_${bookId}`);
-      if (saved === "custom-spreads" || saved === "standard-single" || saved === "full-spread-24") return saved;
-    }
-    return "standard-single";
-  });
+  // SSR-safe defaults — must be identical on the server and on the client's
+  // first render, or React's hydration fails (server never has access to
+  // localStorage, so branching on `typeof window` inside a useState
+  // initializer produces exactly that mismatch whenever a saved value
+  // differs from the default). Any saved preference is applied afterward,
+  // client-side only, in the effect below.
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("standard-single");
 
-  const [customSpreads, setCustomSpreads] = useState<CustomSpreadSelection[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`storybook_custom_spreads_${bookId}`);
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          /* ignore */
-        }
+  const [customSpreads, setCustomSpreads] = useState<CustomSpreadSelection[]>(() =>
+    bookId === "dream-big" ? [{ startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" }] : [],
+  );
+
+  // Apply any saved layout preference after mount (client-only — this runs
+  // post-hydration, so it can never cause a server/client mismatch, only a
+  // one-time post-hydration update to the already-committed DOM).
+  useEffect(() => {
+    const savedMode = localStorage.getItem(`storybook_layout_mode_${bookId}`);
+    if (savedMode === "custom-spreads" || savedMode === "standard-single" || savedMode === "full-spread-24") {
+      setLayoutMode(savedMode);
+    }
+    const savedSpreads = localStorage.getItem(`storybook_custom_spreads_${bookId}`);
+    if (savedSpreads) {
+      try {
+        setCustomSpreads(JSON.parse(savedSpreads));
+      } catch {
+        /* ignore malformed saved state */
       }
     }
-    if (bookId === "dream-big") {
-      return [{ startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" }];
-    }
-    return [];
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
