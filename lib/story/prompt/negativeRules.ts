@@ -22,7 +22,15 @@ export function negativeRules(isSpread?: boolean, framing: FramingMode = "medium
   }
 
   const noTextConstraint =
-    "ABSOLUTELY NO TEXT IN THE IMAGE: no captions, names, titles, letters, words, numbers, typography, or gibberish lettering anywhere in the picture, including on maps, scrolls, banners, signs, or clothing — leave every such surface blank. No watermarks, signatures, logos, frames, or borders.";
+    "ABSOLUTELY NO TEXT IN THE IMAGE: no captions, names, titles, letters, words, numbers, typography, gibberish " +
+    "lettering, name patches, brand names or logos (including on instruments, guitars, or equipment), shirt/clothing " +
+    "typography, decorative pseudo-writing, or signage anywhere in the picture, including on maps, scrolls, banners, " +
+    "signs, patches, placards, boards, or clothing — render every such surface as a clean, blank surface with no " +
+    "marks on it. No watermarks, signatures, logos, frames, or borders.";
+
+  const noAccessoryConstraint =
+    "Do not add jewelry, necklaces, or any identity-changing accessory that is not explicitly part of the " +
+    "specified outfit above.";
 
   return (
     "DO NOT: " +
@@ -32,6 +40,8 @@ export function negativeRules(isSpread?: boolean, framing: FramingMode = "medium
     "use an extreme close-up unless specified; " +
     gutterRule +
     "or apply independent horizontal/vertical stretching. " +
+    noAccessoryConstraint +
+    " " +
     noTextConstraint
   );
 }

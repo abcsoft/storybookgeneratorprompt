@@ -20,10 +20,27 @@ function article(word: string): string {
 }
 
 export const BOOKEND_OUTFIT =
-  "cozy casual clothes: a cheerful everyday sweater and comfortable pants";
+  "a muted-tone patterned knit sweater (soft heather-blue with a subtle all-over pattern) and comfortable dark " +
+  "casual trousers, hair worn in its natural everyday style — no necklace, no jewelry, and no other " +
+  "identity-changing accessory";
 export const INTRO_PAJAMAS = "soft cozy blue pajamas";
 
-export const STORY_META = { defaultOutfit: BOOKEND_OUTFIT };
+/**
+ * Global illustration-style lock for Dream Big — included verbatim in every
+ * page's prompt via STORY_META.styleLock (see buildIllustrationPrompt.ts),
+ * so no page can drift into a different rendering style than any other.
+ */
+export const DREAM_BIG_STYLE_LOCK =
+  "GLOBAL ILLUSTRATION STYLE LOCK — every page of this book uses this exact same art style, verbatim, with zero " +
+  "variation: warm hand-painted digital children's-book illustration, softly cinematic lighting, gentle painterly " +
+  "texture, natural child proportions, consistent facial rendering, expressive but not exaggerated, a polished " +
+  "print-ready finish. This one consistent style must be used on every single page — never mix styles between " +
+  "pages. Explicitly prohibited: rendering one page photorealistically and another as a cartoon (or vice versa); " +
+  "a 3D-animated/CGI render look; plastic or glossy synthetic-looking skin; anime style; a different illustrator's " +
+  "style or rendering technique from page to page; adult or teenage facial proportions on this child; and any " +
+  "unrequested jewelry or identity-changing accessory.";
+
+export const STORY_META = { defaultOutfit: BOOKEND_OUTFIT, styleLock: DREAM_BIG_STYLE_LOCK };
 
 /** Build a full illustration prompt using the central prompt engine. */
 function illustration(
@@ -375,7 +392,14 @@ export const dreamBigPages: PageSpec[] = [
         "background with a few gentle stars.",
       "single-page",
       "backcover",
-      undefined,
+      "BACKCOVER SAFE REGIONS — reserve two separate clean, low-detail quiet regions, kept apart from each other " +
+        "and from the child: (1) a barcode-safe region in the LOWER-RIGHT corner, reserved for an ISBN/barcode " +
+        "sticker added later by print production — keep it plain background with no part of the child, props, or " +
+        "background detail inside it; (2) a separate quiet region elsewhere in the frame (away from the " +
+        "lower-right corner) reserved for the application's own vector title text, added later by layout software " +
+        "— do not place any part of the child's face, hands, or torso inside that region either. Do not render " +
+        "any text, title, or barcode artwork yourself — leave both reserved regions as plain, calm background. " +
+        "Position the waving child clear of both reserved regions.",
       BOOKEND_OUTFIT,
     ),
     text: () => `Dream big.`,
