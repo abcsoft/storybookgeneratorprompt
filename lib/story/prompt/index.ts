@@ -18,8 +18,7 @@ export {
   singlePageCompositionRules,
   spreadCompositionRules,
 } from "./compositionRules";
-export { characterIdentityContract, characterIdentityFingerprint } from "./identityRules";
-export type { CharacterIdentityContract } from "./identityRules";
+export { identityRules } from "./identityRules";
 export { negativeRules } from "./negativeRules";
 export { styleRules } from "./styleRules";
 export { wardrobeRules } from "./wardrobeRules";

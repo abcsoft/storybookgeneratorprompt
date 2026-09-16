@@ -22,22 +22,17 @@ import {
   spreadCompositionRules,
   type FramingMode,
 } from "./compositionRules";
-import { characterIdentityContract } from "./identityRules";
+import { identityRules } from "./identityRules";
 import { negativeRules } from "./negativeRules";
 import { styleRules } from "./styleRules";
 import { wardrobeRules } from "./wardrobeRules";
 
 export interface BuildIllustrationPromptOptions {
   child: ChildProfile;
-  /** The story's continuity defaults — outfit, companion, and style lock. */
+  /** The story's continuity defaults — outfit and companion. */
   story: {
     defaultOutfit?: string;
     companion?: CompanionSpec;
-    /** This book's global illustration-style lock, included verbatim in
-     *  every page's prompt (see styleLock resolution below). Omit to fall
-     *  back to the shared default photoreal style (styleRules()) — kept
-     *  as the default so existing books/tests are unaffected. */
-    styleLock?: string;
   };
   /** The scene description. Stays prominent and verbatim — this is what Gemini
    *  should follow most closely. */
@@ -87,14 +82,16 @@ export function buildIllustrationPrompt(
       ? opts.companionOverride
       : story.companion;
 
-  // 1. Page role and narrative action
+  // 1. Identity / reference contract
+  const identityBlock = identityRules();
+
+  // 2. Exact resolved output contract
+  const targetFormatBlock = buildTargetFormatBlock(profileId, layout, kind ?? "scene");
+
+  // 3. Scene action and required objects
   const sceneBlock = `This is ${child.name}, a ${child.age}-year-old ${childNoun(child.gender)}. ${scene}`;
 
-  // 2. Immutable identity contract — identical fingerprint/block on every
-  // page built for this child, regardless of scene, costume, or style.
-  const identityBlock = characterIdentityContract(child).block;
-
-  // 3. Mutable costume/pose/expression
+  // 6. One framing block
   const framing = inferFramingMode(scene, kind, opts.framing);
   const framingBlock = buildFramingBlock(framing);
 
@@ -110,22 +107,13 @@ export function buildIllustrationPrompt(
     }
   }
 
+  // 4. Outfit / prop state
   const outfitBlock = wardrobeRules(outfit);
+
+  // 5. Companion state (entities)
   const companionBlock = companionRules(companion);
 
-  // 4. Global illustration-style lock — verbatim per book (story.styleLock),
-  // falling back to the shared default when a book doesn't set one, so
-  // existing books/tests keep their current style unchanged.
-  const styleBlock = [
-    styleOverride ?? story.styleLock ?? styleRules(),
-    light ? lightingClause(child.name, light) : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  // 5. Scene composition (safe areas, margins, gutter, crop safety, and any
-  // scene-specific composition notes — including text-reservation regions
-  // for spreads, handled inline by spreadCompositionRules).
+  // 7. One composition block (safe areas, margins, gutter, crop safety)
   const compositionRulesBlock =
     layout === "single-page"
       ? singlePageCompositionRules(framing)
@@ -149,10 +137,15 @@ export function buildIllustrationPrompt(
     .filter(Boolean)
     .join(" ");
 
-  // 6. Slot/profile-derived dimensions and safe regions
-  const targetFormatBlock = buildTargetFormatBlock(profileId, layout, kind ?? "scene");
+  // 8. Visual style and lighting
+  const styleBlock = [
+    styleOverride ?? styleRules(),
+    light ? lightingClause(child.name, light) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  // 8 & 9. Negative rules, ending in the explicit generated-text prohibition.
+  // 9. One concise negative block (containing the single typography / no-text prohibition)
   const hasCustomSignPolicy = Boolean(
     styleOverride &&
       (styleOverride.includes("TYPOGRAPHY EXCEPTION") ||
@@ -168,18 +161,15 @@ export function buildIllustrationPrompt(
     ).trim();
   }
 
-  // Assembly order: 1. role/narrative, 2. immutable identity, 3. mutable
-  // costume/companion, 4. style lock, 5. composition, 6. slot/profile
-  // dimensions, 7-9. negative rules (incl. the explicit text prohibition).
   return [
-    sceneBlock,
     identityBlock,
+    targetFormatBlock,
+    sceneBlock,
     outfitBlock,
     companionBlock,
-    styleBlock,
     framingBlock,
     compositionBlock,
-    targetFormatBlock,
+    styleBlock,
     negativeBlock,
   ]
     .filter(Boolean)

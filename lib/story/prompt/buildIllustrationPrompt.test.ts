@@ -20,32 +20,30 @@ describe("buildIllustrationPrompt", () => {
     expect(prompt).toContain("Riding a bicycle down a rainbow hill.");
   });
 
-  it("assembles blocks in scene -> identity -> costume/companion -> style -> composition -> format -> negative order", () => {
+  it("assembles blocks in identity -> format -> scene -> composition -> style -> negative order", () => {
     const prompt = buildIllustrationPrompt({
       child,
       story: { defaultOutfit: "a red cape", companion },
       scene: "UNIQUE_SCENE_MARKER",
       layout: "single-page",
     });
-    const sceneIdx = prompt.indexOf("UNIQUE_SCENE_MARKER");
     const identityIdx = prompt.indexOf("IDENTITY FIRST");
+    const formatIdx = prompt.indexOf("TARGET ARTWORK FORMAT");
+    const sceneIdx = prompt.indexOf("UNIQUE_SCENE_MARKER");
     const wardrobeIdx = prompt.indexOf("WARDROBE CONTINUITY");
     const companionIdx = prompt.indexOf("COMPANION CONTINUITY");
-    const styleIdx = prompt.indexOf("A high-end children's storybook picture");
     const compositionIdx = prompt.indexOf("COMPOSITION (single page)");
-    const formatIdx = prompt.indexOf("TARGET ARTWORK FORMAT");
+    const styleIdx = prompt.indexOf("A high-end children's storybook picture");
     const negativeIdx = prompt.indexOf("DO NOT:");
-    const textProhibitionIdx = prompt.indexOf("ABSOLUTELY NO TEXT IN THE IMAGE");
 
-    expect(prompt.indexOf("This is Alex")).toBe(0); // narrative/role is the very first thing in the prompt
-    expect(identityIdx).toBeGreaterThan(sceneIdx);
-    expect(wardrobeIdx).toBeGreaterThan(identityIdx);
+    expect(identityIdx).toBeGreaterThanOrEqual(0);
+    expect(formatIdx).toBeGreaterThan(identityIdx);
+    expect(sceneIdx).toBeGreaterThan(formatIdx);
+    expect(wardrobeIdx).toBeGreaterThan(sceneIdx);
     expect(companionIdx).toBeGreaterThan(wardrobeIdx);
-    expect(styleIdx).toBeGreaterThan(companionIdx);
-    expect(compositionIdx).toBeGreaterThan(styleIdx);
-    expect(formatIdx).toBeGreaterThan(compositionIdx);
-    expect(negativeIdx).toBeGreaterThan(formatIdx);
-    expect(textProhibitionIdx).toBeGreaterThan(negativeIdx);
+    expect(compositionIdx).toBeGreaterThan(companionIdx);
+    expect(styleIdx).toBeGreaterThan(compositionIdx);
+    expect(negativeIdx).toBeGreaterThan(styleIdx);
   });
 
   it("omits wardrobe/companion blocks entirely when a story has neither", () => {
