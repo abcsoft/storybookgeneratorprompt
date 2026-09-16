@@ -157,13 +157,33 @@ describe("Dream Big Markdown truthfulness", () => {
     expect(md).toMatch(/Generate these \*\*24 image files\*\*/);
   });
 
-  it("with a spread: header states both the image-file count and the larger physical-page count truthfully", () => {
+  it("with a spread: header states both the image-asset count and the larger physical-page count truthfully", () => {
     const md = renderPromptsMarkdown(child, bookId, profileId, "custom-spreads", [
       { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
     ]);
-    expect(md).toMatch(/Generate these \*\*24 image files\*\*/);
-    expect(md).toMatch(/fill \*\*25 physical pages\*\*/);
+    expect(md).toMatch(/Generate \*\*24 image assets\*\*/);
+    expect(md).toMatch(/- 1 panoramic spread\b/);
+    expect(md).toMatch(/- 23 single-page assets/);
+    expect(md).toMatch(/produce \*\*25 physical PDF pages\*\*/);
+    expect(md).toMatch(/Expanded Hybrid/);
     expect(md).toMatch(/25-backcover\.png/);
+  });
+
+  it("with 11 spreads (all eligible pairs): header truthfully states 35 physical pages, not 24", () => {
+    const elevenPairs = Array.from({ length: 11 }, (_, i) => ({
+      startPage: 2 + i * 2,
+      endPage: 3 + i * 2,
+      textSide: "left" as const,
+      subjectSide: "right" as const,
+    }));
+    const md = renderPromptsMarkdown(child, bookId, profileId, "custom-spreads", elevenPairs);
+    expect(md).toMatch(/Generate \*\*24 image assets\*\*/);
+    expect(md).toMatch(/- 11 panoramic spreads/);
+    expect(md).toMatch(/- 13 single-page assets/);
+    expect(md).toMatch(/produce \*\*35 physical PDF pages\*\*/);
+    expect(md).toMatch(/35-backcover\.png/);
+    expect(md).toMatch(/34-closing\.png/);
+    expect(md).not.toMatch(/produce \*\*24 physical PDF pages\*\*/);
   });
 
   it("each illustration section states its own slot, physical page(s), and legacy aliases separately from the canonical filename", () => {

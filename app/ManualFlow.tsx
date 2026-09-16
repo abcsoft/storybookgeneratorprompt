@@ -127,7 +127,7 @@ export default function ManualFlow({
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`storybook_layout_mode_${bookId}`);
-      if (saved === "custom-spreads" || saved === "standard-single") return saved;
+      if (saved === "custom-spreads" || saved === "standard-single" || saved === "full-spread-24") return saved;
     }
     return "standard-single";
   });
@@ -2668,6 +2668,7 @@ export default function ManualFlow({
                 key={p.index}
                 page={p}
                 pageLabel={pageLabelByIndex.get(p.index) ?? `Page ${p.page}`}
+                totalAssets={pages.length}
                 entry={illustrations[p.index] ?? emptyEntry()}
                 copied={copied === p.page}
                 onCopyPrompt={() => copyPrompt(p.prompt, p.page)}

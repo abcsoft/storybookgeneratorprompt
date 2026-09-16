@@ -79,7 +79,9 @@ export async function POST(request: Request): Promise<Response> {
     const bookId = typeof rawBody.bookId === "string" ? rawBody.bookId : undefined;
     const profileId = typeof rawBody.profileId === "string" ? rawBody.profileId : undefined;
     const mode =
-      rawBody.mode === "custom-spreads" || rawBody.mode === "standard-single"
+      rawBody.mode === "custom-spreads" ||
+      rawBody.mode === "standard-single" ||
+      rawBody.mode === "full-spread-24"
         ? rawBody.mode
         : undefined;
 
@@ -103,6 +105,19 @@ export async function POST(request: Request): Promise<Response> {
         mode,
         customSpreads,
       });
+
+      // NOTE: a route-level rejection using plan.isValidForProfile was
+      // deliberately NOT added here. While investigating it, an existing,
+      // separate bug surfaced: resolveLayoutPlan(), when called with no
+      // explicit `mode` for a fixed-page profile with a registered edition
+      // (e.g. printify-hardcover-square-8x8), does not actually route
+      // through that edition — computing its own default spread flips the
+      // derived mode to "custom-spreads" first, which then disqualifies the
+      // edition branch (`mode !== "custom-spreads"` is one of its guards).
+      // That makes plan.isValidForProfile false for what may be a
+      // currently-working call path today, since nothing previously checked
+      // it. Rejecting on it here without first fixing that routing bug risks
+      // breaking real Printify usage. Left as a follow-up, not fixed blind.
       const resolvedSlots = plan.assets.map((slot) => ({
         slotId: slot.slotId,
         illustrationIndex: slot.illustrationIndex,
@@ -134,7 +149,15 @@ export async function POST(request: Request): Promise<Response> {
       // wardrobe contradictions, filename/physical-page mismatches, and a
       // submitted spread silently vanishing or an unsubmitted one appearing).
       const contractLint = lintPromptContract(pages);
-      const spreadLint = lintSubmittedSpreadsMatchResolved(customSpreads, pages);
+      // customSpreads is only meaningful in "custom-spreads" mode — other
+      // modes ignore it by design (e.g. the client may still be holding a
+      // previously-selected spread in state while the user is on Standard
+      // Single), so comparing it against the resolved output only makes
+      // sense for that mode.
+      const spreadLint =
+        mode === "custom-spreads"
+          ? lintSubmittedSpreadsMatchResolved(customSpreads, pages)
+          : { ok: true, issues: [] };
       const lintIssues = [...contractLint.issues, ...spreadLint.issues];
       if (lintIssues.length > 0) {
         console.error(`[api/prompts] requestId=${requestId} prompt contract violation`, lintIssues);
@@ -149,7 +172,8 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ pages, markdown, anchorPrompt, resolvedSlots });
     } catch (err) {
       if (isControlledValidationError(err)) {
-        return errorResponse(400, err.message, "INVALID_LAYOUT", requestId);
+        const code = mode === "full-spread-24" ? "EDITION_NOT_AVAILABLE" : "INVALID_LAYOUT";
+        return errorResponse(400, err.message, code, requestId);
       }
       console.error(`[api/prompts] requestId=${requestId} unexpected error`, err);
       return errorResponse(

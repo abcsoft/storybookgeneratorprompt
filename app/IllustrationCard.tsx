@@ -12,6 +12,7 @@ import styles from "./page.module.css";
 export default function IllustrationCard({
   page,
   pageLabel,
+  totalAssets,
   entry,
   copied,
   onCopyPrompt,
@@ -35,6 +36,10 @@ export default function IllustrationCard({
 }: {
   page: ManualPage;
   pageLabel: string;
+  /** Total number of image assets in this book, for the "Asset N of total"
+   *  label — never confused with the physical page number(s) this asset
+   *  resolves to, which are shown separately. */
+  totalAssets?: number;
   entry: IllustrationEntry;
   copied: boolean;
   onCopyPrompt: () => void;
@@ -100,7 +105,14 @@ export default function IllustrationCard({
       <div className={styles.illoBody}>
         <div className={styles.illoHead}>
           <span className={styles.illoNumber}>
-            Illustration {String(page.page).padStart(2, "0")}
+            Asset {String(page.illustrationNumber ?? page.page).padStart(2, "0")}
+            {totalAssets ? ` of ${totalAssets}` : ""}
+            {page.physicalPages && page.physicalPages.length > 0 && (
+              <span className={styles.illoPhysicalPages}>
+                {" "}
+                · Physical Page{page.physicalPages.length > 1 ? "s" : ""} {page.physicalPages.join("–")}
+              </span>
+            )}
           </span>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
             <span
@@ -157,9 +169,9 @@ export default function IllustrationCard({
         </div>
 
         <div className={styles.illoMeta}>
-          {pageLabel} · {page.role ?? page.kind.toUpperCase()} ·{" "}
+          {pageLabel} · Role: {page.role ?? page.kind.toUpperCase()} ·{" "}
           {page.spread ? `${page.aspect} spread` : (page.aspect ?? "4:3")}
-          <span className={styles.promptFile}> {page.filename}</span>
+          <span className={styles.promptFile}> Filename: {page.filename}</span>
         </div>
 
         {/* Detailed provenance information */}

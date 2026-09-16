@@ -21,7 +21,25 @@ import { assertValidFacingPair, isValidFacingPair } from "../pdf/imposition";
 import { getEditionForProfile } from "./editions";
 import type { ChildProfile, StoryTemplate, LayoutType, PageKind, FramingMode } from "./types";
 
-export type LayoutMode = "standard-single" | "custom-spreads";
+/**
+ * - "standard-single": every interior scene is its own single-page asset
+ *   (24 image assets, 24 physical PDF leaves for Dream Big). Default.
+ * - "custom-spreads" ("Expanded Hybrid" in the UI): the user picks story
+ *   scenes to render as two-page spreads. Every original scene is kept —
+ *   nothing is dropped, combined, or rewritten — so each selected spread
+ *   adds exactly one physical PDF leaf beyond standard-single's baseline.
+ *   The resulting page count is NOT fixed at 24; it grows with every
+ *   spread selected, and the UI/API/Markdown must all say so truthfully.
+ * - "full-spread-24": a *fixed* 24-physical-page edition (Page 1 standalone,
+ *   11 interior spreads across Pages 2-23, Page 24 standalone — 13 image
+ *   assets total) that requires rewriting/combining Dream Big's 22 source
+ *   scenes down to 11 spread beats. That is an editorial content decision,
+ *   not a layout-geometry one, and is NOT made here: this mode is a stub
+ *   that resolveLayoutPlan() rejects until an approved edition (e.g. a
+ *   registered "dream-big-full-spread-24" PrintEdition) exists. See
+ *   lib/story/editions/dreamBigFullSpread24.proposal.ts.
+ */
+export type LayoutMode = "standard-single" | "custom-spreads" | "full-spread-24";
 export type AssetKind = "front-cover" | "back-cover" | "single-page" | "spread";
 export type TextSide = "left" | "right" | "none";
 export type SubjectSide = "left" | "right" | "centered";
@@ -69,14 +87,39 @@ export interface CustomSpreadSelection {
 
 export interface PagePlanValidationResult {
   valid: boolean;
+  /** Interior physical leaves only (excludes front/back cover). */
   physicalPageCount: number;
   requiredPageCount: number;
   spreadCount: number;
+  /** Single interior physical leaves (excludes front/back cover). */
   singleCount: number;
   eligiblePairs: { startPage: number; endPage: number; label: string }[];
   spreads: CustomSpreadSelection[];
   errors: string[];
   explanation?: string;
+  /** True when this mode/profile combination is not currently available
+   *  (e.g. "full-spread-24" pending editorial approval). */
+  unavailable?: boolean;
+
+  // Explicit, never-ambiguous counts (section 5/6): "pages" always means a
+  // physical PDF leaf here, never an image asset — the two are only equal
+  // when there are zero spreads.
+  /** Story scenes in the source template (22 for Dream Big) — constant
+   *  across every mode; a scene is never dropped, combined, or duplicated. */
+  storySceneCount: number;
+  /** Total distinct image FILES to generate (cover + backcover + interior
+   *  singles + interior spreads, each spread counted once). */
+  imageAssetCount: number;
+  /** Of imageAssetCount, how many are two-page spread images. */
+  spreadAssetCount: number;
+  /** Of imageAssetCount, how many are single-page images (interior singles
+   *  PLUS the front and back cover). */
+  singleAssetCount: number;
+  /** Total interior physical PDF leaves (singles=1 leaf, spreads=2 leaves). */
+  interiorLeafCount: number;
+  /** interiorLeafCount + front cover + back cover — the true total physical
+   *  page count of the resulting PDF. */
+  totalPdfLeafCount: number;
 }
 
 /**
@@ -110,6 +153,33 @@ export function recalculateAndValidatePhysicalPagePlan(
       label: `Pages ${startPage}–${endPage}`,
     }),
   );
+
+  if (mode === "full-spread-24") {
+    errors.push(
+      "Full Spread 24-Page Edition is coming soon — editorial mapping required. " +
+        "Rewriting Dream Big's 22 source scenes down to 11 spread beats is an editorial content " +
+        "decision that has not been reviewed/approved yet. Use Standard Single or Expanded Hybrid instead.",
+    );
+    const storySceneCount = interiorSpecs.length;
+    return {
+      valid: false,
+      unavailable: true,
+      physicalPageCount: totalPhysicalPages - 2,
+      requiredPageCount,
+      spreadCount: 0,
+      singleCount: 0,
+      eligiblePairs,
+      spreads: [],
+      errors,
+      explanation: errors.join(" "),
+      storySceneCount,
+      imageAssetCount: 0,
+      spreadAssetCount: 0,
+      singleAssetCount: 0,
+      interiorLeafCount: 0,
+      totalPdfLeafCount: 0,
+    };
+  }
 
   const validSpreads: CustomSpreadSelection[] = [];
   if (mode === "custom-spreads") {
@@ -145,33 +215,47 @@ export function recalculateAndValidatePhysicalPagePlan(
   }
 
   const spreadCount = mode === "custom-spreads" ? validSpreads.length : 0;
-  // For a variable-page profile (no fixed profile.interiorPageCount, e.g.
-  // Classic Landscape), resolveLayoutPlan's actual asset-building loop does
+  const storySceneCount = interiorSpecs.length;
+  const isVariablePageBudget = profile.interiorPageCount === undefined;
+  // Variable-page profiles (e.g. Classic Landscape, no fixed
+  // profile.interiorPageCount): resolveLayoutPlan's asset-building loop does
   // NOT remove any story scenes to make room for a spread — every scene is
   // kept, and a spread simply occupies 2 physical pages for the 1 scene it
-  // carries instead of 1. So each spread adds exactly one physical page
-  // beyond the standard-single baseline (interiorSpecs.length), and the
-  // total interior physical-page count is NOT a fixed budget that a spread
-  // "spends" — it truthfully grows. (Verified against resolveLayoutPlan's
-  // own resolvedInteriorCount output; see layoutPlan.test.ts.)
+  // carries instead of 1. So each spread truthfully adds one physical page
+  // beyond the standard-single baseline (storySceneCount). (Verified
+  // against resolveLayoutPlan's own resolvedInteriorCount output; see
+  // dreamBigCustomSpreadsIntegrity.test.ts.)
   //
-  // A fixed-page profile (profile.interiorPageCount set, e.g. a Printify
-  // edition) is a genuinely fixed budget instead — kept as before pending a
-  // proper incompatible-selection rejection for that path (not yet
-  // implemented: see the "fixed-page profile" TODO below).
-  const isVariablePageBudget = profile.interiorPageCount === undefined;
-  const physicalPageCount = isVariablePageBudget
-    ? interiorSpecs.length + spreadCount
-    : requiredPageCount;
-  const singleCount = isVariablePageBudget
-    ? interiorSpecs.length - spreadCount
-    : physicalPageCount - spreadCount * 2;
+  // Fixed-page profiles with a registered PrintEdition (e.g. the Printify
+  // 24-page hardcover): the edition's own default mapping already reaches
+  // exactly profile.interiorPageCount via its own fixed spreads (see
+  // dreamBigPrintify24Edition) — that path is untouched here. This function
+  // keeps the pre-existing "spread spends 2 of the fixed budget" display
+  // model for that case; a real per-selection reachability check against
+  // the registered edition (rather than this budget approximation) is a
+  // separate, not-yet-implemented improvement.
+  const physicalPageCount = isVariablePageBudget ? storySceneCount + spreadCount : requiredPageCount;
+  const singleCount = isVariablePageBudget ? storySceneCount - spreadCount : physicalPageCount - spreadCount * 2;
+  const spreadAssetCount = spreadCount;
+  const singleAssetCount = singleCount + 2; // + front cover + back cover
+  const imageAssetCount = singleAssetCount + spreadAssetCount;
+  const interiorLeafCount = physicalPageCount;
+  const totalPdfLeafCount = interiorLeafCount + 2; // + front cover + back cover
 
   let explanation: string | undefined;
   if (errors.length > 0) {
     explanation = errors.join(" ");
-  } else {
+  } else if (!isVariablePageBudget) {
+    // Fixed-page profile: physicalPageCount is the profile's own required
+    // budget, not a value that grows with spreads (see the branch above).
     explanation = `Layout is valid: exactly ${physicalPageCount} physical interior pages (${spreadCount} spread${spreadCount === 1 ? "" : "s"}, ${singleCount} single${singleCount === 1 ? "" : "s"}).`;
+  } else if (spreadCount > 0) {
+    explanation =
+      `Layout is valid: ${imageAssetCount} image assets (${spreadAssetCount} spread${spreadAssetCount === 1 ? "" : "s"}, ` +
+      `${singleAssetCount} single${singleAssetCount === 1 ? "" : "s"}) producing ${totalPdfLeafCount} physical PDF pages ` +
+      `(standard-single would be ${storySceneCount + 2} pages — this selection adds ${spreadCount} page${spreadCount === 1 ? "" : "s"}).`;
+  } else {
+    explanation = `Layout is valid: exactly ${totalPdfLeafCount} physical pages (${imageAssetCount} image assets, no spreads).`;
   }
 
   return {
@@ -183,6 +267,12 @@ export function recalculateAndValidatePhysicalPagePlan(
     eligiblePairs,
     spreads: validSpreads,
     errors,
+    storySceneCount,
+    imageAssetCount,
+    spreadAssetCount,
+    singleAssetCount,
+    interiorLeafCount,
+    totalPdfLeafCount,
     explanation,
   };
 }
@@ -598,6 +688,13 @@ export function getProfileAssetGeometry(
  * - Editorial Editions: Explicitly registered editions (e.g. Dream Big 24-page on Printify).
  */
 export function resolveLayoutPlan(opts: ResolveLayoutPlanOptions): ResolvedLayoutPlan {
+  if (opts.mode === "full-spread-24") {
+    throw new Error(
+      "Full Spread 24-Page Edition is not available yet — it requires an approved editorial " +
+        "mapping (rewriting Dream Big's 22 source scenes down to 11 spread beats) that has not " +
+        "been reviewed. Use Standard Single or Expanded Hybrid instead.",
+    );
+  }
   const { child, bookId, profileId = "printify-hardcover-square-8x8" } = opts;
   const book = getBook(bookId);
   const profile = getPrintProfile(profileId);

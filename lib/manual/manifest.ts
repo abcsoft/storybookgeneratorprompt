@@ -113,21 +113,43 @@ export function renderPromptsMarkdown(
     ...manifest.flatMap((m) => m.physicalPages ?? []),
   );
   const spreadCount = manifest.filter((m) => m.spread).length;
+  const singleAssetCount = manifest.length - spreadCount;
+
+  const modeLabel =
+    mode === "custom-spreads"
+      ? "Expanded Hybrid — selected scenes add pages"
+      : mode === "full-spread-24"
+        ? "Full Spread 24-Page Edition"
+        : "Standard Single — Complete Story";
+
+  // Ground truth from the same planner every other consumer (API route,
+  // UI banner, upload slots) uses — never a separately-guessed count.
+  const plan = resolveLayoutPlan({ child, bookId, profileId: profile.id, mode, customSpreads });
+  const compatibilityLine = plan.isValidForProfile
+    ? `Compatible with ${profile.label}.`
+    : `NOT compatible with ${profile.label}: ${plan.limitations?.join(" ") ?? "page count mismatch."}`;
+
   // A spread is one image file that fills two physical pages, so the file
   // count and the physical-page count only diverge when at least one spread
   // is present — state both explicitly whenever that's true, so a filename
-  // like "25-backcover.png" is never left unexplained next to "24 images".
-  const leafCountNote =
-    spreadCount > 0 && totalPhysicalLeaves !== manifest.length
-      ? ` Together they fill **${totalPhysicalLeaves} physical pages** once assembled into the PDF — ` +
-        `${spreadCount} of the ${manifest.length} image files ${spreadCount === 1 ? "is a wide two-page spread" : "are wide two-page spreads"}, ` +
-        `each covering 2 physical pages instead of 1.`
-      : "";
+  // like "25-backcover.png" (or "35-backcover.png") is never left
+  // unexplained next to a plain image-file count.
+  const summaryBlock =
+    spreadCount > 0
+      ? `Generate **${manifest.length} image assets**:\n` +
+        `- ${spreadCount} panoramic spread${spreadCount === 1 ? "" : "s"}\n` +
+        `- ${singleAssetCount} single-page asset${singleAssetCount === 1 ? "" : "s"}\n\n` +
+        `These assets produce **${totalPhysicalLeaves} physical PDF pages** (not ${manifest.length} — ` +
+        `each spread fills 2 physical pages from 1 image file). Layout mode: **${modeLabel}**. ${compatibilityLine}`
+      : `Generate **${manifest.length} image assets** (all single-page — no spreads), producing **${totalPhysicalLeaves} physical PDF pages**. ` +
+        `Layout mode: **${modeLabel}**. ${compatibilityLine}`;
 
   const header = `# ${name}'s ${getBook(bookId).title} — image prompts
 
+${summaryBlock}
+
 Generate these **${manifest.length} image files** **for free** in the Gemini app
-(Nano Banana 2), then feed them back into the storybook builder.${leafCountNote}
+(Nano Banana 2), then feed them back into the storybook builder.
 
 ## Photos to use
 Pick **2–4 clear, front-facing, well-lit close-ups of just ${name}'s face** —

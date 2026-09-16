@@ -75,6 +75,59 @@ describe("POST /api/prompts", () => {
     expect(spreadSlot.destinationDimensions.width).toBeGreaterThan(spreadSlot.destinationDimensions.height);
   });
 
+  it("11 selected spreads (all eligible pairs): 24 assets, 35 physical leaves, Closing at 34, Backcover at 35", async () => {
+    const { POST } = await import("@/app/api/prompts/route");
+    const elevenPairs = Array.from({ length: 11 }, (_, i) => ({
+      startPage: 2 + i * 2,
+      endPage: 3 + i * 2,
+      textSide: "left",
+      subjectSide: "right",
+    }));
+    const res = await POST(
+      postRequest({ ...DREAM_BIG_CUSTOM_SPREAD_REQUEST, customSpreads: elevenPairs }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.pages.length).toBe(24);
+    const spreads = body.pages.filter((p: any) => p.spread);
+    const singles = body.pages.filter((p: any) => !p.spread);
+    expect(spreads.length).toBe(11);
+    expect(singles.length).toBe(13);
+    const closing = body.pages.find((p: any) => p.kind === "closing");
+    const backcover = body.pages.find((p: any) => p.kind === "backcover");
+    expect(closing.physicalPages).toEqual([34]);
+    expect(closing.filename).toBe("34-closing.png");
+    expect(backcover.physicalPages).toEqual([35]);
+    expect(backcover.filename).toBe("35-backcover.png");
+    expect(body.markdown).toMatch(/produce \*\*35 physical PDF pages\*\*/);
+  });
+
+  it("standard-single with a leftover non-empty customSpreads array still succeeds (client may hold stale spread-selector state)", async () => {
+    // Reproduces a real regression: ManualFlow.tsx's default customSpreads
+    // state for dream-big is non-empty ([{22,23}]) even when the user is on
+    // Standard Single mode, and it's sent on every request regardless of
+    // mode. customSpreads is inert in that mode by design — the lint gate
+    // must not compare it against the (spread-free) resolved output.
+    const { POST } = await import("@/app/api/prompts/route");
+    const res = await POST(
+      postRequest({ ...DREAM_BIG_STANDARD_SINGLE_REQUEST, customSpreads: DREAM_BIG_CUSTOM_SPREAD_REQUEST.customSpreads }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.pages.filter((p: any) => p.spread).length).toBe(0);
+  });
+
+  it("mode 'full-spread-24' is rejected with a clear EDITION_NOT_AVAILABLE code, not a 500", async () => {
+    const { POST } = await import("@/app/api/prompts/route");
+    const res = await POST(
+      postRequest({ ...DREAM_BIG_STANDARD_SINGLE_REQUEST, mode: "full-spread-24" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("EDITION_NOT_AVAILABLE");
+    expect(body.error).toMatch(/not available yet|editorial mapping|coming soon/i);
+  });
+
   it("invalid profile (unparseable age) returns structured JSON 400", async () => {
     const { POST } = await import("@/app/api/prompts/route");
     const res = await POST(

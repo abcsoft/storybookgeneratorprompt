@@ -639,6 +639,10 @@
   font-size: 13px;
   color: var(--ink);
 }
+.illoPhysicalPages {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
 .illoMeta {
   font-size: 12px;
   color: var(--ink-soft);
@@ -1277,6 +1281,17 @@
 .pagePlanExplanation {
   font-size: 11px;
   opacity: 0.9;
+}
+
+.pagePlanWarning {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .spreadPairsSection {

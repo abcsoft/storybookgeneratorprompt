@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import {
-  ELIGIBLE_FACING_PAIRS,
   recalculateAndValidatePhysicalPagePlan,
+  resolveLayoutPlan,
   type CustomSpreadSelection,
   type LayoutMode,
   type SubjectSide,
@@ -140,6 +140,41 @@ export default function SpreadConfigurator({
     return map;
   }, [customSpreads]);
 
+  // Ground-truth scene role for each currently-selected spread's starting
+  // page, from the same planner the API/Markdown/upload-slots use — never a
+  // separately-guessed label like "Closing" for whatever scene actually
+  // resolves there.
+  const roleByStartPage = useMemo(() => {
+    const map = new Map<number, string>();
+    if (mode !== "custom-spreads" || customSpreads.length === 0) return map;
+    try {
+      const plan = resolveLayoutPlan({
+        child: { name: childName || "Child", age: 4, gender: "neutral" },
+        bookId,
+        profileId,
+        mode: "custom-spreads",
+        customSpreads,
+      });
+      for (const asset of plan.assets) {
+        if (asset.assetKind === "spread" && asset.physicalPages.length === 2) {
+          map.set(asset.physicalPages[0], asset.role ?? asset.roleSlug ?? "scene");
+        }
+      }
+    } catch {
+      // Leave the map empty — the row falls back to a page-number-only label.
+    }
+    return map;
+  }, [mode, bookId, profileId, customSpreads, childName]);
+
+  /** How many total physical PDF pages the book would have if this one pair
+   *  were toggled to/from a spread, keeping every other selection as-is. */
+  function totalPagesIfToggled(startPage: number, endPage: number, enableSpread: boolean): number {
+    const next = enableSpread
+      ? [...customSpreads.filter((s) => s.startPage !== startPage), { startPage, endPage, textSide: "left" as const, subjectSide: "right" as const }]
+      : customSpreads.filter((s) => s.startPage !== startPage);
+    return recalculateAndValidatePhysicalPagePlan(bookId, profileId, "custom-spreads", next).totalPdfLeafCount;
+  }
+
   function handleTogglePair(startPage: number, endPage: number, enableSpread: boolean) {
     if (enableSpread) {
       // Default: text left, character auto-opposite (right)
@@ -189,18 +224,24 @@ export default function SpreadConfigurator({
     onCustomSpreadsChange(updated);
   }
 
+  const modeLabel =
+    mode === "standard-single"
+      ? "Standard Single — Complete Story"
+      : mode === "full-spread-24"
+        ? "Full Spread 24-Page Edition"
+        : "Expanded Hybrid — selected scenes add pages";
+
   return (
     <div className={styles.layoutConfiguratorCard}>
       <div className={styles.layoutConfigHeader}>
         <div>
           <h3 className={styles.layoutConfigTitle}>Book Page Layout</h3>
           <p className={styles.layoutConfigSubtitle}>
-            Choose between standard single pages or customize panoramic spreads across valid facing pairs.
+            Choose the complete story as single pages, or expand selected scenes into wide two-page spreads
+            (each expanded scene adds one physical page to the book).
           </p>
         </div>
-        <div className={styles.layoutModeBadge}>
-          {mode === "standard-single" ? "Single Pages Mode" : "Custom Spreads Mode"}
-        </div>
+        <div className={styles.layoutModeBadge}>{modeLabel}</div>
       </div>
 
       {/* Mode Selector */}
@@ -214,11 +255,11 @@ export default function SpreadConfigurator({
         >
           <div className={styles.layoutModeCardTop}>
             <span className={styles.layoutModeCardIcon}>📄</span>
-            <span className={styles.layoutModeCardName}>Standard Single Pages</span>
+            <span className={styles.layoutModeCardName}>Standard Single — Complete Story</span>
             <span className={styles.layoutModeCardPill}>Default & Recommended</span>
           </div>
           <p className={styles.layoutModeCardDesc}>
-            Every page is an individual full-bleed illustration (1:1 square). Clean, classic, and fast to generate.
+            Every one of the story's scenes is its own single-page illustration: 24 image assets, 24 physical PDF pages.
           </p>
         </button>
 
@@ -231,53 +272,94 @@ export default function SpreadConfigurator({
         >
           <div className={styles.layoutModeCardTop}>
             <span className={styles.layoutModeCardIcon}>📖</span>
-            <span className={styles.layoutModeCardName}>Custom Spreads</span>
-            <span className={styles.layoutModeCardPill}>Selectable Pairs</span>
+            <span className={styles.layoutModeCardName}>Expanded Hybrid</span>
+            <span className={styles.layoutModeCardPill}>Selected scenes add pages</span>
           </div>
           <p className={styles.layoutModeCardDesc}>
-            Choose individual facing pairs to render as seamless panoramic wide scenes (2:1 aspect) across two pages.
+            Pick which scenes become wide panoramic spreads. Nothing is dropped or rewritten — every scene is kept,
+            so <strong>each spread you select adds one physical page</strong> beyond the standard 24-page book.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          role="radio"
+          aria-checked={mode === "full-spread-24"}
+          className={`${styles.layoutModeCard} ${mode === "full-spread-24" ? styles.layoutModeCardActive : ""}`}
+          onClick={() => onModeChange("full-spread-24")}
+        >
+          <div className={styles.layoutModeCardTop}>
+            <span className={styles.layoutModeCardIcon}>🔒</span>
+            <span className={styles.layoutModeCardName}>Full Spread 24-Page Edition</span>
+            <span className={styles.layoutModeCardPill}>Coming soon — editorial mapping required</span>
+          </div>
+          <p className={styles.layoutModeCardDesc}>
+            A fixed 24-physical-page edition with 11 interior spreads (13 image assets total) requires rewriting the
+            story's 22 scenes down to 11 spread beats — an editorial content decision, not a layout setting. Not
+            available until that mapping is written and approved.
           </p>
         </button>
       </div>
 
-      {/* Fixed Page Count & Validation Status Banner */}
+      {/* Validation / Truthful Page-Count Status Banner */}
       <div
         className={`${styles.pagePlanBanner} ${planCheck.valid ? styles.pagePlanBannerValid : styles.pagePlanBannerInvalid}`}
       >
-        <div className={styles.pagePlanStats}>
-          <span>
-            Physical Interior Pages: <strong>{planCheck.physicalPageCount}</strong> / {planCheck.requiredPageCount}
-          </span>
-          <span className={styles.pagePlanDivider}>•</span>
-          <span>
-            Spreads: <strong>{planCheck.spreadCount}</strong> ({planCheck.spreadCount * 2} pages)
-          </span>
-          <span className={styles.pagePlanDivider}>•</span>
-          <span>
-            Single Pages: <strong>{planCheck.singleCount}</strong>
-          </span>
-        </div>
+        {!planCheck.unavailable && (
+          <div className={styles.pagePlanStats}>
+            <span>
+              Story scenes: <strong>{planCheck.storySceneCount}</strong>
+            </span>
+            <span className={styles.pagePlanDivider}>•</span>
+            <span>
+              Image assets: <strong>{planCheck.imageAssetCount}</strong> ({planCheck.spreadAssetCount} spread
+              {planCheck.spreadAssetCount === 1 ? "" : "s"}, {planCheck.singleAssetCount} single
+              {planCheck.singleAssetCount === 1 ? "" : "s"})
+            </span>
+            <span className={styles.pagePlanDivider}>•</span>
+            <span>
+              Total physical PDF pages: <strong>{planCheck.totalPdfLeafCount}</strong>
+            </span>
+          </div>
+        )}
         <div className={styles.pagePlanExplanation}>{planCheck.explanation}</div>
+        {mode === "custom-spreads" && planCheck.spreadCount > 0 && planCheck.totalPdfLeafCount !== planCheck.storySceneCount + 2 && (
+          <div className={styles.pagePlanWarning} role="alert">
+            ⚠️ Each selected spread adds one physical page. Selecting {planCheck.spreadCount} spread
+            {planCheck.spreadCount === 1 ? "" : "s"} produces a {planCheck.totalPdfLeafCount}-page book.
+          </div>
+        )}
       </div>
 
-      {/* Custom Spreads Pair Selector (only active when custom-spreads mode is chosen) */}
+      {mode === "full-spread-24" && (
+        <div className={styles.pagePlanExplanation} data-testid="full-spread-24-coming-soon">
+          Full Spread 24-Page Edition is coming soon — editorial mapping required. Use Standard Single or Expanded
+          Hybrid for now.
+        </div>
+      )}
+
+      {/* Expanded Hybrid Scene Spread Selector (only active in that mode) */}
       {mode === "custom-spreads" && (
         <div className={styles.spreadPairsSection}>
           <div className={styles.spreadPairsIntro}>
-            <h4>Eligible Facing Pairs (24-Page Physical Book)</h4>
+            <h4>Expanded Hybrid — selectable scene spreads</h4>
             <p>
-              Page 1 (Dedication) and Page 24 (Final Page) are standalone single pages. Only facing page pairs (verso
-              left → recto right) can physically form a printed spread.
+              Every scene below is kept in the book. Toggling a pair to <strong>Two-Page Spread</strong> renders that
+              scene as one wide panoramic image instead of a single page — and adds one physical page to the final
+              book, shifting every later scene, Closing, and the Backcover forward by one page. Page 1 (Dedication)
+              and the final page are always standalone singles.
             </p>
           </div>
 
           <div className={styles.spreadPairsList}>
-            {ELIGIBLE_FACING_PAIRS.map(([startPage, endPage]) => {
+            {planCheck.eligiblePairs.map(({ startPage, endPage }) => {
               const spread = spreadMap.get(startPage);
               const isSpread = Boolean(spread);
               const textSide: TextSide = spread?.textSide ?? "left";
               const subjectSide: SubjectSide =
                 spread?.subjectSide ?? (textSide === "left" ? "right" : textSide === "right" ? "left" : "centered");
+              const role = roleByStartPage.get(startPage);
+              const totalIfToggled = totalPagesIfToggled(startPage, endPage, !isSpread);
 
               return (
                 <div
@@ -288,9 +370,15 @@ export default function SpreadConfigurator({
                     <div className={styles.spreadPairLabelBlock}>
                       <span className={styles.spreadPairNumber}>
                         Pages {startPage}–{endPage}
+                        {role ? ` · ${role}` : ""}
                       </span>
                       <span className={styles.spreadPairLeaves}>
                         Verso {startPage} & Recto {endPage}
+                      </span>
+                      <span className={styles.spreadPairLeaves} data-testid={`pages-if-toggled-${startPage}-${endPage}`}>
+                        {isSpread
+                          ? `Currently a spread. Switching back to single pages: ${totalIfToggled} total pages.`
+                          : `Expanding this pair adds 1 page: ${totalIfToggled} total pages.`}
                       </span>
                     </div>
 
