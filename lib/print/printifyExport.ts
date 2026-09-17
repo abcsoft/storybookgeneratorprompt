@@ -418,7 +418,7 @@ export async function exportPrintifyBook(
           front: { data: frontImg.buffer, mimeType: frontImg.mimeType },
           back: backImg ? { data: backImg.buffer, mimeType: backImg.mimeType } : null,
         },
-        { title: book.title, childName: opts.child.name },
+        { title: book.title, childName: opts.child.name, backCoverText: plan.backCoverAsset.storyText },
       );
       await writeFile(path.join(dir, "cover.png"), coverPng);
       written.push("cover.png");

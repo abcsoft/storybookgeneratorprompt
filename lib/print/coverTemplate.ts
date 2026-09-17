@@ -115,6 +115,35 @@ export function renderCoverHtml(
       </div>`;
   }
 
+  // Generic (non-detective) back-cover copy — application-rendered vector
+  // text, positioned inside the back-cover zone and kept clear of the
+  // profile's reserved barcode-safe rect (when the profile has one) so a
+  // long line of copy never overlaps where a real ISBN/UPC barcode will be
+  // placed. This was previously never rendered at all on the wrap cover
+  // (only the single-page back-cover template had it) — the copy simply
+  // never reached the printify/lulu wrap-cover HTML.
+  let backCoverTextHtml = "";
+  if (!hasDetectiveSign && text.backCoverText) {
+    const barcode = profile.barcodeSafeAreaPct;
+    // Default: centered lower third of the back zone. With a barcode-safe
+    // rect reserved in the bottom-right of the back zone, shift the copy up
+    // and constrain its width so it can never overlap that corner.
+    const bottomPct = barcode ? Math.max(14, barcode.bottomPct + barcode.heightPct + 4) : 10;
+    const maxWidthPct = barcode ? 100 - barcode.widthPct - barcode.rightPct - 8 : 78;
+    backCoverTextHtml = `
+      <div class="back-cover-copy" style="bottom:${bottomPct}%; max-width:${maxWidthPct}%;">
+        ${escapeHtml(text.backCoverText)}
+      </div>`;
+  }
+
+  // Reserved barcode-safe region on the back cover — no vector copy, art
+  // crop, or overlay may be placed here; left empty/plain for the real
+  // printer-applied barcode. Positioned as a percentage of the `.back` zone
+  // itself (its own containing block), never a hardcoded pixel rect.
+  const barcodeSafeHtml = profile.barcodeSafeAreaPct
+    ? `<div class="barcode-safe-region" style="right:${profile.barcodeSafeAreaPct.rightPct}%; bottom:${profile.barcodeSafeAreaPct.bottomPct}%; width:${profile.barcodeSafeAreaPct.widthPct}%; height:${profile.barcodeSafeAreaPct.heightPct}%;"></div>`
+    : "";
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -232,6 +261,23 @@ ${fontFaceCss()}
     text-transform: uppercase;
     word-break: break-word;
   }
+  .back-cover-copy {
+    position: absolute;
+    left: 8%;
+    color: #fff;
+    font-family: "Nunito", sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1.4;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+    z-index: 3;
+  }
+  /* Reserved for the printer-applied barcode — intentionally empty/unstyled;
+     see the inline right/bottom/width/height set per-profile above. */
+  .barcode-safe-region {
+    position: absolute;
+    z-index: 4;
+  }
 </style>
 </head>
 <body>
@@ -239,6 +285,8 @@ ${fontFaceCss()}
     <div class="art back">
       ${art.backDataUri ? artFrameHtml(art.backDataUri) : `<div class="art-fallback"></div>`}
       ${detectiveSignHtml}
+      ${backCoverTextHtml}
+      ${barcodeSafeHtml}
     </div>
     <div class="spine"></div>
     <div class="art front">${artFrameHtml(art.frontDataUri)}</div>

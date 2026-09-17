@@ -349,6 +349,7 @@ export async function POST(request: Request): Promise<Response> {
   // 7. Assemble PDF using authoritative slot mapping
   // ──────────────────────────────────────────────────
   let pdf: Buffer;
+  let interiorPdf: Buffer | undefined;
   try {
     // Also build a legacy numeric map for backward compat with the assembler's
     // existing fallback paths (canonical filename, legacy aliases)
@@ -373,6 +374,7 @@ export async function POST(request: Request): Promise<Response> {
       videoTarget,
     });
     pdf = assembled.pdf;
+    interiorPdf = assembled.interiorPdf;
   } catch (err: any) {
     if (err?.code === "MISSING_REQUIRED_ARTWORK" || err?.name === "MissingArtworkError") {
       return NextResponse.json(
@@ -413,11 +415,36 @@ export async function POST(request: Request): Promise<Response> {
     console.warn("[storybook] could not save run to disk:", err);
   }
 
+  // `part=interior` returns the production-only interior file (exactly N
+  // interior pages, no cover/backcover, no DRAFT/NOT FOR PRINT watermark in
+  // production) instead of the combined cover+interior+backcover review
+  // proof that this route returns by default. The combined file must never
+  // be presented as the production printer file — see the interiorPdf doc
+  // comment in lib/manual/assemble.ts.
+  const wantsInteriorOnly = form.get("part") === "interior";
+  if (wantsInteriorOnly) {
+    if (!interiorPdf) {
+      return NextResponse.json(
+        { code: "INTERIOR_PDF_UNAVAILABLE", error: "The interior-only PDF could not be built for this export." },
+        { status: 500 },
+      );
+    }
+    return new Response(new Uint8Array(interiorPdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="great-adventure-interior.pdf"`,
+        "Content-Length": String(interiorPdf.length),
+        "X-Storybook-File-Role": "production-interior",
+      },
+    });
+  }
+
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${bookFilename(child.name, bookId)}"`,
       "Content-Length": String(pdf.length),
+      "X-Storybook-File-Role": "combined-review-proof",
     },
   });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
-import { buildBook, chooseVerseInk, optimizePageImage } from "./buildBook";
+import { buildBook, buildInteriorOnlyBook, chooseVerseInk, optimizePageImage } from "./buildBook";
 import type { ChildProfile, GeneratedPage } from "../story/types";
 
 const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
@@ -142,5 +142,64 @@ describe("buildBook (integration, launches Puppeteer)", () => {
     const pdf = await buildBook(pages, child);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
+  });
+});
+
+describe("buildInteriorOnlyBook", () => {
+  function scenePage(overrides: Partial<GeneratedPage>): GeneratedPage {
+    return {
+      index: 0,
+      kind: "scene",
+      text: "",
+      image: null,
+      imageMimeType: "image/png",
+      failed: false,
+      ...overrides,
+    };
+  }
+
+  it("filters out cover/backcover and renders only the interior pages as a real vector-text PDF", async () => {
+    const img = await solidPng({ r: 50, g: 120, b: 180 });
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, kind: "cover", text: "Alex's Great Adventure", image: img, slotId: "cover-front" }),
+      scenePage({ index: 1, kind: "greeting", text: "Hello Alex.", image: img, slotId: "01-greeting" }),
+      scenePage({ index: 2, kind: "scene", text: "A scene.", image: img, slotId: "02-scene-01" }),
+      scenePage({ index: 3, kind: "video-qr", text: "", image: img, slotId: "03-video-qr" }),
+      scenePage({ index: 4, kind: "backcover", text: "The End.", image: img, slotId: "cover-back" }),
+    ];
+
+    const pdf = await buildInteriorOnlyBook(pages, child);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    // Exactly 3 pages (greeting, scene, video-qr) — cover/backcover excluded.
+    const pageCount = (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    expect(pageCount).toBe(3);
+  });
+
+  it("rejects a greeting page that isn't interior page 1", async () => {
+    const img = await solidPng({ r: 50, g: 120, b: 180 });
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, kind: "scene", text: "s1", image: img, slotId: "s1" }),
+      scenePage({ index: 1, kind: "greeting", text: "g", image: img, slotId: "s2" }),
+    ];
+    await expect(buildInteriorOnlyBook(pages, child)).rejects.toThrow(/greeting page must be interior page 1/i);
+  });
+
+  it("rejects a video-qr page that isn't the last interior page", async () => {
+    const img = await solidPng({ r: 50, g: 120, b: 180 });
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, kind: "greeting", text: "g", image: img, slotId: "s1" }),
+      scenePage({ index: 1, kind: "video-qr", text: "", image: img, slotId: "s2" }),
+      scenePage({ index: 2, kind: "scene", text: "s3", image: img, slotId: "s3" }),
+    ];
+    await expect(buildInteriorOnlyBook(pages, child)).rejects.toThrow(/video-qr page must be the last/i);
+  });
+
+  it("rejects duplicate slot ids", async () => {
+    const img = await solidPng({ r: 50, g: 120, b: 180 });
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, kind: "scene", text: "s1", image: img, slotId: "dup" }),
+      scenePage({ index: 1, kind: "scene", text: "s2", image: img, slotId: "dup" }),
+    ];
+    await expect(buildInteriorOnlyBook(pages, child)).rejects.toThrow(/duplicate slot/i);
   });
 });

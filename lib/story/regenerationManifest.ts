@@ -84,18 +84,42 @@ export const GREAT_ADVENTURE_REGENERATION_MANIFEST: RegenerationManifestEntry[] 
       "actively-lifted lid, and the panel position has moved to top-right.",
   },
   { sceneId: "chest-bursts-open", decision: "REFRAME_ONLY", reason: "Artwork (golden starlight swirl) is correct; only the text-panel position needs to move to top-right so it no longer sits over the now-open chest." },
-  { sceneId: "star-friend", decision: "KEEP_EXISTING", reason: "No defect observed." },
+  {
+    sceneId: "star-friend",
+    decision: "REGENERATION_REQUIRED",
+    reason:
+      "Existing artwork depicts the star reveal on an outdoor forest path at dusk with fireflies, breaking " +
+      "location continuity from the crystal cave established in the three preceding scenes. The prompt now " +
+      "requires the star to rise out of the open treasure chest inside the same cave chamber — regenerate to match.",
+  },
+  // Flight-scene identity review (PDF pages 22-23 / interior pages 21-22):
+  // both scenes were split from one former combined "flying home" spread, so
+  // neither has a single existing image that corresponds to it 1:1 — a
+  // visual identity comparison (face/age/hair/Scout-contract drift) isn't
+  // possible against artwork that was never generated for this exact scene.
+  // REGENERATION_REQUIRED here is "nothing to compare yet," not "compared
+  // and found drifted." Both already receive the new immutable identity +
+  // Scout + style-lock contracts (via the shared prompt engine) for
+  // whenever they ARE generated.
   {
     sceneId: "star-trail-departure",
     decision: "REGENERATION_REQUIRED",
-    reason: "New scene (split from the former combined flying-home spread) with no prior matching artwork — nothing exists yet to keep.",
+    reason: "New scene (split from the former combined flying-home spread) with no prior matching artwork — nothing exists yet to keep or compare identity against.",
   },
   {
     sceneId: "star-trail-homeward-flight",
     decision: "REGENERATION_REQUIRED",
-    reason: "New scene (split from the former combined flying-home spread) with no prior matching artwork — nothing exists yet to keep.",
+    reason: "New scene (split from the former combined flying-home spread) with no prior matching artwork — nothing exists yet to keep or compare identity against.",
   },
-  { sceneId: "closing", decision: "KEEP_EXISTING", reason: "Child's face and Scout both remain visible past the text panel; does not cover most of the sleeping child. No defect observed." },
+  {
+    sceneId: "closing",
+    decision: "KEEP_EXISTING",
+    reason:
+      "Visually inspected against the bottom-left text panel: the child's face (top of frame), Scout (bottom-right, " +
+      "beyond the panel), the glowing star, and the window (top-right) all remain fully visible past the panel — " +
+      "the panel covers only the blanket/torso area. Meets the 'must not cover face/most of body/Scout/star/window' " +
+      "requirement as currently positioned, so REFRAME_ONLY/RENDER_OVERLAY_ONLY is not needed here.",
+  },
   {
     sceneId: "video-qr",
     decision: "RENDER_OVERLAY_ONLY",
@@ -109,9 +133,13 @@ export const GREAT_ADVENTURE_REGENERATION_MANIFEST: RegenerationManifestEntry[] 
     sceneId: "backcover",
     decision: "RENDER_OVERLAY_ONLY",
     reason:
-      "Artwork (waving farewell scene) is correct and distinct from the front cover; only the overlaid copy " +
-      "needed correcting (removed a duplicated ellipsis — was \"The End…\\n...or maybe...\", now the single " +
-      "required line) — a text-overlay fix, not an artwork regeneration.",
+      "Artwork (waving farewell scene) is correct and distinct from the front cover, and child/Scout identity " +
+      "in it matches every other page on visual inspection — no regeneration needed. Fixed instead: (1) the " +
+      "duplicated-ellipsis copy bug (was \"The End…\\n...or maybe...\", now the single required line); " +
+      "(2) the wrap-cover pipeline (printifyExport.ts -> composeCover) never rendered generic back-cover copy " +
+      "at all — only a book-specific \"detective sign\" special case existed — now wired to render it as real " +
+      "vector text; (3) a profile-derived (percentage-based, never hardcoded) barcode-safe region is now " +
+      "reserved on the back-cover zone, and the copy's position is computed to clear it.",
   },
 ];
 

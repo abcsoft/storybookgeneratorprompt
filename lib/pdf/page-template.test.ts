@@ -112,6 +112,30 @@ describe("renderBookHtml (landscape)", () => {
   });
 });
 
+describe("draft vs. production — no draft marks leak into production output", () => {
+  // A complete page set (no missing/failed art — assembleFromImages already
+  // fails closed before a real production export could ever reach a missing
+  // slot, so that's a separate, already-covered concern; this test isolates
+  // just the isDraft-gated overlay watermark/guide border).
+  const completePages: GeneratedPage[] = [
+    page({ index: 0, kind: "cover", text: "Alex's Dream Big Adventure" }),
+    page({ index: 1, kind: "scene", role: "PILOT", text: "Up and away, Alex!" }),
+    page({ index: 2, kind: "backcover", text: "Dream big." }),
+  ];
+  const productionOut = renderBookHtml(completePages, child); // options.draft defaults to false
+  const draftOut = renderBookHtml(completePages, child, { draft: true });
+
+  it("production output contains no DRAFT watermark div or guide-border div (the CSS *rule* may still exist unused in the stylesheet)", () => {
+    expect(productionOut).not.toContain("DRAFT / NOT FOR PRINT");
+    expect(productionOut).not.toContain('class="draft-overlay-watermark"');
+  });
+
+  it("draft output clearly shows the watermark and guide-border div", () => {
+    expect(draftOut).toContain("DRAFT / NOT FOR PRINT");
+    expect(draftOut).toContain('class="draft-overlay-watermark"');
+  });
+});
+
 describe("video-qr page — application-rendered QR/CTA, never the blank verse capsule", () => {
   const withoutQr = page({ index: 0, kind: "video-qr", text: "" });
   const outNoQr = renderBookHtml([withoutQr], child);

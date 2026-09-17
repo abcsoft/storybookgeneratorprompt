@@ -5,7 +5,7 @@
  * illustration slot is missing. Gradient placeholders exist ONLY in explicit draft mode.
  */
 
-import { buildBook } from "../pdf/buildBook";
+import { buildBook, buildInteriorOnlyBook } from "../pdf/buildBook";
 import { buildLuluInteriorBook } from "../pdf/luluExport";
 import { getPrintProfile } from "../print/registry";
 import { DEFAULT_BOOK_ID } from "../story/registry";
@@ -107,7 +107,7 @@ export async function assembleFromImages(
   bookId: string = DEFAULT_BOOK_ID,
   profileId?: string,
   opts?: AssembleFromImagesOptions,
-): Promise<{ pdf: Buffer; usedPages: number; totalPages: number }> {
+): Promise<{ pdf: Buffer; interiorPdf?: Buffer; usedPages: number; totalPages: number }> {
   const profile = getPrintProfile(profileId);
   const effectiveMode = opts?.layoutMode ?? opts?.mode ?? "standard-single";
   const isDraft = opts?.draft === true;
@@ -199,8 +199,10 @@ export async function assembleFromImages(
   });
 
   let pdf: Buffer;
+  let interiorPdf: Buffer | undefined;
   if (profile.exportMode === "lulu-interior-pdf") {
     pdf = await buildLuluInteriorBook(generated, child, profile);
+    interiorPdf = pdf; // this path's `pdf` already IS the interior-only file
     const { exportLuluPackage } = await import("../print/luluPackageExport");
     try {
       await exportLuluPackage({
@@ -213,11 +215,26 @@ export async function assembleFromImages(
       console.warn("[storybook] Lulu package export failed:", err);
     }
   } else {
+    // `pdf` is the combined cover+interior+backcover REVIEW PROOF — labelled
+    // and returned for on-screen preview/download, but never the production
+    // interior file. `interiorPdf` is the genuine production interior-only
+    // output (exactly N interior pages, greeting first / video-qr last, real
+    // vector story text) — computed alongside it so every profile using this
+    // pipeline (not just the Lulu-branded ones) gets a real split output.
     pdf = await buildBook(generated, child, profile, { draft: isDraft });
+    try {
+      interiorPdf = await buildInteriorOnlyBook(generated, child, { draft: isDraft });
+    } catch (err) {
+      // Don't fail the whole (already-succeeded) combined-proof export over
+      // the interior-only invariant checks — surface it as a missing field
+      // instead, same fail-closed spirit as the Lulu package export above.
+      console.warn("[storybook] Interior-only PDF build failed:", err);
+    }
   }
 
   return {
     pdf,
+    interiorPdf,
     usedPages: images.size,
     totalPages: plan.assets.length,
   };

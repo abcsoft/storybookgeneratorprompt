@@ -64,3 +64,50 @@ describe("renderCoverHtml", () => {
     ).toThrow();
   });
 });
+
+describe("renderCoverHtml — back-cover copy + barcode-safe region", () => {
+  it("renders generic (non-detective) back-cover copy as real vector text, not baked into the art", () => {
+    const html = renderCoverHtml(
+      printifyHardcoverSquare8x8Profile,
+      { frontDataUri: TINY_PNG, backDataUri: TINY_PNG },
+      { title: "Great Adventure", childName: "Ihan", backCoverText: "The End… or maybe it's just the beginning of Ihan's next adventure!" },
+    );
+    expect(html).toContain('class="back-cover-copy"');
+    expect(html).toContain("The End… or maybe it's just the beginning of Ihan's next adventure!");
+  });
+
+  it("reserves a profile-derived barcode-safe rect (percentage-based, not a hardcoded pixel rect)", () => {
+    const html = renderCoverHtml(
+      printifyHardcoverSquare8x8Profile,
+      { frontDataUri: TINY_PNG, backDataUri: TINY_PNG },
+      { title: "Great Adventure", childName: "Ihan", backCoverText: "The End…" },
+    );
+    const barcode = printifyHardcoverSquare8x8Profile.barcodeSafeAreaPct!;
+    expect(barcode).toBeDefined();
+    expect(html).toContain('class="barcode-safe-region"');
+    expect(html).toContain(`right:${barcode.rightPct}%`);
+    expect(html).toContain(`bottom:${barcode.bottomPct}%`);
+  });
+
+  it("omits the barcode-safe region entirely for a profile that doesn't declare one", () => {
+    const html = renderCoverHtml(
+      { ...printifyHardcoverSquare8x8Profile, barcodeSafeAreaPct: undefined },
+      { frontDataUri: TINY_PNG, backDataUri: TINY_PNG },
+      { title: "Great Adventure", childName: "Ihan", backCoverText: "The End…" },
+    );
+    expect(html).not.toContain('class="barcode-safe-region"');
+  });
+
+  it("the back-cover copy's max-width and vertical position clear the barcode-safe rect", () => {
+    const html = renderCoverHtml(
+      printifyHardcoverSquare8x8Profile,
+      { frontDataUri: TINY_PNG, backDataUri: TINY_PNG },
+      { title: "Great Adventure", childName: "Ihan", backCoverText: "The End…" },
+    );
+    const barcode = printifyHardcoverSquare8x8Profile.barcodeSafeAreaPct!;
+    const bottomMatch = html.match(/class="back-cover-copy" style="bottom:([\d.]+)%/);
+    expect(bottomMatch).toBeTruthy();
+    const copyBottomPct = Number(bottomMatch![1]);
+    expect(copyBottomPct).toBeGreaterThanOrEqual(barcode.bottomPct + barcode.heightPct);
+  });
+});

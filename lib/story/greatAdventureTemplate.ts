@@ -22,6 +22,8 @@
 
 import { buildIllustrationPrompt } from "./prompt/buildIllustrationPrompt";
 import { pronouns, cap, type Pronouns } from "./textHelpers";
+import { secretMarkerPromptFragment } from "./greatAdventureSecretMarkerContract";
+import { GREAT_ADVENTURE_SCOUT_CONTRACT } from "./greatAdventureIdentityContract";
 import type {
   ChildProfile,
   CompanionSpec,
@@ -33,14 +35,10 @@ import type {
 
 /** Scout, kept consistent page-to-page via the shared companion-rules block
  *  instead of being re-described by hand in every scene (see item 4). */
-const SCOUT: CompanionSpec = {
-  name: "Scout",
-  description: "a small fluffy light-brown puppy",
-  consistencyRules:
-    "same floppy ears, same fur color and length, same size and body " +
-    "proportions on every page — a single puppy only, never duplicated, " +
-    "never a different breed",
-};
+/** The single source of truth for Scout's identity — see
+ *  greatAdventureIdentityContract.ts's GREAT_ADVENTURE_SCOUT_CONTRACT for
+ *  the itemized field list and why it's defined there rather than here. */
+const SCOUT: CompanionSpec = GREAT_ADVENTURE_SCOUT_CONTRACT;
 
 /** The standard adventure outfit, worn on every page unless a scene opts into
  *  one of the special outfits below (see item 3 — configurable per story, not
@@ -70,8 +68,10 @@ const STORY_META = { defaultOutfit: DEFAULT_OUTFIT, companion: SCOUT };
  * scenes below, plus the semantic-contract lint test that checks this
  * verbatim reuse (lib/story/greatAdventureSemanticContracts.test.ts).
  */
-export const SECRET_MARKER =
-  "a single distinctive ancient marker symbol: a plain equal-armed cross inside a circle, carved in pale weathered stone — always this exact same symbol, proportions, and carving style, never a different glyph";
+/** @deprecated kept as a re-export for backward compatibility — import
+ *  `secretMarkerPromptFragment()` / `GREAT_ADVENTURE_SECRET_MARKER_CONTRACT`
+ *  from greatAdventureSecretMarkerContract.ts directly in new code. */
+export const SECRET_MARKER = secretMarkerPromptFragment();
 
 /** Build a full illustration prompt through the shared prompt engine. */
 function illustration(
@@ -336,7 +336,7 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Standing in a hidden stone chamber before a big old wooden treasure chest " +
+      "Standing in a hidden stone chamber deep within the same crystal cave, before a big old wooden treasure chest " +
       "that sits on a glowing X marked on the floor, both hands actively gripping the raised lid and pushing " +
       "it open — the lid clearly lifted at an angle, hinges visible, not resting closed — with a " +
       "thrilled expression, with Scout beside them; shafts of golden light from above.",
@@ -367,17 +367,26 @@ const STORY: Beat[] = [
       "Bright warm golden light radiating outward from the open chest, lighting the child's face, dim cave around; eye-level camera.",
   },
   {
+    // Location continuity: stays in the SAME crystal cave chamber as the
+    // preceding treasure-chest scenes — reuses the cave walls, glowing gems,
+    // and lantern already established there. The forest/path imagery this
+    // beat previously used has been removed; the journey home starts only
+    // at the next (departure) beat, once they've actually left the cave.
     scene:
-      "A single friendly glowing star floating in the air beside the smiling child, " +
-      "lighting a sparkling path that points the way home, with " +
-      "Scout gazing up in wonder; a soft magical glow all around.",
+      "Still inside the glittering crystal cave chamber, beside the open treasure chest, a single friendly " +
+      "glowing star rises up out of the chest in a soft shower of sparkles and floats in the air beside the " +
+      "smiling child, its warm glow mixing with the colourful glow of the surrounding crystal walls, with " +
+      "Scout gazing up at it in wonder.",
     copy: (c) =>
       `To their surprise, the greatest treasure wasn't gold or jewels. It was a ` +
       `little shining star—a forever friend who promised to show ${c.name} and ` +
       `Scout the way back home.`,
-    ink: "dark", // pale forest path — dark text on a panel reads better than white
+    ink: "dark", // glowing crystal cave — dark text on a panel reads better than white
     light:
-      "Dim dusk forest lit by the soft warm glow of the floating star and fireflies; eye-level camera on the path.",
+      "Dim crystal-cave interior lit by the warm, colourful glow of the crystals and the tiny star's own glow; eye-level camera inside the cave chamber.",
+    compositionNotes:
+      "keep the same crystal-cave walls, gems, and cave lantern established in the previous two scenes clearly " +
+      "visible — do not change location to a forest, path, or any outdoor setting.",
   },
   {
     scene:

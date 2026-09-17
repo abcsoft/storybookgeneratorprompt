@@ -106,7 +106,7 @@ export function chooseVerseInk(meanLuminance: number): "light" | "dark" {
 }
 
 function hasVerse(kind: GeneratedPage["kind"]): boolean {
-  return kind === "scene" || kind === "intro" || kind === "closing";
+  return kind === "scene" || kind === "intro" || kind === "closing" || kind === "greeting";
 }
 
 async function pickVerseInk(
@@ -132,14 +132,7 @@ async function pickVerseInk(
   }
 }
 
-export async function buildBook(
-  pages: GeneratedPage[],
-  child: ChildProfile,
-  profile?: PrintProfile,
-  options?: BuildBookOptions,
-): Promise<Buffer> {
-  const isDraft = options?.draft === true;
-
+async function renderPagesToPdf(pages: GeneratedPage[], child: ChildProfile, isDraft: boolean): Promise<Buffer> {
   // Fail closed in production: no missing artwork allowed
   if (!isDraft) {
     const missingPages = pages.filter((p) => p.failed || !p.image);
@@ -197,4 +190,77 @@ export async function buildBook(
   } finally {
     await browser.close();
   }
+}
+
+export async function buildBook(
+  pages: GeneratedPage[],
+  child: ChildProfile,
+  profile?: PrintProfile,
+  options?: BuildBookOptions,
+): Promise<Buffer> {
+  return renderPagesToPdf(pages, child, options?.draft === true);
+}
+
+/**
+ * `great-adventure-interior.pdf` production output for any profile using
+ * this (vector-PDF, page.pdf()) pipeline — filters out the cover/backcover
+ * pages and renders the SAME HTML/CSS as the combined preview, so it keeps
+ * real, searchable vector story text (unlike the Lulu raster pipeline in
+ * lib/pdf/luluExport.ts, which flattens every page to an opaque JPEG for
+ * print-color fidelity and has no embedded text at all).
+ *
+ * Fails closed on the same structural invariants as
+ * lib/pdf/luluExport.ts's buildLuluInteriorBook: no cover/backcover leaking
+ * into the interior sequence, no duplicate slots, greeting must be page 1,
+ * video-qr must be the last interior page (when those kinds are present —
+ * i.e. for a StoryEdition-backed book; older books without a greeting/
+ * video-qr page skip that specific check).
+ */
+export async function buildInteriorOnlyBook(
+  pages: GeneratedPage[],
+  child: ChildProfile,
+  options?: BuildBookOptions,
+): Promise<Buffer> {
+  const isDraft = options?.draft === true;
+  const interiorPages = pages.filter((p) => p.kind !== "cover" && p.kind !== "backcover");
+
+  if (interiorPages.some((p) => p.kind === "cover" || p.kind === "backcover")) {
+    throw new Error("Interior PDF invariant violated: a cover/backcover page survived the interior filter.");
+  }
+  const seenSlotIds = new Set<string>();
+  for (const p of interiorPages) {
+    if (p.slotId) {
+      if (seenSlotIds.has(p.slotId)) {
+        throw new Error(`Interior PDF invariant violated: duplicate slot "${p.slotId}" in the interior page sequence.`);
+      }
+      seenSlotIds.add(p.slotId);
+    }
+  }
+  const hasStandardEditionKinds = interiorPages.some((p) => p.kind === "greeting" || p.kind === "video-qr");
+  if (hasStandardEditionKinds) {
+    const greetingIndex = interiorPages.findIndex((p) => p.kind === "greeting");
+    const videoQrIndex = interiorPages.findIndex((p) => p.kind === "video-qr");
+    if (greetingIndex !== -1 && greetingIndex !== 0) {
+      throw new Error("Interior PDF invariant violated: the greeting page must be interior page 1.");
+    }
+    if (videoQrIndex !== -1 && videoQrIndex !== interiorPages.length - 1) {
+      throw new Error("Interior PDF invariant violated: the video-qr page must be the last interior page.");
+    }
+  }
+
+  return renderPagesToPdf(interiorPages, child, isDraft);
+}
+
+/**
+ * A labelled review/proof PDF — the SAME combined cover+interior+backcover
+ * document as before, but callers should treat this as a preview artifact
+ * only, never as a production printer file (see buildInteriorOnlyBook /
+ * lib/print/coverWrapExport.ts for the actual production outputs).
+ */
+export async function buildCombinedReviewProof(
+  pages: GeneratedPage[],
+  child: ChildProfile,
+  options?: BuildBookOptions,
+): Promise<Buffer> {
+  return renderPagesToPdf(pages, child, options?.draft === true);
 }

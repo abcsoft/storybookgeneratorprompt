@@ -23,6 +23,11 @@ export const printifyHardcoverSquare8x8Profile: PrintProfile = {
   // against Printify's live spec sheet for your page count before ordering;
   // lib/print/preflight.ts surfaces a warning for this every export.
   spineWidthPx: 120,
+  // Standard bottom-right ISBN/UPC barcode placement, as a percentage of the
+  // back-cover zone (never hardcoded pixels) — a ~2in x 1.2in barcode is
+  // typical; 2/8.5≈24%, 1.2/8.5≈14% on this trim size, inset a further
+  // margin from the trim edge.
+  barcodeSafeAreaPct: { rightPct: 6, bottomPct: 6, widthPct: 26, heightPct: 16 },
   singleAspect: "1:1",
   spreadAspect: "2:1",
   providerPresetAspect: "1:1",

@@ -49,6 +49,13 @@ export interface PrintProfile {
   coverGeometryPx?: PxSize;
   /** Placeholder spine width. */
   spineWidthPx?: number;
+  /** Reserved barcode-safe region on the BACK cover panel of the wrap
+   *  cover, as percentages of the back-cover zone's own width/height (never
+   *  hardcoded pixels for a specific profile) — vector back-cover copy must
+   *  render outside this rect. Absent when the profile has no cover-wrap
+   *  product (e.g. `exportMode: "single-pdf"`) or no authoritative barcode
+   *  placement has been supplied yet. */
+  barcodeSafeAreaPct?: { rightPct: number; bottomPct: number; widthPct: number; heightPct: number };
   /** Physical trim aspect ratio for a single page, e.g. "11:8", "1:1". */
   trimAspect?: string;
   /** Full-bleed target canvas aspect ratio for a single page, e.g. "15:11", "1:1". */

@@ -30,6 +30,7 @@ describe("Great Adventure regeneration manifest", () => {
       "ocean-storm",
       "treasure-chest-reach",
       "savanna-riverbank",
+      "star-friend",
     ];
     for (const sceneId of flagged) {
       const entry = GREAT_ADVENTURE_REGENERATION_MANIFEST.find((e) => e.sceneId === sceneId);

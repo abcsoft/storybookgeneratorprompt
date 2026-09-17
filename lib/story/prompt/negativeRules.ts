@@ -22,7 +22,7 @@ export function negativeRules(isSpread?: boolean, framing: FramingMode = "medium
   }
 
   const noTextConstraint =
-    "ABSOLUTELY NO TEXT IN THE IMAGE: no captions, names, titles, letters, words, numbers, typography, or gibberish lettering anywhere in the picture, including on maps, scrolls, banners, signs, or clothing — leave every such surface blank. No watermarks, signatures, logos, frames, or borders.";
+    "ABSOLUTELY NO TEXT IN THE IMAGE: no captions, names, titles, letters, words, numbers, typography, gibberish lettering, or AI-generated story/caption text anywhere in the picture, including on maps, scrolls, banners, signs, or clothing — leave every such surface blank. No watermarks, signatures, logos, name patches, brand marks, or borders. No unrequested jewelry, necklaces, badges, or patches on any character.";
 
   return (
     "DO NOT: " +
