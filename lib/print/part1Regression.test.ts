@@ -8,6 +8,7 @@ import { runPreflight } from "./preflight";
 import { validateExportedFolder } from "./printifyExport";
 import { greatAdventurePrintify24Edition } from "../story/greatAdventureTemplate";
 import { getEditionForProfile } from "../story/editions";
+import { resolveLayoutPlan } from "../story/layoutPlan";
 
 describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regression Tests", () => {
   // Test 1: Printify profile requires exactly 24 interior pages
@@ -49,10 +50,33 @@ describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regressi
 
   // Test 5: Error messages use 'Illustration' correctly
   it("5. Error messages use 'Illustration' correctly", async () => {
+    // Great Adventure now resolves through its registered standard-24
+    // StoryEdition on every profile, which takes priority over the legacy
+    // great-adventure-printify-24 PrintEdition this test used to exercise —
+    // that edition's spreads (and its distinct "Illus 05 is a wide spread"
+    // numbering) are no longer reachable via
+    // runPreflight()/resolveLayoutPlan() for this bookId, and every
+    // standard-24 interior page on the Printify SQUARE profile is 1:1, which
+    // is never orientation-incompatible with any source (square is
+    // compatible with both portrait and landscape — see aspectCheck.ts) —
+    // so there's no longer a way to trigger this specific error class on
+    // that profile. Use Classic Landscape instead, a genuinely landscape
+    // target, to exercise the same "Illustration N (filename)" message
+    // format. "Illustration N" is the asset's real 1-based position
+    // (illustrationIndex + 1) in the resolved plan.
     const dummyChild = { name: "Test", age: 5, gender: "boy" as const };
-    // Create a portrait buffer (opposite orientation of wide spread landscape 2:1)
+    const plan = resolveLayoutPlan({
+      child: dummyChild,
+      bookId: "great-adventure",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
+    const targetSlot = plan.assets[5];
+    expect(targetSlot.assetKind).toBe("single-page");
+
+    // Portrait buffer against the landscape target — orientation-incompatible.
     const badAspectBuffer = await sharp({
-      create: { width: 100, height: 300, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
+      create: { width: 800, height: 1200, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
     })
       .png()
       .toBuffer();
@@ -60,12 +84,13 @@ describe("Part 1: Printify 24-Page Foundation, Numbering, and Preflight Regressi
     const res = await runPreflight({
       child: dummyChild,
       bookId: "great-adventure",
-      profileId: "printify-hardcover-square-8x8",
-      files: [
-        { filename: "05.png", buffer: badAspectBuffer }, // Illus 05 is a wide spread requiring 2:1
-      ],
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+      files: [{ filename: targetSlot.expectedFilename, buffer: badAspectBuffer }],
     });
-    expect(res.errors.some((e) => e.startsWith("Illustration 5 (05.png)"))).toBe(true);
+    expect(
+      res.errors.some((e) => e.startsWith(`Illustration ${targetSlot.illustrationIndex + 1} (${targetSlot.expectedFilename})`)),
+    ).toBe(true);
   });
 
   // Test 6: Physical page mapping is stable

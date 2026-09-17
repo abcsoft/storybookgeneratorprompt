@@ -25,6 +25,8 @@ export const printifyHardcoverSquare8x8Profile: PrintProfile = {
   spineWidthPx: 120,
   singleAspect: "1:1",
   spreadAspect: "2:1",
+  providerPresetAspect: "1:1",
+  providerPresetSpreadAspect: "2:1",
   exportMode: "printify-folder",
   interiorPageCount: 24,
 };

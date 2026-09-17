@@ -558,3 +558,178 @@ export const theGreatDetectiveBook: StoryTemplate = {
   pages: theGreatDetectivePages,
   defaultOutfit: HERO_OUTFIT,
 };
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition. This story's 23 investigation beats (STORY[0..22])
+// had no separate intro distinct from the narrative itself, so STORY[0] (the
+// "notices sad Rohan" beat) becomes Page 2's intro. The remaining 22 beats
+// (STORY[1..22]) become exactly 20 scenes via two editorially approved
+// adjacent merges: the two short initial search beats (swings, sandbox) into
+// one search scene, and the two consecutive footprint beats (wide discovery,
+// close-up deduction) into one discovery-and-deduction scene — Rohan, Meera,
+// the ball, the magnifying glass, the muddy footprint clue, and the
+// kindness/friendship resolution are all preserved, in the same order.
+// The existing merged closing/back-cover page (the "CASE CLOSED" wooden-sign
+// wrap-up) becomes the new Page 23 closing; a new, simple back cover
+// (matching every other story's plain wave-goodbye back cover, no sign
+// needed since the case-closed payoff now lives on the closing page)
+// fills the separate cover group's back panel.
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function detectiveBeatScene(beat: Beat, sceneId: string): StoryEditionScene {
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(beat.scene, beat.light, undefined, "single-page", "scene"),
+    text: (c) => beat.copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+// detectiveBeatScene() hardcodes kind: "scene" (it's built for narrative
+// beats), so STORY[0]'s repurposed-as-intro scene needs its kind corrected
+// to "intro" afterward — otherwise the resolver files it as a 21st "scene"
+// page (wrong canonical filename, wrong pageKind) instead of Page 2 "intro".
+const introScene: StoryEditionScene = { ...detectiveBeatScene(STORY[0], "intro"), kind: "intro" };
+
+const searchMergedScene: StoryEditionScene = {
+  sceneId: "search-playground",
+  kind: "scene",
+  illustrationPrompt: illustration(
+    "Crouching low in the sunny playground, having just checked under the swings and now carefully " +
+      `examining the sandbox with ${MAGNIFIER} held steady in one hand, looking determined and observant, as ` +
+      "the swings and slide stand in the background — showing the search moving from one spot to the next.",
+    "Bright midday sun from above, warm and clear; eye-level camera moving from the swings toward the sandbox.",
+    undefined,
+    "single-page",
+    "scene",
+  ),
+  text: (c) => {
+    const p = pronouns(c.gender);
+    return (
+      `First ${c.name} checked under the swings — no ball. Then ${p.subj} moved to the sandbox with ${p.poss} ` +
+      `trusty glass. Still no ball — but ${c.name} did not give up.`
+    );
+  },
+  legacyFilenames: [],
+};
+
+const footprintMergedScene: StoryEditionScene = {
+  sceneId: "footprint-discovery",
+  kind: "scene",
+  illustrationPrompt: illustration(
+    "Crouched on the ground with eyes wide in discovery, peering closely through " +
+      `${MAGNIFIER} at a trail of little muddy child's sneaker footprints — clearly HUMAN kid footprints, NOT ` +
+      "animal paw prints — studying the wiggly tread pattern on the bottom with a focused, thinking expression.",
+    "Bright, clear daylight raking low from the upper left so the footprints stand out, with crisp detail on the tread pattern; low eye-level camera near the trail.",
+    undefined,
+    "single-page",
+    "scene",
+  ),
+  text: (c) => {
+    const p = pronouns(c.gender);
+    return (
+      `Then ${c.name} looked down at the ground. Aha — a clue! ${cap(p.subj)} peered through ${p.poss} glass at ` +
+      `the wiggly lines. "These are sneaker prints," ${p.subj} said, "about my size!"`
+    );
+  },
+  legacyFilenames: [],
+};
+
+const closingScene: StoryEditionScene = {
+  sceneId: "case-closed",
+  kind: "closing",
+  illustrationPrompt: (c, profileId, overrides) => {
+    const scene =
+      "In a sunny playground dappled with light beneath leafy trees, standing and smiling warmly while handing " +
+      `the bright yellow ball back to ${ROHAN}, both looking happy, with ${MAGNIFIER} in the other hand; swings, ` +
+      "a slide, a merry-go-round and a wooden bench softly behind, and a couple of children playing in the " +
+      "distance; a cheerful, satisfying 'case solved' mood. In the right-hand foreground — set fully inside the " +
+      "frame with a clear margin of open background between the sign and the right edge — a charming, rustic " +
+      "hand-painted wooden sign post is planted in the grass with a smooth, clean, blank wooden placard face " +
+      "completely free of letters, numbers, or text, reserved for title overlay. IMPORTANT COMPOSITION: keep " +
+      "the ENTIRE wooden placard within the central safe area of the picture, well away from all four edges, " +
+      "with an open, calm surface suitable for overlaid typography." + FULL_FIGURE;
+    const light =
+      "Warm and golden, with sunlight filtering through the dense green tree leaves, casting dappled light and " +
+      "a subtle rainbow arch in the upper trees; eye-level camera by the bench.";
+    return illustration(scene, light, undefined, "single-page", "closing")(c, profileId, overrides);
+  },
+  text: (c) => `CASE CLOSED!\n${c.name.toUpperCase()}'S DETECTIVE AGENCY`,
+  legacyFilenames: [],
+};
+
+const newBackCoverScene: StoryEditionScene = {
+  sceneId: "backcover",
+  kind: "backcover",
+  illustrationPrompt: illustration(
+    `Waving cheerfully with a big joyful smile, holding ${MAGNIFIER} up in the other hand, standing in a soft, ` +
+      "simple sunny playground background with a few gentle clouds.",
+    "Warm, bright afternoon sunlight from the upper right, cheerful and clear; eye-level camera.",
+    undefined,
+    "single-page",
+    "backcover",
+  ),
+  text: () => `The case may be closed, but the adventures of a great detective never stop!`,
+  legacyFilenames: [],
+};
+
+export const theGreatDetectiveStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "the-great-detective",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    { defaultOutfit: HERO_OUTFIT },
+    "A calm, dreamy portrait moment in a sunny playground at soft morning light, sitting comfortably and " +
+      `looking toward the viewer with a warm, curious smile, ${MAGNIFIER} resting nearby.`,
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: introScene,
+  scenes: [
+    detectiveBeatScene(STORY[1], "lost-ball-promise"),
+    detectiveBeatScene(STORY[2], "detective-method"),
+    searchMergedScene,
+    footprintMergedScene,
+    detectiveBeatScene(STORY[7], "following-past-slide"),
+    detectiveBeatScene(STORY[8], "behind-the-bush"),
+    detectiveBeatScene(STORY[9], "puddle-problem"),
+    detectiveBeatScene(STORY[10], "thinking-it-through"),
+    detectiveBeatScene(STORY[11], "trail-resumes"),
+    detectiveBeatScene(STORY[12], "willow-tree"),
+    detectiveBeatScene(STORY[13], "flash-of-yellow"),
+    detectiveBeatScene(STORY[14], "ball-isnt-alone"),
+    detectiveBeatScene(STORY[15], "reassuring-smile"),
+    detectiveBeatScene(STORY[16], "kind-soft-voice"),
+    detectiveBeatScene(STORY[17], "meera-introduces-herself"),
+    detectiveBeatScene(STORY[18], "ball-handed-over"),
+    detectiveBeatScene(STORY[19], "into-the-sunshine"),
+    detectiveBeatScene(STORY[20], "happy-reunion"),
+    detectiveBeatScene(STORY[21], "introducing-new-friend"),
+    detectiveBeatScene(STORY[22], "three-friends-playing-catch"),
+  ],
+  closing: closingScene,
+  videoQr: buildVideoQrScene(
+    { defaultOutfit: HERO_OUTFIT },
+    "A calm, low-detail sunny playground background at golden hour with soft blurred swings and trees, echoing " +
+      "the story's setting.",
+  ),
+  cover: {
+    front: reuseDetectiveSpec(theGreatDetectivePages[0], "cover"),
+    back: newBackCoverScene,
+  },
+};
+
+function reuseDetectiveSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return {
+    sceneId,
+    kind: spec.kind,
+    illustrationPrompt: spec.illustrationPrompt,
+    text: spec.text,
+    legacyFilenames: [],
+  };
+}
+
+registerStoryEdition(theGreatDetectiveStandard24Edition);

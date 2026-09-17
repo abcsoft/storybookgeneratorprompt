@@ -11,9 +11,19 @@ interface BookMeta {
   id: string;
   title: string;
   subtitle: string;
-  /** Illustrations to generate (one per page spec). */
+  /** Ordered narrative scenes (excludes greeting/intro/closing/video-QR/cover). */
+  narrativeSceneCount: number;
+  /** Numbered interior pages 1..N — the cover is delivered separately and never gets one. */
+  interiorPageCount: number;
+  /** Front + back cover, delivered separately, never assigned an interior page number. */
+  coverAssetCount: number;
+  /** Total illustrations to generate: interior pages + separate cover assets. */
+  imageAssetCount: number;
+  /** Facing pairs rendered as one panoramic spread instead of two singles (0 unless explicitly approved). */
+  spreadCount: number;
+  /** @deprecated legacy fallback only */
   pages: number;
-  /** Physical pages once printed — spreads occupy two leaves. */
+  /** @deprecated legacy fallback only */
   printPages: number;
 }
 
@@ -133,9 +143,7 @@ export default function Studio({
                   <span className={styles.bookRule} aria-hidden="true" />
                   <span className={styles.bookTitle}>{b.title}</span>
                   <span className={styles.bookPages}>
-                    {selectedProfile.interiorPageCount
-                      ? `Interior pages: ${selectedProfile.interiorPageCount}`
-                      : `${b.printPages} pages`}
+                    {b.interiorPageCount} interior pages + separate cover
                   </span>
                 </button>
               );
@@ -144,6 +152,17 @@ export default function Studio({
           <p className={styles.shelfCaption} aria-live="polite">
             {selected?.subtitle}
           </p>
+          {selected && (
+            <p className={styles.shelfCaption} aria-live="polite">
+              {selected.narrativeSceneCount} narrative scenes · {selected.interiorPageCount} interior pages ·{" "}
+              {selected.coverAssetCount} cover asset{selected.coverAssetCount === 1 ? "" : "s"} (delivered separately)
+              {" · "}
+              {selected.imageAssetCount} illustrations total
+              {selected.spreadCount > 0
+                ? ` · ${selected.spreadCount} approved spread${selected.spreadCount === 1 ? "" : "s"}`
+                : " · no spreads"}
+            </p>
+          )}
         </>
       )}
 
@@ -195,7 +214,7 @@ export default function Studio({
           onSessionWorkChange={setManualHasWork}
         />
       ) : (
-        <AutoFlow bookId={bookId} pageCount={selected?.pages ?? 24} />
+        <AutoFlow bookId={bookId} pageCount={selected?.imageAssetCount ?? 26} />
       )}
 
       {pendingBookId && (

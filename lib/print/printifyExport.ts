@@ -55,6 +55,11 @@ export interface PrintifyExportOptions {
   qualityAcknowledgements?: Record<string, import("./preflight").QualityAcknowledgementRecord>;
   acknowledgeQualityWarnings?: boolean;
   visualApprovals?: Record<string, import("../enhance/types").SignedEnhancementApprovalRecord>;
+  /** Application-rendered QR + fallback URL for the video-qr interior page
+   *  (see lib/story/qr.ts). Omit or leave `isPlaceholder: true` for a draft
+   *  export; this pipeline does not currently gate production on it the way
+   *  lib/manual/assemble.ts does for the Classic Landscape path. */
+  videoQr?: { dataUri: string | null; url: string | null; isPlaceholder: boolean };
 }
 
 export interface PrintifyExportResult {
@@ -467,6 +472,10 @@ export async function exportPrintifyBook(
           text: leaf.text,
           transform: slot.assetKind === "single-page" ? provided?.transform : undefined,
           sourcePx: slot.assetKind === "single-page" ? sourcePx : undefined,
+          kind: slot.kind,
+          textPanelPosition: slot.textPanelPosition,
+          videoQr: opts.videoQr,
+          childName: opts.child.name,
         }),
       });
     }

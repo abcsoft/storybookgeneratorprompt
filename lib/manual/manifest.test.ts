@@ -8,26 +8,40 @@ const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
 describe("buildManifest", () => {
   const manifest = buildManifest(child);
 
-  it("has one entry per page with sequential numbering", () => {
-    expect(manifest.length).toBe(24);
-    expect(manifest[0].page).toBe(1);
-    expect(manifest[0].index).toBe(0);
-    expect(manifest.at(-1)?.page).toBe(24);
-    expect(manifest.at(-1)?.index).toBe(23);
+  it("has 24 interior pages numbered 1-24 plus a separate cover never assigned an interior page number", () => {
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26 assets.
+    expect(manifest.length).toBe(26);
+    const interior = manifest.filter((m) => (m.physicalPages ?? []).length > 0);
+    expect(interior.length).toBe(24);
+    expect(interior.map((m) => m.physicalPages?.[0])).toEqual(
+      Array.from({ length: 24 }, (_, i) => i + 1),
+    );
+    expect(manifest[0].kind).toBe("cover");
+    expect(manifest[0].physicalPages ?? []).toEqual([]);
+    expect(manifest.at(-1)?.kind).toBe("backcover");
+    expect(manifest.at(-1)?.physicalPages ?? []).toEqual([]);
   });
 
-  it("uses zero-padded 1-based filenames", () => {
-    expect(["01-cover.png", "01.png"]).toContain(manifest[0].filename);
-    expect(["03-pilot.png", "03.png", "page-03.png"]).toContain(manifest[2].filename);
-    expect(["24-backcover.png", "24.png"]).toContain(manifest.at(-1)?.filename);
+  it("uses canonical filenames with the cover delivered separately from the interior", () => {
+    expect(manifest[0].filename).toBe("cover-front.png");
+    expect(manifest.at(-1)?.filename).toBe("cover-back.png");
+    const interior = manifest.filter((m) => (m.physicalPages ?? []).length > 0);
+    expect(interior[0].filename).toBe("01-greeting.png");
+    expect(interior[1].filename).toBe("02-intro.png");
+    expect(interior[2].filename).toBe("03-scene-01.png");
+    expect(interior.at(-3)?.filename).toBe("22-scene-20.png");
+    expect(interior.at(-2)?.filename).toBe("23-closing.png");
+    expect(interior.at(-1)?.filename).toBe("24-video-qr-background.png");
   });
 
-  it("personalizes every prompt and text", () => {
+  it("personalizes every prompt, and every page's text except the app-rendered video-QR page", () => {
     for (const m of manifest) {
       expect(m.prompt.length).toBeGreaterThan(0);
-      expect(m.text.length).toBeGreaterThan(0);
+      if (m.kind !== "video-qr") {
+        expect(m.text.length).toBeGreaterThan(0);
+      }
     }
-    expect(manifest.filter((m) => m.prompt.includes("4-year-old boy")).length).toBe(24);
+    expect(manifest.filter((m) => m.prompt.includes("4-year-old boy")).length).toBe(26);
   });
 
   it("defaults to the classic landscape aspect ratios (no profileId passed)", () => {

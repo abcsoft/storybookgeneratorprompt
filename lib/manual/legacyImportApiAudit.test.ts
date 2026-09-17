@@ -110,20 +110,27 @@ describe("Legacy 22-file Import API Audit", () => {
     expect(data.choices).toBeDefined();
     expect(data.choices.length).toBe(2);
 
-    // Verify SHIFT_PLUS_TWO choice
+    // Verify SHIFT_PLUS_TWO choice ("files are Pilot through Back Cover" —
+    // cover-front, greeting, intro, and video-qr have no legacy equivalent
+    // among these 22 files and remain missing)
     const shiftChoice = data.choices.find((c: any) => c.interpretation === "SHIFT_PLUS_TWO");
     expect(shiftChoice).toBeDefined();
     expect(shiftChoice.resultingMissingSlots).toEqual([
-      expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+      expect.objectContaining({ slotId: "cover-front", physicalPages: [] }),
+      expect.objectContaining({ slotId: "01-greeting", physicalPages: [1] }),
       expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+      expect.objectContaining({ slotId: "24-video-qr-background", physicalPages: [24] }),
     ]);
 
-    // Verify KEEP_NUMERIC_SLOTS choice
+    // Verify KEEP_NUMERIC_SLOTS choice ("files are Cover through Inventor" —
+    // greeting, closing, video-qr, and the separate back cover remain missing)
     const keepChoice = data.choices.find((c: any) => c.interpretation === "KEEP_NUMERIC_SLOTS");
     expect(keepChoice).toBeDefined();
     expect(keepChoice.resultingMissingSlots).toEqual([
+      expect.objectContaining({ slotId: "01-greeting" }),
       expect.objectContaining({ slotId: "23-closing" }),
-      expect.objectContaining({ slotId: "24-backcover" }),
+      expect.objectContaining({ slotId: "24-video-qr-background" }),
+      expect.objectContaining({ slotId: "cover-back" }),
     ]);
   });
 
@@ -156,16 +163,20 @@ describe("Legacy 22-file Import API Audit", () => {
     const data = await res.json();
     expect(data.code).toBe("MISSING_REQUIRED_ARTWORK");
 
-    // CRITICAL ASSERTION: Must report 01-cover and 02-intro as missing
+    // CRITICAL ASSERTION: Must report cover-front, greeting, intro, and
+    // video-qr as missing (none of these had a legacy equivalent among the
+    // 22 "Pilot through Back Cover" files)
     expect(data.missingSlots).toEqual([
-      expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+      expect.objectContaining({ slotId: "cover-front", physicalPages: [] }),
+      expect.objectContaining({ slotId: "01-greeting", physicalPages: [1] }),
       expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+      expect.objectContaining({ slotId: "24-video-qr-background", physicalPages: [24] }),
     ]);
 
-    // CRITICAL NEGATIVE ASSERTION: Must NOT report 23-closing or 24-backcover
+    // CRITICAL NEGATIVE ASSERTION: Must NOT report 23-closing or cover-back — both got a file.
     const slotIds = data.missingSlots.map((s: any) => s.slotId);
     expect(slotIds).not.toContain("23-closing");
-    expect(slotIds).not.toContain("24-backcover");
+    expect(slotIds).not.toContain("cover-back");
   });
 
   // ──────────────────────────────────────────────────
@@ -197,13 +208,17 @@ describe("Legacy 22-file Import API Audit", () => {
     const data = await res.json();
     expect(data.code).toBe("MISSING_REQUIRED_ARTWORK");
 
-    // Must report 23-closing and 24-backcover as missing
+    // Must report greeting, closing, video-qr, and the separate back cover as
+    // missing (all 20 careers + cover + intro got a file: cover + intro + 20
+    // careers = 22, exactly matching "files are Cover through Inventor").
     const slotIds = data.missingSlots.map((s: any) => s.slotId);
+    expect(slotIds).toContain("01-greeting");
     expect(slotIds).toContain("23-closing");
-    expect(slotIds).toContain("24-backcover");
+    expect(slotIds).toContain("24-video-qr-background");
+    expect(slotIds).toContain("cover-back");
 
-    // Must NOT report 01-cover or 02-intro
-    expect(slotIds).not.toContain("01-cover");
+    // Must NOT report cover-front or 02-intro
+    expect(slotIds).not.toContain("cover-front");
     expect(slotIds).not.toContain("02-intro");
   });
 
@@ -220,16 +235,18 @@ describe("Legacy 22-file Import API Audit", () => {
 
     expect(report.legacyRecoveryApplied).toBe(true);
     expect(report.missingSlotDetails).toEqual([
-      expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+      expect.objectContaining({ slotId: "cover-front", physicalPages: [] }),
+      expect.objectContaining({ slotId: "01-greeting", physicalPages: [1] }),
       expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+      expect.objectContaining({ slotId: "24-video-qr-background", physicalPages: [24] }),
     ]);
 
-    // 01.png mapped to 03-pilot, NOT 01-cover
-    expect(report.bySlotId.get("03-pilot")).toBe("01.png");
-    expect(report.bySlotId.has("01-cover")).toBe(false);
+    // 01.png mapped to 03-scene-01 (first career scene), NOT the front cover
+    expect(report.bySlotId.get("03-scene-01")).toBe("01.png");
+    expect(report.bySlotId.has("cover-front")).toBe(false);
 
-    // 22.png mapped to 24-backcover
-    expect(report.bySlotId.get("24-backcover")).toBe("22.png");
+    // 22.png (the old "backcover" file) mapped to the separate cover-back asset
+    expect(report.bySlotId.get("cover-back")).toBe("22.png");
   });
 
   // ──────────────────────────────────────────────────
@@ -243,23 +260,27 @@ describe("Legacy 22-file Import API Audit", () => {
     });
 
     expect(report.missingSlotDetails).toEqual([
+      expect.objectContaining({ slotId: "01-greeting" }),
       expect.objectContaining({ slotId: "23-closing" }),
-      expect.objectContaining({ slotId: "24-backcover" }),
+      expect.objectContaining({ slotId: "24-video-qr-background" }),
+      expect.objectContaining({ slotId: "cover-back" }),
     ]);
 
-    // 01.png mapped to 01-cover
-    expect(report.bySlotId.get("01-cover")).toBe("01.png");
+    // 01.png mapped to cover-front
+    expect(report.bySlotId.get("cover-front")).toBe("01.png");
     expect(report.bySlotId.get("02-intro")).toBe("02.png");
 
-    // 23-closing and 24-backcover are missing
+    // greeting, closing, video-qr, and cover-back are missing
+    expect(report.bySlotId.has("01-greeting")).toBe(false);
     expect(report.bySlotId.has("23-closing")).toBe(false);
-    expect(report.bySlotId.has("24-backcover")).toBe(false);
+    expect(report.bySlotId.has("24-video-qr-background")).toBe(false);
+    expect(report.bySlotId.has("cover-back")).toBe(false);
   });
 
   // ──────────────────────────────────────────────────
-  // Test 6: Full 24-file canonical set passes through API and produces PDF
+  // Test 6: Full 26-file canonical set (2 cover + 24 interior) passes through API and produces PDF
   // ──────────────────────────────────────────────────
-  it("6. Full 24 canonical files pass API preflight and produce a PDF", async () => {
+  it("6. Full 26 canonical files pass API preflight and produce a PDF", async () => {
     const formData = new FormData();
     formData.append("name", child.name);
     formData.append("age", String(child.age));
@@ -267,8 +288,9 @@ describe("Legacy 22-file Import API Audit", () => {
     formData.append("bookId", "dream-big");
     formData.append("profileId", "classic-landscape-11x8");
     formData.append("layoutMode", "standard-single");
+    formData.append("videoUrl", "https://example.com/watch/dream-big-test-video");
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
       const buf = await makeHighResImage();
       formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
@@ -299,7 +321,7 @@ describe("Legacy 22-file Import API Audit", () => {
     formData.append("layoutMode", "standard-single");
 
     // 2000x1500 ≈ 178 PPI (between 150 and 300)
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
       const buf = await sharp({
         create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
@@ -339,9 +361,10 @@ describe("Legacy 22-file Import API Audit", () => {
     formData.append("bookId", "dream-big");
     formData.append("profileId", "classic-landscape-11x8");
     formData.append("layoutMode", "standard-single");
+    formData.append("videoUrl", "https://example.com/watch/dream-big-test-video");
 
     const acks: Record<string, any> = {};
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
       const buf = await sharp({
         create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
@@ -385,7 +408,7 @@ describe("Legacy 22-file Import API Audit", () => {
     formData.append("acknowledgeQualityWarnings", "true");
 
     // 1376x768 ≈ 122 PPI (below 150)
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
       const buf = await sharp({
         create: { width: 1376, height: 768, channels: 3, background: { r: 100, g: 100, b: 100 } },

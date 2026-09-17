@@ -25,6 +25,7 @@ import { saveRun } from "@/lib/generate/saveRun";
 import { bookFilename } from "@/lib/story/registry";
 import { resolveLayoutPlan, type LayoutMode } from "@/lib/story/layoutPlan";
 import type { ChildProfile } from "@/lib/story/types";
+import { directVideoTarget } from "@/lib/story/qr";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -356,6 +357,12 @@ export async function POST(request: Request): Promise<Response> {
       images.set(slotId, img);
     }
 
+    const rawVideoUrl = form.get("videoUrl");
+    const videoTarget =
+      typeof rawVideoUrl === "string" && rawVideoUrl.trim().length > 0
+        ? directVideoTarget(rawVideoUrl.trim())
+        : undefined;
+
     const assembled = await assembleFromImages(child, images, bookId, profileId, {
       mode,
       layoutMode: mode,
@@ -363,6 +370,7 @@ export async function POST(request: Request): Promise<Response> {
       draft: isDraft,
       confirmLegacyOffsetRecovery: confirmLegacyOffsetRecovery || legacyInterpretation === "SHIFT_PLUS_TWO",
       resolvedSlotMapping,
+      videoTarget,
     });
     pdf = assembled.pdf;
   } catch (err: any) {
@@ -372,6 +380,16 @@ export async function POST(request: Request): Promise<Response> {
           code: "MISSING_REQUIRED_ARTWORK",
           error: "Cannot export production PDF: required artwork is missing.",
           missingSlots: err.missingSlots ?? [],
+        },
+        { status: 400 },
+      );
+    }
+    if (err?.code === "INVALID_VIDEO_QR" || err?.name === "InvalidVideoQrError") {
+      return NextResponse.json(
+        {
+          code: "INVALID_VIDEO_QR",
+          error: err.message ?? "Cannot export production PDF: the video-qr page is not production-ready.",
+          reason: err.reason ?? null,
         },
         { status: 400 },
       );

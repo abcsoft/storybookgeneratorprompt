@@ -444,3 +444,69 @@ export const dreamBigPrintify24Edition: PrintEdition = {
 
 registerPrintEdition(dreamBigPrintify24Edition);
 
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: 24 interior pages (greeting, intro, 20 existing
+// career scenes verbatim, closing, video-qr) + a separate 2-asset cover
+// group, resolved identically for every print profile. See
+// lib/story/storyEdition.ts. Every reused scene below points at the exact
+// same illustrationPrompt/text functions already defined in dreamBigPages
+// above — no career-scene wording changes.
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+// From layoutGeometry.ts (a dependency-free leaf module), NOT layoutPlan.ts:
+// layoutPlan.ts imports `getBook` from "./registry", which imports this file
+// to register the book — importing a value from layoutPlan.ts here would be
+// a true circular import (registry.ts -> dreamBigTemplate.ts -> layoutPlan.ts
+// -> registry.ts), which throws "getRoleSlug is not a function" under
+// Vitest's Vite/ESM transform (the same failure class already fixed between
+// storyEdition.ts and layoutPlan.ts — see storyEdition.ts's header comment).
+import { getRoleSlug } from "./layoutGeometry";
+
+function reuseScene(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return {
+    sceneId,
+    kind: spec.kind,
+    role: spec.role,
+    illustrationPrompt: spec.illustrationPrompt,
+    text: spec.text,
+    legacyFilenames: [],
+  };
+}
+
+// dreamBigPages layout: [0]=cover, [1]=intro, [2..21]=20 careers, [22]=closing, [23]=backcover.
+const dreamBigIntroScene = reuseScene(dreamBigPages[1], "intro");
+const dreamBigCareerScenes: StoryEditionScene[] = dreamBigPages.slice(2, 22).map((spec) =>
+  reuseScene(spec, getRoleSlug(spec.kind, spec.role)),
+);
+const dreamBigClosingScene = reuseScene(dreamBigPages[22], "closing");
+const dreamBigCoverScene = reuseScene(dreamBigPages[0], "cover");
+const dreamBigBackCoverScene = reuseScene(dreamBigPages[23], "backcover");
+
+export const dreamBigStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "dream-big",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment at soft dawn light, sitting comfortably and looking toward the viewer with " +
+      "a warm, gentle smile, a few soft clouds and gentle stars drifting in a pastel sky behind them.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: dreamBigIntroScene,
+  scenes: dreamBigCareerScenes,
+  closing: dreamBigClosingScene,
+  videoQr: buildVideoQrScene(
+    STORY_META,
+    "A calm, low-detail dreamy night sky with soft glowing stars and a gentle sweep of color, echoing the " +
+      "cover's golden-hour dream theme.",
+  ),
+  cover: {
+    front: dreamBigCoverScene,
+    back: dreamBigBackCoverScene,
+  },
+};
+
+registerStoryEdition(dreamBigStandard24Edition);

@@ -161,19 +161,31 @@ describe("Resolved Prompts Enforcement & Negative Tests", () => {
     }
   });
 
-  it("negative test: Bedtime Dream closing in custom-spreads mode resolves strictly as single-page and rejects spread prompts", () => {
-    const spreadPlan = resolveLayoutPlan({
+  it("negative test: Bedtime Dream now resolves through its registered standard-24 edition, so an unapproved custom-spread request is rejected outright", () => {
+    // Bedtime Dream has a registered "standard-24" StoryEdition with no
+    // approvedSpreadPairs, so Custom Spreads is disabled for it — the
+    // request must fail closed rather than silently combining pages.
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "bedtime-dream",
+        profileId: "classic-landscape-11x8",
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 10, endPage: 11, textSide: "left", subjectSide: "right" }],
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
+
+    // Its default (Standard Single) resolution still gives the closing page
+    // strictly as a single-page asset, never a spread.
+    const plan = resolveLayoutPlan({
       child,
       bookId: "bedtime-dream",
       profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 10, endPage: 11, textSide: "left", subjectSide: "right" }],
     });
-
-    const closingSlot = spreadPlan.interiorAssets.find((a) => a.sceneId === "closing")!;
+    const closingSlot = plan.interiorAssets.find((a) => a.pageKind === "closing")!;
     expect(closingSlot.layout).toBe("single-page");
     expect(closingSlot.assetKind).toBe("single-page");
-    expect(closingSlot.physicalPages).toEqual([14]);
+    expect(closingSlot.physicalPages).toEqual([23]);
     expect(closingSlot.destinationDimensions).toEqual({ width: 3375, height: 2475 });
 
     // Negative prompt check: no spread prompt or raw spread-master prompt permitted

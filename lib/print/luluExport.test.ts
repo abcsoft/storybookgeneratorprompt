@@ -109,3 +109,45 @@ describe("FIX PART 1: Lulu Print Profile & PDF Geometry Tests", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("buildLuluInteriorBook — fail-closed structural invariants", () => {
+  const child: ChildProfile = { name: "Ihan", age: 5, gender: "boy" };
+  const profile = luluPremiumColorLandscape11x85Profile;
+
+  function scenePage(overrides: Partial<GeneratedPage>): GeneratedPage {
+    return {
+      index: 0,
+      kind: "scene",
+      text: "",
+      image: null,
+      imageMimeType: "image/png",
+      failed: false,
+      ...overrides,
+    };
+  }
+
+  it("rejects duplicate slotId in the interior sequence", async () => {
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, slotId: "03-scene-01" }),
+      scenePage({ index: 1, slotId: "03-scene-01" }), // duplicate
+    ];
+    await expect(buildLuluInteriorBook(pages, child, profile)).rejects.toThrow(/duplicate slot/i);
+  });
+
+  it("rejects a greeting page that isn't interior page 1", async () => {
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, kind: "scene", slotId: "s1" }),
+      scenePage({ index: 1, kind: "greeting", slotId: "s2" }),
+    ];
+    await expect(buildLuluInteriorBook(pages, child, profile)).rejects.toThrow(/greeting page must be interior page 1/i);
+  });
+
+  it("rejects a video-qr page that isn't the last interior page", async () => {
+    const pages: GeneratedPage[] = [
+      scenePage({ index: 0, kind: "greeting", slotId: "s1" }),
+      scenePage({ index: 1, kind: "video-qr", slotId: "s2" }),
+      scenePage({ index: 2, kind: "scene", slotId: "s3" }),
+    ];
+    await expect(buildLuluInteriorBook(pages, child, profile)).rejects.toThrow(/video-qr page must be the last/i);
+  });
+});

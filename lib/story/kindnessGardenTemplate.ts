@@ -380,3 +380,209 @@ export const kindnessGardenBook: StoryTemplate = {
   specialOutfits: SPECIAL_OUTFITS,
   companion: PIP,
 };
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: each of the 10 original beats becomes two
+// sequential, visually distinct moments (setup/discovery, then
+// action/result) — 20 scenes total. Pip is not introduced until the first
+// split beat (matching the original: absent from cover/intro), every prop
+// (the glowing seed/pot, the notebook) and outfit swap (rain, pajamas)
+// carries forward at the same point in the story, and cause-and-effect
+// order is unchanged — nothing is duplicated, each half shows a distinct
+// action.
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function reuseKGSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return { sceneId, kind: spec.kind, role: spec.role, illustrationPrompt: spec.illustrationPrompt, text: spec.text, legacyFilenames: [] };
+}
+
+function kgScene(
+  sceneId: string,
+  scene: string,
+  copy: (c: ChildProfile, p: Pronouns) => string,
+  opts: { light?: string; compositionNotes?: string; outfitOverride?: string; companionOverride?: CompanionSpec | null } = {},
+): StoryEditionScene {
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(scene, { kind: "scene", ...opts }),
+    text: (c) => copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+const kgScenes: StoryEditionScene[] = [
+  kgScene(
+    "brambles-discovery",
+    "Crouching beside a tangle of brambles behind an old wooden garden gate, peering in with soft concern at " +
+      "a small rabbit caught by one paw, reaching a gentle hand toward it; dappled morning light through " +
+      "overgrown leaves.",
+    (c) => `Just behind the gate, ${c.name} heard a tiny frightened squeak — a little rabbit, caught in the brambles!`,
+    { light: "Soft dappled morning light filtering through overgrown leaves from the upper left; eye-level camera at kneeling height.", companionOverride: null },
+  ),
+  kgScene(
+    "brambles-freed",
+    "Kneeling in the same spot, now happily cradling the freed rabbit against their chest with a warm smile, " +
+      "as it nuzzles close, one floppy ear flopping over; the brambles now empty behind them.",
+    (c) => `With gentle hands, ${c.name} freed the small friend. "There you go!" Pip nuzzled close, safe at last.`,
+    { light: "Soft dappled morning light, now warmer as the sun climbs; eye-level camera at kneeling height." },
+  ),
+  kgScene(
+    "seed-planted",
+    "Kneeling in dry garden earth, carefully planting a tiny glowing seed into a small clay pot, patting the " +
+      "soil gently with both hands and a hopeful expression, with Pip sniffing the pot curiously beside them.",
+    (c) => `${c.name} found a tiny glowing seed and planted it carefully in a little clay pot to take home.`,
+    { light: "Warm early-morning sun from the right, soft and golden over dry earth; eye-level camera at ground height." },
+  ),
+  kgScene(
+    "sunflower-watered",
+    "Tipping a small green watering can over a wilted, drooping sunflower, watching hopefully as a single drop " +
+      "catches the light and the sunflower begins to lift its head, with Pip sitting attentively beside them.",
+    (c) => `Nearby, a tall sunflower drooped, thirsty and sad. ${c.name} gave it a careful drink — and watched it slowly lift its head.`,
+    { light: "Warm early-morning sun from the right, soft and golden; eye-level camera at flower height." },
+  ),
+  kgScene(
+    "meadow-discovery",
+    "Standing at the edge of a wide wildflower meadow, eyes wide in wonder at dozens of sleepy, closed flower " +
+      "buds waiting in the grass as far as the eye can see, with Pip hopping ahead into the grass.",
+    (c, p) => `Beyond the brambles lay a whole meadow of sleepy buds. ${cap(p.subj)} could hardly believe how big the garden really was.`,
+    { light: "Bright open mid-morning daylight from above, warm and clear; eye-level camera at the meadow's edge.", compositionNotes: "a wide establishing shot — keep the whole meadow readable, not a close-up." },
+  ),
+  kgScene(
+    "meadow-resolve",
+    "Walking further into the meadow with arms spread wide, brushing fingertips gently over the sleepy flower " +
+      "buds as if greeting each one, a determined, joyful expression, with Pip bounding happily through the grass ahead.",
+    (c) => `${c.name} stepped into the meadow, ready to help every sleepy bud wake up, one at a time.`,
+    { light: "Bright open mid-morning daylight, warm and clear; eye-level camera in the meadow grass." },
+  ),
+  kgScene(
+    "ladybugs-discovery",
+    "Standing at the near bank of a small garden stream, noticing a little family of ladybugs stranded on a " +
+      "leaf at the water's edge, looking concerned, with Pip watching curiously from beside them.",
+    (c) => `A family of ladybugs had lost their way home, stranded at the edge of a garden stream.`,
+    { light: "Cool, dappled streamside light from the upper left; eye-level camera at the stream's bank." },
+  ),
+  kgScene(
+    "ladybugs-crossed",
+    "Carefully balancing across a wide, mossy fallen log over the stream, arms out for balance, guiding the " +
+      "little ladybug family walking along the same log toward the far bank, with Pip watching from the near side.",
+    (c) => `${c.name} balanced carefully along a mossy log, showing the ladybugs the way home, step by step.`,
+    { light: "Cool, dappled streamside light, gently diffuse; eye-level camera at the log's height.", compositionNotes: "keep both of the child's hands and their head fully visible while balancing — no arm or foot may leave the frame." },
+  ),
+  kgScene(
+    "birdhouse-setup",
+    "Kneeling in the grass beside a cheerful squirrel and a sparrow who are struggling with scattered wooden " +
+      "birdhouse pieces, looking over with a helpful, curious expression, with Pip sniffing a pile of wood shavings nearby.",
+    (c) => `Next, a squirrel and a sparrow were struggling to build a new home. ${c.name} knelt down to help.`,
+    { light: "Warm dappled afternoon light through the branches from the right; eye-level camera at kneeling height." },
+  ),
+  kgScene(
+    "birdhouse-built",
+    "Kneeling in the same spot, now happily holding a little wooden peg steady as the squirrel and sparrow " +
+      "nail the finished birdhouse together, all three working as a team with proud smiles.",
+    (c) => `Together, they held the little wooden pieces steady until the new birdhouse was finished.`,
+    { light: "Warm dappled afternoon light, golden as the sun lowers; eye-level camera at kneeling height." },
+  ),
+  kgScene(
+    "rain-begins",
+    "Looking up in surprise as the sky turns soft grey and the first raindrops begin to fall, one hand raised " +
+      "to feel the rain, already reaching for a giant leaf overhead, with Pip ducking close beside them.",
+    (c) => `Then the sky turned soft and grey, and rain began to fall!`,
+    { outfitOverride: SPECIAL_OUTFITS.rain, light: "Soft overcast grey daylight, cool and even, with the first raindrops streaking through the air; eye-level camera in the open." },
+  ),
+  kgScene(
+    "rain-sheltered",
+    "Sheltering snugly under a giant leaf held overhead like an umbrella, smiling out at the falling raindrops " +
+      "and giggling, with Pip tucked close beside them; soft grey rain and a few puddles reflecting the sky.",
+    (c) => `${c.name} and Pip ducked beneath a giant leaf, giggling as the raindrops pattered all around.`,
+    { outfitOverride: SPECIAL_OUTFITS.rain, light: "Soft overcast grey daylight, cool and even, rain streaking gently through the air; eye-level camera under the leaf." },
+  ),
+  kgScene(
+    "hedgehogs-discovery",
+    "Now back in familiar green overalls after the rain clears, crouching by a cluster of hedgehogs peeking " +
+      "out shyly from the base of a hedge, offering a warm, welcoming smile, with Pip peeking out too.",
+    (c) => `The rain cleared, leaving the air fresh and sweet. Near the hedge, a family of hedgehogs peeked out, hungry and shy.`,
+    { light: "Warm golden late-afternoon sunlight from the low sun behind, soft and glowing on damp leaves; eye-level camera at hedgehog height." },
+  ),
+  kgScene(
+    "hedgehogs-shared",
+    "Kneeling by the hedge, opening a small cloth pouch and sharing seeds and berries with each hedgehog in " +
+      "turn, gentle and patient, with Pip nibbling a berry of its own beside them.",
+    (c) => `${c.name} knelt down and shared a pouch of seeds and berries with every one of them.`,
+    { light: "Warm golden late-afternoon sunlight, soft and glowing; eye-level camera at hedgehog height." },
+  ),
+  kgScene(
+    "sketching-setup",
+    "Sitting down beneath a big blossoming tree at sunset, opening a small notebook and picking up a stubby " +
+      "pencil, looking around thoughtfully at the day's new garden friends; golden sunset light through the blossoms above.",
+    (c) => `As the sun dipped low, ${c.name} settled beneath the blossoming tree with a notebook and pencil.`,
+    { light: "Warm golden sunset light filtering down through blossoms from above; eye-level camera beneath the tree.", companionOverride: null },
+  ),
+  kgScene(
+    "sketching-done",
+    "Still seated beneath the blossoming tree, holding up a finished notebook page filled with small sketches " +
+      "of the day's garden friends, admiring the drawings with a contented, happy smile.",
+    (c, p) => `${cap(p.subj)} sketched picture portraits of every new garden friend ${p.subj} had met that day.`,
+    { light: "Warm golden sunset light, deepening toward dusk; eye-level camera beneath the tree.", companionOverride: null },
+  ),
+  kgScene(
+    "fox-discovery",
+    "Kneeling low at the edge of the meadow at dusk, noticing a wide-eyed baby fox peeking shyly out of the " +
+      "ferns, offering a calm, gentle smile, with Pip peeking around them curiously.",
+    (c) => `One last visitor peeked shyly out of the ferns at dusk — a baby fox.`,
+    { light: "Soft, warm dusk light from the low horizon, gentle and diffuse; eye-level camera at kneeling height." },
+  ),
+  kgScene(
+    "fox-shared",
+    "Still kneeling at the meadow's edge, gently offering the very last handful of seeds to the now-close baby " +
+      "fox, who nibbles trustingly from an open palm, with Pip hopping over to greet the new friend too.",
+    (c) => `${c.name} knelt down slowly and offered the very last of the seeds — and the little fox came close.`,
+    { light: "Soft, warm dusk light, deepening toward twilight; eye-level camera at kneeling height." },
+  ),
+  kgScene(
+    "bloom-begins",
+    "Standing at the center of the meadow at twilight as the very first flowers burst open in bright color " +
+      "around their feet, arms lifting in delighted surprise, with the squirrel, sparrow, hedgehogs, and baby " +
+      "fox beginning to gather at a comfortable distance and Pip bouncing at their feet.",
+    (c) => `And then — the very first flowers burst into color, right at ${c.name}'s feet!`,
+    { light: "Radiant twilight glow as the meadow begins to sparkle with magical evening color; eye-level camera among the flowers." },
+  ),
+  kgScene(
+    "bloom-celebration",
+    "Standing in the center of the now fully bloomed meadow at twilight, arms raised high in joy as every " +
+      "flower bursts open in every color all around, surrounded at a comfortable distance by the squirrel, " +
+      "sparrow, hedgehogs, and baby fox, with Pip bouncing at their feet in delight.",
+    (c) => `Every flower in the meadow burst into color at once! ${c.name}'s new friends gathered all around, and the whole garden sparkled with life.`,
+    { light: "Radiant twilight glow as the whole blooming meadow sparkles with magical evening color; eye-level camera among the flowers.", compositionNotes: "keep the child, Pip, and every garden friend safely inside the frame with roughly a 10-12% margin from the outer edge — a wide celebratory shot, never a close-up crop of any one animal." },
+  ),
+];
+
+export const kindnessGardenStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "kindness-garden",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment in a sunny backyard at soft morning light, sitting comfortably beside an " +
+      "old wooden garden gate and looking toward the viewer with a warm, gentle smile, a small glowing seed " +
+      "resting in cupped hands.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: reuseKGSpec(kindnessGardenPages[1], "intro"),
+  scenes: kgScenes,
+  closing: reuseKGSpec(kindnessGardenPages[12], "closing"),
+  videoQr: buildVideoQrScene(
+    STORY_META,
+    "A calm, low-detail twilight garden background with soft blurred flowers and gentle fireflies, echoing the " +
+      "meadow's magical bloom.",
+  ),
+  cover: {
+    front: reuseKGSpec(kindnessGardenPages[0], "cover"),
+    back: reuseKGSpec(kindnessGardenPages[13], "backcover"),
+  },
+};
+
+registerStoryEdition(kindnessGardenStandard24Edition);

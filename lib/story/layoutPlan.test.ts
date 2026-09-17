@@ -37,13 +37,24 @@ describe("Authoritative Layout Plan Invariants", () => {
     expect(p1?.asset.physicalPages).toEqual([1]);
   });
 
-  it("Invariant 2: Every spread begins on an even physical page (verso)", () => {
+  it("Invariant 2: Dream Big now resolves through its registered standard-24 edition, which has no approved spreads — every interior page is single, and the even-start-page rule is enforced at the point a spread would be requested", () => {
+    // Dream Big has a registered "standard-24" StoryEdition with no
+    // approvedSpreadPairs, so the default plan contains zero spreads —
+    // there's no longer a live spread to check the even-start-page rule
+    // against directly. The rule itself is still enforced (assertValidFacingPair,
+    // exercised in Invariant 4 below, and lib/pdf/imposition.test.ts) — it
+    // just has no reachable spread asset to apply to for this story anymore.
     const spreads = defaultPlan.interiorAssets.filter((a) => a.assetKind === "spread");
-    expect(spreads.length).toBeGreaterThan(0);
-    for (const spread of spreads) {
-      const startPage = spread.physicalPages[0];
-      expect(startPage % 2).toBe(0);
-    }
+    expect(spreads.length).toBe(0);
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "dream-big",
+        profileId,
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 6, endPage: 7, textSide: "left" }],
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
   it("Invariant 3: Every spread maps left half to even page and right half to the following odd page", () => {
@@ -96,32 +107,46 @@ describe("Authoritative Layout Plan Invariants", () => {
     ).toThrow();
   });
 
-  it("Invariant 5: Dream Big default mapping is: p1 intro, p2-21 20 careers, p22-23 closing spread", () => {
-    // 23 physical interior pages total (intro, 20 careers, closing spread 22-23)
-    expect(defaultPlan.interiorPageCount).toBe(23);
+  it("Invariant 5: Dream Big's standard-24 edition maps p1 greeting, p2 intro, p3-22 20 careers, p23 closing, p24 video-qr — cover always separate", () => {
+    // 24 physical interior pages total, numbered continuously; no spread —
+    // Dream Big's standard-24 edition declares no approvedSpreadPairs.
+    expect(defaultPlan.interiorPageCount).toBe(24);
 
-    // Physical page 1: intro dedication
+    // Physical page 1: personalized greeting (app-overlaid text, not "Once
+    // upon a time" — that's the intro, now page 2).
     const p1 = defaultPlan.pageToAsset.get(1)!;
-    expect(p1.asset.slotId).toBe("page-01");
+    expect(p1.asset.slotId).toBe("01-greeting");
+    expect(p1.asset.pageKind).toBe("greeting");
     expect(p1.asset.assetKind).toBe("single-page");
-    expect(p1.asset.storyText).toContain("Once upon a time");
+    expect(p1.asset.storyText).toContain(child.name);
 
-    // Physical pages 2-21: 20 single career scenes
-    for (let p = 2; p <= 21; p++) {
+    // Physical page 2: intro dedication
+    const p2 = defaultPlan.pageToAsset.get(2)!;
+    expect(p2.asset.slotId).toBe("02-intro");
+    expect(p2.asset.pageKind).toBe("intro");
+    expect(p2.asset.storyText).toContain("Once upon a time");
+
+    // Physical pages 3-22: 20 single career scenes
+    for (let p = 3; p <= 22; p++) {
       const entry = defaultPlan.pageToAsset.get(p)!;
       expect(entry.asset.assetKind).toBe("single-page");
+      expect(entry.asset.pageKind).toBe("scene");
       expect(entry.asset.physicalPages).toEqual([p]);
     }
 
-    // Physical pages 22-23: closing spread
-    const p22 = defaultPlan.pageToAsset.get(22)!;
+    // Physical page 23: closing
     const p23 = defaultPlan.pageToAsset.get(23)!;
-    expect(p22.asset).toBe(p23.asset);
-    expect(p22.asset.slotId).toBe("spread-22-23");
-    expect(p22.asset.assetKind).toBe("spread");
-    expect(p22.asset.physicalPages).toEqual([22, 23]);
+    expect(p23.asset.slotId).toBe("23-closing");
+    expect(p23.asset.pageKind).toBe("closing");
+    expect(p23.asset.assetKind).toBe("single-page");
 
-    // Covers are separate from interior pages
+    // Physical page 24: app-rendered, character-free video-QR background
+    const p24 = defaultPlan.pageToAsset.get(24)!;
+    expect(p24.asset.slotId).toBe("24-video-qr-background");
+    expect(p24.asset.pageKind).toBe("video-qr");
+    expect(p24.asset.storyText).toBe("");
+
+    // Covers are separate from interior pages, never assigned a page number.
     expect(defaultPlan.coverAsset.assetKind).toBe("front-cover");
     expect(defaultPlan.coverAsset.physicalPages).toEqual([]);
     expect(defaultPlan.backCoverAsset.assetKind).toBe("back-cover");
@@ -144,52 +169,51 @@ describe("Authoritative Layout Plan Invariants", () => {
     expect(diverAsset?.physicalPages.length).toBe(1);
   });
 
-  it("Invariant 7: Enabling a custom spread consumes exactly one valid facing pair", () => {
-    const customPlan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId,
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 4, endPage: 5, textSide: "left" }],
-    });
+  it("Invariant 7: A custom spread request against Dream Big's standard-24 edition is rejected outright, not silently consumed", () => {
+    // Dream Big's standard-24 edition declares no approvedSpreadPairs, so
+    // "consuming a facing pair" for a spread is no longer possible for this
+    // story at all — the request must fail closed instead.
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "dream-big",
+        profileId,
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 4, endPage: 5, textSide: "left" }],
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
 
-    expect(customPlan.interiorPageCount).toBe(23);
-    const p4 = customPlan.pageToAsset.get(4)!;
-    const p5 = customPlan.pageToAsset.get(5)!;
-    expect(p4.asset).toBe(p5.asset);
-    expect(p4.asset.slotId).toBe("spread-04-05");
-    expect(p4.asset.physicalPages).toEqual([4, 5]);
-
-    // Ensure all 23 physical pages are covered
-    for (let p = 1; p <= 23; p++) {
-      expect(customPlan.pageToAsset.has(p)).toBe(true);
+    // The standard-single resolution still covers all 24 physical pages.
+    const standardPlan = resolveLayoutPlan({ child, bookId: "dream-big", profileId, mode: "standard-single" });
+    for (let p = 1; p <= 24; p++) {
+      expect(standardPlan.pageToAsset.has(p)).toBe(true);
     }
   });
 
-  it("Invariant 8: Text-left and text-right choices render story text on selected leaf", () => {
-    const leftSpreadPlan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId,
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 6, endPage: 7, textSide: "left" }],
-    });
-    const leftAsset = leftSpreadPlan.pageToAsset.get(6)!.asset;
-    expect(leftAsset.textSide).toBe("left");
-    expect(leftAsset.subjectSide).toBe("right");
-    expect(leftAsset.layout).toBe("text-left-subject-right");
+  it("Invariant 8: A custom spread request is rejected the same way regardless of the requested textSide", () => {
+    // Dream Big's standard-24 edition has no approvedSpreadPairs, so there is
+    // no longer a live spread asset whose textSide/subjectSide/layout could
+    // be checked — every custom-spreads request against it fails closed,
+    // whichever textSide is requested.
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "dream-big",
+        profileId,
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 6, endPage: 7, textSide: "left" }],
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
 
-    const rightSpreadPlan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId,
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 6, endPage: 7, textSide: "right" }],
-    });
-    const rightAsset = rightSpreadPlan.pageToAsset.get(6)!.asset;
-    expect(rightAsset.textSide).toBe("right");
-    expect(rightAsset.subjectSide).toBe("left");
-    expect(rightAsset.layout).toBe("subject-left-text-right");
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "dream-big",
+        profileId,
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 6, endPage: 7, textSide: "right" }],
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
   it("Invariant 9: Single and spread destination dimensions match exact selected print profile", () => {
@@ -208,17 +232,17 @@ describe("Authoritative Layout Plan Invariants", () => {
   });
 
   it("Invariant 11: Prompt, manifest, and layout plan report unified authority", () => {
+    // Custom spreads are rejected outright for Dream Big (standard-24, no
+    // approvedSpreadPairs) — use its valid standard-single resolution to
+    // check manifest/plan agreement instead.
     const plan = resolveLayoutPlan({
       child,
       bookId: "dream-big",
       profileId,
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 4, endPage: 5, textSide: "left" }],
+      mode: "standard-single",
     });
 
-    const manifest = buildManifest(child, "dream-big", profileId, "custom-spreads", [
-      { startPage: 4, endPage: 5, textSide: "left" },
-    ]);
+    const manifest = buildManifest(child, "dream-big", profileId, "standard-single", []);
 
     expect(manifest.length).toBe(plan.assets.length);
     for (let i = 0; i < manifest.length; i++) {
@@ -241,7 +265,7 @@ describe("Authoritative Layout Plan Invariants", () => {
 describe("Page Layout Feature Verification Suite", () => {
   const profileId = "printify-hardcover-square-8x8";
 
-  it("1. default all-single workflow: resolves 22 interior single pages with 1:1 aspect and page-NN filenames", () => {
+  it("1. default all-single workflow: resolves 24 interior single pages with 1:1 aspect and canonical filenames", () => {
     const singlePlan = resolveLayoutPlan({
       child,
       bookId: "dream-big",
@@ -249,134 +273,90 @@ describe("Page Layout Feature Verification Suite", () => {
       mode: "standard-single",
     });
 
-    expect(singlePlan.interiorPageCount).toBe(22);
-    expect(singlePlan.interiorAssets.length).toBe(22);
+    // Standard-24 edition: 24 interior pages, numbered continuously 1-24, no
+    // spreads (Dream Big has no approvedSpreadPairs).
+    expect(singlePlan.interiorPageCount).toBe(24);
+    expect(singlePlan.interiorAssets.length).toBe(24);
     expect(singlePlan.interiorAssets.every((a) => a.assetKind === "single-page")).toBe(true);
     expect(singlePlan.interiorAssets.every((a) => a.expectedSourceAspect === "1:1")).toBe(true);
 
-    for (let p = 1; p <= 22; p++) {
+    for (let p = 1; p <= 24; p++) {
       const entry = singlePlan.pageToAsset.get(p);
       expect(entry).toBeDefined();
       expect(entry?.asset.physicalPages).toEqual([p]);
-      const expectedSlot = `page-${String(p).padStart(2, "0")}`;
-      expect(entry?.asset.slotId).toBe(expectedSlot);
-      expect(entry?.asset.filename).toBe(`${expectedSlot}.png`);
     }
 
-    const manifest = buildManifest(child, "dream-big", profileId, "standard-single");
-    expect(manifest.length).toBe(24); // cover + 22 interior pages + back cover
-    expect(manifest.slice(1, 23).every((m) => !m.spread && m.aspect === "1:1")).toBe(true);
-    expect(manifest[1].filename).toBe("page-01.png");
-    expect(manifest[22].filename).toBe("page-22.png");
+    const manifest = buildManifest(child, "dream-big", profileId, "standard-single", []);
+    // cover-front + 24 interior pages + cover-back = 26 assets.
+    expect(manifest.length).toBe(26);
+    expect(manifest.slice(1, 25).every((m) => !m.spread && m.aspect === "1:1")).toBe(true);
+    expect(manifest[0].filename).toBe("cover-front.png");
+    expect(manifest[1].filename).toBe("01-greeting.png");
+    expect(manifest[2].filename).toBe("02-intro.png");
+    expect(manifest[3].filename).toBe("03-scene-01.png");
+    expect(manifest[22].filename).toBe("22-scene-20.png");
+    expect(manifest[23].filename).toBe("23-closing.png");
+    expect(manifest[24].filename).toBe("24-video-qr-background.png");
+    expect(manifest[25].filename).toBe("cover-back.png");
   });
 
-  it("2. Dream Big default closing spread 22–23: maps spread on 22–23 and singles on 1–21", () => {
+  it("2. Dream Big's standard-24 default has no closing spread — every interior page, including closing (23) and video-qr (24), resolves single", () => {
+    // Originally Dream Big had a default editorial spread on 22-23; its
+    // registered standard-24 StoryEdition declares no approvedSpreadPairs,
+    // so the default resolution (no explicit mode) is now uniformly single-page.
     const plan = resolveLayoutPlan({
       child,
       bookId: "dream-big",
       profileId,
     });
 
-    expect(plan.interiorPageCount).toBe(23);
-    const p22 = plan.pageToAsset.get(22);
+    expect(plan.interiorPageCount).toBe(24);
     const p23 = plan.pageToAsset.get(23);
-    expect(p22).toBeDefined();
-    expect(p23).toBeDefined();
-    expect(p22?.asset).toBe(p23?.asset);
-    expect(p22?.asset.assetKind).toBe("spread");
-    expect(p22?.asset.physicalPages).toEqual([22, 23]);
-    expect(p22?.asset.slotId).toBe("spread-22-23");
-    expect(p22?.asset.expectedSourceAspect).toBe("2:1");
-    expect(p22?.asset.destinationDimensions).toEqual({ width: 4800, height: 2400 });
+    const p24 = plan.pageToAsset.get(24);
+    expect(p23?.asset.assetKind).toBe("single-page");
+    expect(p23?.asset.pageKind).toBe("closing");
+    expect(p24?.asset.assetKind).toBe("single-page");
+    expect(p24?.asset.pageKind).toBe("video-qr");
 
-    // p1 intro is single page
+    // p1 greeting is single page
     expect(plan.pageToAsset.get(1)?.asset.assetKind).toBe("single-page");
   });
 
-  it("3. custom Text Left spread: text on left leaf, child on right looking inward/left", () => {
+  // Tests 3-5 originally exercised Custom Spreads' per-spread textSide
+  // (left/right/none) selection UI on Dream Big — building one text leaf +
+  // one art-only leaf with a composition prompt matching the chosen side.
+  // Dream Big's standard-24 edition has no approvedSpreadPairs, so that
+  // whole per-spread textSide selection feature has no reachable resolution
+  // path for it anymore (or for any of the other 9 registered stories,
+  // which are all standard-24 too) — every request is rejected outright,
+  // regardless of which textSide is requested. The underlying composition
+  // prompt language itself is still separately, genuinely covered by test 9
+  // below (`spreadCompositionRules` called directly).
+  it("3. custom Text Left spread request is rejected — Custom Spreads has no reachable resolution path for Dream Big", () => {
     const customSpreads: CustomSpreadSelection[] = [
       { startPage: 4, endPage: 5, textSide: "left" },
     ];
-    const plan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId,
-      mode: "custom-spreads",
-      customSpreads,
-    });
-
-    const spread = plan.pageToAsset.get(4)!.asset;
-    expect(spread.assetKind).toBe("spread");
-    expect(spread.textSide).toBe("left");
-    expect(spread.subjectSide).toBe("right");
-
-    // Left leaf (p4) has text; right leaf (p5) is art-only
-    expect(spread.leaves[0].physicalPageNumber).toBe(4);
-    expect(spread.leaves[0].hasText).toBe(true);
-    expect(spread.leaves[0].text).toBeTruthy();
-    expect(spread.leaves[1].physicalPageNumber).toBe(5);
-    expect(spread.leaves[1].hasText).toBe(false);
-    expect(spread.leaves[1].text).toBeNull();
-
-    // Composition prompt instructs text-left, subject-right inward
-    expect(spread.prompt).toContain("Reserve the LEFT-HAND region as calm");
-    expect(spread.prompt).toContain("RIGHT-HAND subject-side region, looking inward toward the left when natural");
+    expect(() =>
+      resolveLayoutPlan({ child, bookId: "dream-big", profileId, mode: "custom-spreads", customSpreads }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
-  it("4. custom Text Right spread: text on right leaf, child on left looking inward/right", () => {
+  it("4. custom Text Right spread request is rejected the same way", () => {
     const customSpreads: CustomSpreadSelection[] = [
       { startPage: 8, endPage: 9, textSide: "right" },
     ];
-    const plan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId,
-      mode: "custom-spreads",
-      customSpreads,
-    });
-
-    const spread = plan.pageToAsset.get(8)!.asset;
-    expect(spread.assetKind).toBe("spread");
-    expect(spread.textSide).toBe("right");
-    expect(spread.subjectSide).toBe("left");
-
-    // Left leaf (p8) is art-only; right leaf (p9) has text
-    expect(spread.leaves[0].physicalPageNumber).toBe(8);
-    expect(spread.leaves[0].hasText).toBe(false);
-    expect(spread.leaves[0].text).toBeNull();
-    expect(spread.leaves[1].physicalPageNumber).toBe(9);
-    expect(spread.leaves[1].hasText).toBe(true);
-    expect(spread.leaves[1].text).toBeTruthy();
-
-    // Composition prompt instructs text-right, subject-left inward
-    expect(spread.prompt).toContain("Reserve the RIGHT-HAND region as calm");
-    expect(spread.prompt).toContain("LEFT-HAND subject-side region, looking inward toward the right when natural");
+    expect(() =>
+      resolveLayoutPlan({ child, bookId: "dream-big", profileId, mode: "custom-spreads", customSpreads }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
-  it("5. No Text spread: balanced panoramic artwork with both leaves art-only", () => {
+  it("5. No Text spread request is rejected the same way", () => {
     const customSpreads: CustomSpreadSelection[] = [
       { startPage: 10, endPage: 11, textSide: "none" },
     ];
-    const plan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId,
-      mode: "custom-spreads",
-      customSpreads,
-    });
-
-    const spread = plan.pageToAsset.get(10)!.asset;
-    expect(spread.textSide).toBe("none");
-    expect(!spread.storyText).toBe(true);
-    expect(spread.leaves[0].hasText).toBe(false);
-    expect(spread.leaves[0].text).toBeNull();
-    expect(spread.leaves[1].hasText).toBe(false);
-    expect(spread.leaves[1].text).toBeNull();
-
-    // Composition prompt contract
-    expect(spread.prompt).toContain("full-art spread with no story text");
-    expect(spread.prompt).toContain("balanced panoramic artwork");
-    expect(spread.prompt).toContain("away from the center gutter");
+    expect(() =>
+      resolveLayoutPlan({ child, bookId: "dream-big", profileId, mode: "custom-spreads", customSpreads }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
   it("6. invalid pair rejection: rejects 1–2, 3–4, 5–6, 23–24 and accepts only valid pairs", () => {
@@ -447,19 +427,16 @@ describe("Page Layout Feature Verification Suite", () => {
   });
 
   it("8. prompt/manifest/upload/review/export agreement: all subsystems reflect layout mode", () => {
-    const customSpreads: CustomSpreadSelection[] = [
-      { startPage: 6, endPage: 7, textSide: "left", subjectSide: "right" },
-    ];
-
+    // Custom spreads is rejected outright for Dream Big (standard-24, no
+    // approvedSpreadPairs) — use its valid standard-single resolution.
     const plan = resolveLayoutPlan({
       child,
       bookId: "dream-big",
       profileId,
-      mode: "custom-spreads",
-      customSpreads,
+      mode: "standard-single",
     });
 
-    const manifest = buildManifest(child, "dream-big", profileId, "custom-spreads", customSpreads);
+    const manifest = buildManifest(child, "dream-big", profileId, "standard-single", []);
     expect(manifest.length).toBe(plan.assets.length);
 
     for (let i = 0; i < manifest.length; i++) {
@@ -572,8 +549,15 @@ describe("Page Layout Feature Verification Suite", () => {
   });
 
   it("13. saved selection survives reload/editing: serialized JSON config restores identical plan", () => {
+    // Dream Big's standard-24 edition rejects Custom Spreads outright, so a
+    // saved config can no longer hold mode "custom-spreads" for it — but the
+    // client may still be holding a stale non-empty customSpreads array from
+    // before this architecture change while on Standard Single (see
+    // lib/api/promptsRoute.test.ts's "leftover non-empty customSpreads"
+    // regression). customSpreads is inert in that mode, so the round-trip
+    // must still resolve deterministically rather than throwing.
     const savedConfig: { mode: LayoutMode; customSpreads: CustomSpreadSelection[] } = {
-      mode: "custom-spreads",
+      mode: "standard-single",
       customSpreads: [
         { startPage: 4, endPage: 5, textSide: "left", subjectSide: "right" },
         { startPage: 12, endPage: 13, textSide: "right", subjectSide: "left" },

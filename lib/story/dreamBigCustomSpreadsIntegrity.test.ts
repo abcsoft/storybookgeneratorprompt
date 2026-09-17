@@ -1,22 +1,19 @@
 /**
- * Regression coverage for the Custom Spreads truthfulness/geometry bugs
- * found in a live "Dream Big + Classic Landscape 11x8 + Pages 22-23" run:
+ * Regression coverage for Dream Big's prompt/page-count truthfulness.
  *
- * - The backcover prompt leaked front-cover composition text (wrong "kind"
- *   branch in buildTargetFormatBlock).
- * - Career-scene prompts simultaneously said "outfit changes to match the
- *   career uniform" AND "keep this exact [everyday sweater] outfit
- *   unchanged" (wardrobeRules always ran regardless of the scene's own
- *   costume note).
- * - The single-page aspect heading said "3:2" while the prompt body's own
- *   "closest provider preset" said "4:3" (ASPECT_SINGLE had drifted from
- *   PROVIDER_PRESET_ASPECT_SINGLE).
- * - Selecting a spread silently grows total physical pages (22 -> 23, then
- *   closing/backcover shift to 24/25) with nothing in the Markdown header
- *   explaining why filenames jump past the stated image count.
+ * Originally this file covered the Custom Spreads truthfulness/geometry bugs
+ * found in a live "Dream Big + Classic Landscape 11x8 + Pages 22-23" run
+ * (backcover leaking front-cover text, career-scene wardrobe contradictions,
+ * a drifted aspect heading, and Custom Spreads silently growing the physical
+ * page count past what the Markdown header claimed).
  *
- * These tests assert the invariants a correct Custom Spreads resolution
- * must hold for the Dream Big template, independent of the live browser.
+ * Dream Big now resolves through a registered "standard-24" StoryEdition
+ * (lib/story/dreamBigTemplate.ts) with no approvedSpreadPairs, so Custom
+ * Spreads is disabled for it outright — the old spread-growth scenarios this
+ * file exercised no longer exist as a valid resolution path. These tests
+ * cover the same defect classes against the new fixed-24 model instead:
+ * exactly 24 interior pages (1-24) plus a cover delivered separately, never
+ * assigned an interior page number.
  */
 
 import { describe, expect, it } from "vitest";
@@ -28,76 +25,46 @@ const child: ChildProfile = { name: "Shihab", age: 4, gender: "boy" };
 const bookId = "dream-big";
 const profileId = "classic-landscape-11x8";
 
-/** Every scene's stable identity, independent of which physical page or
- *  asset kind (single vs spread half) it ends up resolved to. */
-function sceneIdentities(manifest: ReturnType<typeof buildManifest>): string[] {
-  return manifest.map((m) => m.role ?? m.kind).sort();
-}
-
-describe("Dream Big custom-spreads physical-page integrity", () => {
-  it("standard-single: 24 assets, physical pages 1..24 unique and consecutive", () => {
+describe("Dream Big standard-24 physical-page integrity", () => {
+  it("standard-single: 26 assets (24 interior + 2 cover), interior physical pages 1..24 unique and consecutive", () => {
     const manifest = buildManifest(child, bookId, profileId, "standard-single", []);
-    expect(manifest.length).toBe(24);
-    const allPages = manifest.flatMap((m) => m.physicalPages ?? []).sort((a, b) => a - b);
+    expect(manifest.length).toBe(26);
+    const interior = manifest.filter((m) => (m.physicalPages ?? []).length > 0);
+    expect(interior.length).toBe(24);
+    const allPages = interior.flatMap((m) => m.physicalPages ?? []).sort((a, b) => a - b);
     expect(allPages).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+
+    const frontCover = manifest.find((m) => m.kind === "cover")!;
     const backcover = manifest.find((m) => m.kind === "backcover")!;
-    expect(backcover.physicalPages).toEqual([24]);
-    expect(backcover.filename).toBe("24-backcover.png");
+    expect(frontCover.physicalPages ?? []).toEqual([]);
+    expect(backcover.physicalPages ?? []).toEqual([]);
+    expect(frontCover.filename).toBe("cover-front.png");
+    expect(backcover.filename).toBe("cover-back.png");
   });
 
-  it("one spread (Pages 22-23): physical pages 1..25 unique and consecutive, no collision", () => {
-    const manifest = buildManifest(child, bookId, profileId, "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    const allPages = manifest.flatMap((m) => m.physicalPages ?? []).sort((a, b) => a - b);
-    expect(allPages).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
-    // No physical page claimed by more than one asset.
-    expect(new Set(allPages).size).toBe(allPages.length);
+  it("Custom Spreads is rejected outright — Dream Big has no approved spread pairs for its standard-24 edition", () => {
+    expect(() =>
+      buildManifest(child, bookId, profileId, "custom-spreads", [
+        { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
+      ]),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
-  it("a spread never drops or duplicates a story scene — same 22 interior scenes present either way", () => {
-    const single = buildManifest(child, bookId, profileId, "standard-single", []);
-    const spread = buildManifest(child, bookId, profileId, "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    // Interior scenes only (exclude cover/backcover, which don't change).
-    const singleInterior = sceneIdentities(single.filter((m) => m.kind !== "cover" && m.kind !== "backcover"));
-    const spreadInterior = sceneIdentities(spread.filter((m) => m.kind !== "cover" && m.kind !== "backcover"));
-    expect(spreadInterior).toEqual(singleInterior);
-  });
-
-  it("a slot's filename always encodes its own actual physical page(s), never a stale number", () => {
-    const manifest = buildManifest(child, bookId, profileId, "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
+  it("a slot's filename always encodes its own actual physical page, never a stale number", () => {
+    const manifest = buildManifest(child, bookId, profileId, "standard-single", []);
     for (const m of manifest) {
-      if (m.kind === "cover" || (m.physicalPages?.length ?? 0) === 0) continue;
+      if ((m.physicalPages?.length ?? 0) === 0) continue; // cover/back-cover carry no interior page number
       const firstPage = m.physicalPages![0];
-      const leadingNumber = m.filename.match(/(\d+)/)?.[1];
+      const leadingNumber = m.filename.match(/^(\d+)/)?.[1];
       expect(leadingNumber, `${m.filename} should start with its physical page ${firstPage}`).toBe(
         String(firstPage).padStart(2, "0"),
       );
     }
   });
-
-  it("multiple non-overlapping spreads all resolve — none silently dropped", () => {
-    const manifest = buildManifest(child, bookId, profileId, "custom-spreads", [
-      { startPage: 2, endPage: 3, textSide: "left", subjectSide: "right" },
-      { startPage: 6, endPage: 7, textSide: "left", subjectSide: "right" },
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    const spreadPagePairs = manifest
-      .filter((m) => m.spread)
-      .map((m) => (m.physicalPages ?? []).join("-"))
-      .sort();
-    expect(spreadPagePairs).toEqual(["2-3", "22-23", "6-7"].sort());
-  });
 });
 
 describe("Dream Big prompt-content truthfulness", () => {
-  const manifest = buildManifest(child, bookId, profileId, "custom-spreads", [
-    { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-  ]);
+  const manifest = buildManifest(child, bookId, profileId, "standard-single", []);
 
   it("the backcover prompt never contains front-cover composition text", () => {
     const backcover = manifest.find((m) => m.kind === "backcover")!;
@@ -112,7 +79,7 @@ describe("Dream Big prompt-content truthfulness", () => {
 
   it("career-scene prompts state a costume change and do NOT also claim the outfit is unchanged", () => {
     const careers = manifest.filter((m) => m.kind === "scene");
-    expect(careers.length).toBeGreaterThan(0);
+    expect(careers.length).toBe(20);
     for (const m of careers) {
       expect(m.prompt, `${m.role} prompt should describe a career costume change`).toMatch(
         /outfit changes to match the .* career uniform/,
@@ -124,8 +91,10 @@ describe("Dream Big prompt-content truthfulness", () => {
     }
   });
 
-  it("non-career pages (cover/intro/closing/backcover) keep their wardrobe continuity block", () => {
-    const nonCareer = manifest.filter((m) => m.kind !== "scene");
+  it("non-career pages with the child on-page keep their wardrobe continuity block", () => {
+    // The app-rendered video-QR page is deliberately character-free (no
+    // child in the scene at all), so it has no wardrobe block to keep.
+    const nonCareer = manifest.filter((m) => m.kind !== "scene" && m.kind !== "video-qr");
     expect(nonCareer.length).toBeGreaterThan(0);
     for (const m of nonCareer) {
       expect(m.prompt, `${m.kind} prompt should keep WARDROBE CONTINUITY`).toMatch(
@@ -152,76 +121,21 @@ describe("Dream Big prompt-content truthfulness", () => {
 });
 
 describe("Dream Big Markdown truthfulness", () => {
-  it("standard-single: header image count matches physical page count (no spreads, nothing to explain)", () => {
+  it("standard-single: header states the true 26-asset / 24-physical-page split, no spreads to explain", () => {
     const md = renderPromptsMarkdown(child, bookId, profileId, "standard-single", []);
-    expect(md).toMatch(/Generate these \*\*24 image files\*\*/);
-  });
-
-  it("with a spread: header states both the image-asset count and the larger physical-page count truthfully", () => {
-    const md = renderPromptsMarkdown(child, bookId, profileId, "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    expect(md).toMatch(/Generate \*\*24 image assets\*\*/);
-    expect(md).toMatch(/- 1 panoramic spread\b/);
-    expect(md).toMatch(/- 23 single-page assets/);
-    expect(md).toMatch(/produce \*\*25 physical PDF pages\*\*/);
-    expect(md).toMatch(/Expanded Hybrid/);
-    expect(md).toMatch(/25-backcover\.png/);
-  });
-
-  it("with 11 spreads (all eligible pairs): header truthfully states 35 physical pages, not 24", () => {
-    const elevenPairs = Array.from({ length: 11 }, (_, i) => ({
-      startPage: 2 + i * 2,
-      endPage: 3 + i * 2,
-      textSide: "left" as const,
-      subjectSide: "right" as const,
-    }));
-    const md = renderPromptsMarkdown(child, bookId, profileId, "custom-spreads", elevenPairs);
-    expect(md).toMatch(/Generate \*\*24 image assets\*\*/);
-    expect(md).toMatch(/- 11 panoramic spreads/);
-    expect(md).toMatch(/- 13 single-page assets/);
-    expect(md).toMatch(/produce \*\*35 physical PDF pages\*\*/);
-    expect(md).toMatch(/35-backcover\.png/);
-    expect(md).toMatch(/34-closing\.png/);
-    expect(md).not.toMatch(/produce \*\*24 physical PDF pages\*\*/);
-  });
-
-  it("each illustration section states its own slot, physical page(s), and legacy aliases separately from the canonical filename", () => {
-    const md = renderPromptsMarkdown(child, bookId, profileId, "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    expect(md).toMatch(/\*\*Slot:\*\* `spread-22-23-inventor`/);
-    expect(md).toMatch(/\*\*Physical pages:\*\* 22–23/);
-    expect(md).toMatch(/\*\*Legacy aliases/);
+    expect(md).toMatch(/Generate \*\*26 image assets\*\* \(all single-page — no spreads\), producing \*\*24 physical PDF pages\*\*/);
+    expect(md).toMatch(/Generate these \*\*26 image files\*\*/);
+    expect(md).toMatch(/cover-front\.png/);
+    expect(md).toMatch(/cover-back\.png/);
+    expect(md).toMatch(/24-video-qr-background\.png/);
   });
 });
 
 describe("Dream Big resolveLayoutPlan interior-page-count truthfulness", () => {
-  it("a single spread grows interiorPageCount by exactly 1 beyond standard-single's 22", () => {
-    const single = resolveLayoutPlan({ child, bookId, profileId, mode: "standard-single", customSpreads: [] });
-    const spread = resolveLayoutPlan({
-      child,
-      bookId,
-      profileId,
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" }],
-    });
-    expect(single.interiorPageCount).toBe(22);
-    expect(spread.interiorPageCount).toBe(23);
-  });
-
-  it("three spreads grow interiorPageCount by exactly 3 beyond standard-single's 22", () => {
-    const spread = resolveLayoutPlan({
-      child,
-      bookId,
-      profileId,
-      mode: "custom-spreads",
-      customSpreads: [
-        { startPage: 2, endPage: 3, textSide: "left", subjectSide: "right" },
-        { startPage: 6, endPage: 7, textSide: "left", subjectSide: "right" },
-        { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-      ],
-    });
-    expect(spread.interiorPageCount).toBe(25);
+  it("standard-single always resolves to exactly 24 interior pages, regardless of any requested customSpreads", () => {
+    const plan = resolveLayoutPlan({ child, bookId, profileId, mode: "standard-single", customSpreads: [] });
+    expect(plan.interiorPageCount).toBe(24);
+    expect(plan.interiorAssets.length).toBe(24);
+    expect(plan.coverAssetCount).toBe(2);
   });
 });

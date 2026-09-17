@@ -48,38 +48,40 @@ describe("Resolved-Prompt-Only Enforcement at API & Provider Boundary", () => {
     expect(introCall!.prompt).not.toContain("6675×2475");
   });
 
-  it("submits resolved spread prompt and 21:9 preset for Starlit Dream constellation scene in Custom Spreads", async () => {
+  it("Custom Spreads is rejected outright for Starlit Dream — no approved spread pairs on its standard-24 edition", async () => {
+    // Bedtime Dream ("Starlit Dream") now resolves through its registered
+    // standard-24 StoryEdition, which declares no approvedSpreadPairs, so
+    // there's no longer a live "constellation spread" resolution path — the
+    // request must fail closed rather than submitting a hand-built spread
+    // prompt. generateBook() must propagate the same rejection and make zero
+    // provider calls.
     const fakeCalls: Array<{ prompt: string; aspect: string }> = [];
     const fakeGenerate = async (prompt: string, _refs: ReferencePhoto[], aspect?: string) => {
       fakeCalls.push({ prompt, aspect: aspect ?? "" });
       return { data: await makeTinyPngBuffer(), mimeType: "image/png" };
     };
 
-    const plan = resolveLayoutPlan({
-      child,
-      bookId: "bedtime-dream",
-      profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 10, endPage: 11, textSide: "left" }],
-    });
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "bedtime-dream",
+        profileId: "classic-landscape-11x8",
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 10, endPage: 11, textSide: "left" }],
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
 
-    const constellationSlot = plan.assets.find((a) => a.assetKind === "spread");
-    expect(constellationSlot).toBeDefined();
-
-    await generateBook(child, [], {
-      bookId: "bedtime-dream",
-      profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 10, endPage: 11, textSide: "left" }],
-      generate: fakeGenerate,
-      anchor: false,
-    });
-
-    const spreadCall = fakeCalls.find((c) => c.prompt === constellationSlot!.prompt);
-    expect(spreadCall).toBeDefined();
-    expect(spreadCall!.aspect).toBe("21:9");
-    expect(spreadCall!.prompt).toContain("COMPOSITION (two-page continuous spread)");
-    expect(spreadCall!.prompt).toContain("6675×2475 px");
+    await expect(
+      generateBook(child, [], {
+        bookId: "bedtime-dream",
+        profileId: "classic-landscape-11x8",
+        mode: "custom-spreads",
+        customSpreads: [{ startPage: 10, endPage: 11, textSide: "left" }],
+        generate: fakeGenerate,
+        anchor: false,
+      }),
+    ).rejects.toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
+    expect(fakeCalls.length).toBe(0);
   });
 
   it("submits single-page prompt and 4:3 preset when Starlit Dream closing resolves as single (never spread)", async () => {
@@ -89,12 +91,14 @@ describe("Resolved-Prompt-Only Enforcement at API & Provider Boundary", () => {
       return { data: await makeTinyPngBuffer(), mimeType: "image/png" };
     };
 
+    // Standard-single (Bedtime Dream's only valid resolution now, since its
+    // standard-24 edition has no approvedSpreadPairs): closing is always a
+    // single interior page.
     const plan = resolveLayoutPlan({
       child,
       bookId: "bedtime-dream",
       profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 4, endPage: 5, textSide: "left" }],
+      mode: "standard-single",
     });
 
     const closingSlot = plan.assets.find((a) => a.pageKind === "closing");
@@ -104,8 +108,7 @@ describe("Resolved-Prompt-Only Enforcement at API & Provider Boundary", () => {
     await generateBook(child, [], {
       bookId: "bedtime-dream",
       profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 4, endPage: 5, textSide: "left" }],
+      mode: "standard-single",
       generate: fakeGenerate,
       anchor: false,
     });
@@ -119,7 +122,12 @@ describe("Resolved-Prompt-Only Enforcement at API & Provider Boundary", () => {
     expect(closingCall!.prompt).not.toContain("89:33");
   });
 
-  it("submits resolved spread prompt and 21:9 preset for Great Adventure flying-home spread", async () => {
+  it("Great Adventure's standard-24 edition takes priority over the legacy flying-home spread edition even with useEditorialDefault — every page resolves single, and generateBook submits each resolved prompt", async () => {
+    // Great Adventure's registered standard-24 StoryEdition takes priority
+    // over the legacy great-adventure-printify-24 PrintEdition (which had a
+    // flying-home spread) for every profile, regardless of
+    // useEditorialDefault — that option is now silently inert for any story
+    // with a standard-24 edition (i.e. all 10 registered stories).
     const fakeCalls: Array<{ prompt: string; aspect: string }> = [];
     const fakeGenerate = async (prompt: string, _refs: ReferencePhoto[], aspect?: string) => {
       fakeCalls.push({ prompt, aspect: aspect ?? "" });
@@ -133,8 +141,10 @@ describe("Resolved-Prompt-Only Enforcement at API & Provider Boundary", () => {
       useEditorialDefault: true,
     });
 
-    const flyingHomeSlot = plan.assets.find((a) => a.sourceSceneIndex === 18 && a.assetKind === "spread");
-    expect(flyingHomeSlot).toBeDefined();
+    expect(plan.assets.some((a) => a.assetKind === "spread")).toBe(false);
+    const homewardFlightSlot = plan.assets.find((a) => a.sceneId === "star-trail-homeward-flight");
+    expect(homewardFlightSlot).toBeDefined();
+    expect(homewardFlightSlot!.assetKind).toBe("single-page");
 
     await generateBook(child, [], {
       bookId: "great-adventure",
@@ -144,38 +154,46 @@ describe("Resolved-Prompt-Only Enforcement at API & Provider Boundary", () => {
       anchor: false,
     });
 
-    const flyingHomeCall = fakeCalls.find((c) => c.prompt === flyingHomeSlot!.prompt);
-    expect(flyingHomeCall).toBeDefined();
-    expect(flyingHomeCall!.aspect).toBe(flyingHomeSlot!.providerPresetAspect);
-    expect(flyingHomeCall!.prompt).toContain("COMPOSITION (two-page continuous spread)");
+    const homewardFlightCall = fakeCalls.find((c) => c.prompt === homewardFlightSlot!.prompt);
+    expect(homewardFlightCall).toBeDefined();
+    expect(homewardFlightCall!.aspect).toBe(homewardFlightSlot!.providerPresetAspect);
+    expect(homewardFlightCall!.prompt).toContain("COMPOSITION (single page)");
+    expect(homewardFlightCall!.prompt).not.toContain("COMPOSITION (two-page continuous spread)");
   });
 
-  it("makes zero provider calls when a plan is invalid for the selected profile", async () => {
+  it("makes zero provider calls when a plan is genuinely invalid (mode 'full-spread-24', which is not available for any story yet)", async () => {
+    // Every one of the 10 registered stories now has a standard-24 edition,
+    // so resolveLayoutPlan() always resolves validly (isValidForProfile:
+    // true) for standard-single/custom-spreads requests — a genuinely
+    // invalid plan is no longer reachable that way (see
+    // lib/story/pipelineAuditRegression.test.ts's "Dream Big on Printify
+    // 24-page hardcover is valid because an editorial edition exists").
+    // "full-spread-24" is still genuinely rejected for every story, though —
+    // it requires an approved editorial mapping that doesn't exist yet.
     const fakeCalls: Array<{ prompt: string; aspect: string }> = [];
     const fakeGenerate = async (prompt: string, _refs: ReferencePhoto[], aspect?: string) => {
       fakeCalls.push({ prompt, aspect: aspect ?? "" });
       return { data: await makeTinyPngBuffer(), mimeType: "image/png" };
     };
 
-    // Great Adventure on Printify Square in standard-single mode resolves to 19 interior pages,
-    // which violates Printify's strict 24-page hardcover requirement.
-    const plan = resolveLayoutPlan({
-      child,
-      bookId: "great-adventure",
-      profileId: "printify-hardcover-square-8x8",
-      mode: "standard-single",
-    });
-    expect(plan.isValidForProfile).toBe(false);
+    expect(() =>
+      resolveLayoutPlan({
+        child,
+        bookId: "great-adventure",
+        profileId: "printify-hardcover-square-8x8",
+        mode: "full-spread-24",
+      }),
+    ).toThrow("Full Spread 24-Page Edition is not available yet");
 
     await expect(
       generateBook(child, [], {
         bookId: "great-adventure",
         profileId: "printify-hardcover-square-8x8",
-        mode: "standard-single",
+        mode: "full-spread-24",
         generate: fakeGenerate,
         anchor: false,
       }),
-    ).rejects.toThrow("Layout plan is invalid for profile");
+    ).rejects.toThrow("Full Spread 24-Page Edition is not available yet");
 
     // Strictly zero calls reached the provider
     expect(fakeCalls.length).toBe(0);

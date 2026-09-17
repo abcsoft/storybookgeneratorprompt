@@ -324,10 +324,16 @@ export async function runPreflight(
   // 5. Spread Imposition Invariants Check
   for (const asset of plan.interiorAssets) {
     if (asset.assetKind === "spread") {
-      const illoNum =
-        asset.sourceSceneIndex !== undefined
-          ? asset.sourceSceneIndex + 1
-          : plan.assets.findIndex((s) => s.slotId === asset.slotId) + 1;
+      // "Illustration N" (a 1-based, user-facing position) must be the
+      // asset's true position in the resolved book, i.e. illustrationIndex
+      // (always finalized to the real 0-based array position by both
+      // resolveLayoutPlan()'s legacy branches and
+      // resolveStoryEditionPlan()). asset.sourceSceneIndex is NOT
+      // positional for a StoryEdition-resolved plan — storyEdition.ts
+      // reserves 0/1 for the front/back cover and numbers interior assets
+      // from 2, so using it here would show users the wrong "Illustration
+      // N" for every interior asset.
+      const illoNum = asset.illustrationIndex + 1;
       if (asset.physicalPages.length !== 2) {
         const msg = `Spread illustration "${asset.slotId}" maps to ${asset.physicalPages.length} leaves, expected exactly 2.`;
         errors.push(msg);
@@ -366,10 +372,7 @@ export async function runPreflight(
       }
     } else if (asset.assetKind === "single-page") {
       if (asset.physicalPages.length !== 1) {
-        const illoNum =
-          asset.sourceSceneIndex !== undefined
-            ? asset.sourceSceneIndex + 1
-            : plan.assets.findIndex((s) => s.slotId === asset.slotId) + 1;
+        const illoNum = asset.illustrationIndex + 1;
         const msg = `Single illustration "${asset.slotId}" maps to ${asset.physicalPages.length} leaves, expected exactly 1.`;
         errors.push(msg);
         issues.push({
@@ -426,10 +429,7 @@ export async function runPreflight(
     const file = bySlotId.get(slot.slotId);
     if (!file) continue;
 
-    const illoNum =
-      slot.sourceSceneIndex !== undefined
-        ? slot.sourceSceneIndex + 1
-        : plan.assets.findIndex((s) => s.slotId === slot.slotId) + 1;
+    const illoNum = slot.illustrationIndex + 1;
 
     try {
       const meta = await sharp(file.buffer).metadata();

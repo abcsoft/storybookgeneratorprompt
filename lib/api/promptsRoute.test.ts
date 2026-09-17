@@ -49,33 +49,22 @@ describe("POST /api/prompts", () => {
     expect(body.markdown.length).toBeGreaterThan(0);
   });
 
-  it("Dream Big + Classic Landscape + valid Pages 22-23 spread succeeds (the reproduced crash)", async () => {
+  it("Dream Big + Classic Landscape + Pages 22-23 spread is rejected — Dream Big now resolves through its registered standard-24 edition with no approved spread pairs", async () => {
+    // Originally this reproduced a crash (silent 500) for a valid Custom
+    // Spreads request; Dream Big now has a registered "standard-24"
+    // StoryEdition with no approvedSpreadPairs, so Custom Spreads is
+    // disabled for it outright and the route must fail closed with a
+    // structured 400, never a 500 or an HTML error page.
     const { POST } = await import("@/app/api/prompts/route");
     const res = await POST(postRequest(DREAM_BIG_CUSTOM_SPREAD_REQUEST));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     expect(res.headers.get("content-type")).toContain("application/json");
     const body = await res.json();
-
-    expect(body.pages.length).toBeGreaterThan(0);
-    expect(typeof body.markdown).toBe("string");
-    expect(body.markdown.length).toBeGreaterThan(0);
-    expect(typeof body.anchorPrompt).toBe("string");
-    expect(body.anchorPrompt.length).toBeGreaterThan(0);
-    expect(Array.isArray(body.resolvedSlots)).toBe(true);
-    expect(body.resolvedSlots.length).toBeGreaterThan(0);
-
-    const spreadSlot = body.resolvedSlots.find(
-      (s: any) => Array.isArray(s.physicalPages) && s.physicalPages.includes(22) && s.physicalPages.includes(23),
-    );
-    expect(spreadSlot).toBeTruthy();
-    expect(spreadSlot.profileId).toBe("classic-landscape-11x8");
-    expect(spreadSlot.textSide).toBe("left");
-    expect(spreadSlot.subjectSide).toBe("right");
-    expect(spreadSlot.physicalPages).toEqual([22, 23]);
-    expect(spreadSlot.destinationDimensions.width).toBeGreaterThan(spreadSlot.destinationDimensions.height);
+    expect(body.code).toBe("INVALID_LAYOUT");
+    expect(body.error).toMatch(/Custom spreads require an approved fixed-24 editorial mapping\./);
   });
 
-  it("11 selected spreads (all eligible pairs): 24 assets, 35 physical leaves, Closing at 34, Backcover at 35", async () => {
+  it("11 selected spreads (all eligible pairs) is rejected the same way — no spread pairs are approved for Dream Big's standard-24 edition", async () => {
     const { POST } = await import("@/app/api/prompts/route");
     const elevenPairs = Array.from({ length: 11 }, (_, i) => ({
       startPage: 2 + i * 2,
@@ -86,20 +75,10 @@ describe("POST /api/prompts", () => {
     const res = await POST(
       postRequest({ ...DREAM_BIG_CUSTOM_SPREAD_REQUEST, customSpreads: elevenPairs }),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.pages.length).toBe(24);
-    const spreads = body.pages.filter((p: any) => p.spread);
-    const singles = body.pages.filter((p: any) => !p.spread);
-    expect(spreads.length).toBe(11);
-    expect(singles.length).toBe(13);
-    const closing = body.pages.find((p: any) => p.kind === "closing");
-    const backcover = body.pages.find((p: any) => p.kind === "backcover");
-    expect(closing.physicalPages).toEqual([34]);
-    expect(closing.filename).toBe("34-closing.png");
-    expect(backcover.physicalPages).toEqual([35]);
-    expect(backcover.filename).toBe("35-backcover.png");
-    expect(body.markdown).toMatch(/produce \*\*35 physical PDF pages\*\*/);
+    expect(body.code).toBe("INVALID_LAYOUT");
+    expect(body.error).toMatch(/Custom spreads require an approved fixed-24 editorial mapping\./);
   });
 
   it("standard-single with a leftover non-empty customSpreads array still succeeds (client may hold stale spread-selector state)", async () => {
@@ -268,7 +247,10 @@ describe("POST /api/prompts — dependency isolation from paid/local-AI provider
   it("still returns HTTP 200 with every enhancement/paid-provider env var absent", async () => {
     vi.resetModules(); // force a fresh import graph with the env vars cleared
     const { POST } = await import("@/app/api/prompts/route");
-    const res = await POST(postRequest(DREAM_BIG_CUSTOM_SPREAD_REQUEST));
+    // Not a custom-spreads request: Dream Big's standard-24 edition rejects
+    // custom-spreads outright, which is unrelated to what this test checks
+    // (env-var/provider dependency isolation), so use its valid default mode.
+    const res = await POST(postRequest(DREAM_BIG_STANDARD_SINGLE_REQUEST));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.pages.length).toBeGreaterThan(0);

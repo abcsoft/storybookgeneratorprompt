@@ -20,10 +20,11 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
     });
     const manifest = buildManifest(alex, "dream-big", "classic-landscape-11x8", "standard-single");
 
-    expect(manifest.length).toBe(24);
-    expect(plan.assets.length).toBe(24);
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26 assets.
+    expect(manifest.length).toBe(26);
+    expect(plan.assets.length).toBe(26);
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       expect(manifest[i].slotId).toBe(plan.assets[i].slotId);
       expect(manifest[i].expectedFilename).toBe(plan.assets[i].expectedFilename);
       expect(plan.assets[i].destinationDimensions).toEqual({ width: 3375, height: 2475 });
@@ -33,29 +34,26 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
   });
 
   // 2. Dream Big + Classic Landscape + Custom Spreads
-  it("2. Dream Big + Classic Landscape + Custom Spreads: spreads remain spreads", () => {
+  it("2. Dream Big + Classic Landscape + Custom Spreads: rejected outright — Dream Big's standard-24 edition has no approved spread pairs", () => {
+    // Dream Big now resolves through its registered standard-24 StoryEdition
+    // on every profile, which declares no approvedSpreadPairs — Custom
+    // Spreads is disabled for it, so it can no longer produce a real
+    // "spread" asset to check for slot-id agreement.
     const customSpreads: CustomSpreadSelection[] = [
       { startPage: 20, endPage: 21, textSide: "left", subjectSide: "right" },
     ];
-    const plan = resolveLayoutPlan({
-      child: alex,
-      bookId: "dream-big",
-      profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads,
-    });
-    const manifest = buildManifest(alex, "dream-big", "classic-landscape-11x8", "custom-spreads", customSpreads);
-
-    expect(manifest.length).toBe(plan.assets.length);
-
-    // Find the spread asset
-    const spreadAsset = plan.assets.find((a) => a.assetKind === "spread");
-    expect(spreadAsset).toBeDefined();
-    expect(spreadAsset?.physicalPages).toEqual([20, 21]);
-
-    const spreadManifest = manifest.find((m) => m.spread === true);
-    expect(spreadManifest).toBeDefined();
-    expect(spreadManifest?.slotId).toBe(spreadAsset?.slotId);
+    expect(() =>
+      resolveLayoutPlan({
+        child: alex,
+        bookId: "dream-big",
+        profileId: "classic-landscape-11x8",
+        mode: "custom-spreads",
+        customSpreads,
+      }),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
+    expect(() =>
+      buildManifest(alex, "dream-big", "classic-landscape-11x8", "custom-spreads", customSpreads),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 
   // 3. Dream Big + Printify Square
@@ -69,20 +67,22 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
     });
     const manifest = buildManifest(alex, "dream-big", profile.id, "standard-single");
 
-    expect(plan.assets.length).toBe(24);
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26
+    // assets. The cover no longer has a special composite-wrap dimension at
+    // this layer — each cover half is generated as its own normal
+    // single-page-shaped illustration; the actual wraparound cover.png
+    // (using profile.coverGeometryPx) is composited later from the 2 halves
+    // in the print export pipeline (see lib/print/printifyExport.ts).
+    expect(plan.assets.length).toBe(26);
     for (const slot of plan.assets) {
-      if (slot.pageKind === "cover") {
-        expect(slot.destinationDimensions).toEqual({ width: 5370, height: 2850 });
-      } else {
-        expect(slot.destinationDimensions).toEqual({ width: 2400, height: 2400 });
-        expect(slot.targetCanvasAspect).toBe("1:1");
-      }
+      expect(slot.destinationDimensions).toEqual({ width: 2400, height: 2400 });
+      expect(slot.targetCanvasAspect).toBe("1:1");
       // Verify no Classic 11x8 canvas dimensions leaked
       expect(slot.destinationDimensions.width).not.toBe(3375);
       expect(slot.destinationDimensions.height).not.toBe(2475);
     }
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       expect(manifest[i].slotId).toBe(plan.assets[i].slotId);
     }
   });
@@ -98,7 +98,7 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
     });
     const manifest = buildManifest(alex, "dream-big", profile.id, "standard-single");
 
-    expect(plan.assets.length).toBe(24);
+    expect(plan.assets.length).toBe(26);
     for (const slot of plan.assets) {
       expect(slot.destinationDimensions).toEqual({ width: 3375, height: 2625 });
       expect(slot.printDimensionsIn.trimHeightIn).toBe(8.5);
@@ -106,7 +106,7 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
       expect(slot.destinationDimensions.height).not.toBe(2475);
     }
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       expect(manifest[i].slotId).toBe(plan.assets[i].slotId);
     }
   });
@@ -122,7 +122,7 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
     });
     const manifest = buildManifest(alex, "dream-big", profile.id, "standard-single");
 
-    expect(plan.assets.length).toBe(24);
+    expect(plan.assets.length).toBe(26);
     for (const slot of plan.assets) {
       expect(slot.destinationDimensions).toEqual({ width: 2625, height: 2625 });
       expect(slot.printDimensionsIn.trimWidthIn).toBe(8.5);
@@ -132,7 +132,7 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
       expect(slot.destinationDimensions.height).not.toBe(2475);
     }
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       expect(manifest[i].slotId).toBe(plan.assets[i].slotId);
     }
   });
@@ -209,10 +209,12 @@ describe("Cross-Profile Import & Authoritative Slot Integrity", () => {
     expect(report.legacyRecoveryChoices).toBeUndefined();
     expect(report.legacyRecoveryApplied).toBeFalsy();
 
-    // Standard matching assigns 01.png..22.png to the first 22 slots
+    // Standard matching assigns 01.png..22.png to the first 22 slots.
+    // Standard-24 edition: basePlan now has 26 assets (2 cover + 24
+    // interior), so slots 23-26 remain missing, not just 23-24.
     expect(report.assignedCount).toBe(22);
-    expect(report.missingSlots.length).toBe(2); // 23 and 24 missing
-    expect(report.missingSlots).toEqual(["scene-23", "scene-24"]);
+    expect(report.missingSlots.length).toBe(4);
+    expect(report.missingSlots).toEqual(["scene-23", "scene-24", "scene-25", "scene-26"]);
   });
 
   // 9. Static Code Guard: No synthetic slot reconstruction exists in client or matcher code

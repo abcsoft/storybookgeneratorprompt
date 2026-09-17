@@ -19,7 +19,8 @@ import type { PrintProfile } from "../print/types";
 import { getBook } from "./registry";
 import { assertValidFacingPair, isValidFacingPair } from "../pdf/imposition";
 import { getEditionForProfile } from "./editions";
-import type { ChildProfile, StoryTemplate, LayoutType, PageKind, FramingMode } from "./types";
+import { getStoryEdition, resolveStoryEditionPlan } from "./storyEdition";
+import type { ChildProfile, StoryTemplate, LayoutType, PageKind, FramingMode, DeliveryGroup } from "./types";
 
 /**
  * - "standard-single": every interior scene is its own single-page asset
@@ -40,25 +41,34 @@ import type { ChildProfile, StoryTemplate, LayoutType, PageKind, FramingMode } f
  *   lib/story/editions/dreamBigFullSpread24.proposal.ts.
  */
 export type LayoutMode = "standard-single" | "custom-spreads" | "full-spread-24";
-export type AssetKind = "front-cover" | "back-cover" | "single-page" | "spread";
-export type TextSide = "left" | "right" | "none";
-export type SubjectSide = "left" | "right" | "centered";
 
-export interface SafeRegionRectPct {
-  leftPct: number;
-  topPct: number;
-  widthPct: number;
-  heightPct: number;
-}
-
-export interface ResolvedSafeRegions {
-  /** Text safe area percentage bounds within the full canvas */
-  textSafe: SafeRegionRectPct;
-  /** Subject safe area percentage bounds within the full canvas */
-  subjectSafe: SafeRegionRectPct;
-  /** Center gutter percentage strip if this is a spread */
-  gutter?: SafeRegionRectPct;
-}
+// AssetKind, TextSide, SubjectSide, SafeRegionRectPct, ResolvedSafeRegions,
+// and the pure geometry/filename/role-slug helpers below live in
+// layoutGeometry.ts — a dependency-free leaf module — and are re-exported
+// here so every existing "./layoutPlan" consumer is unaffected. See that
+// file's header comment for why: storyEdition.ts needs these without
+// creating a runtime circular import back into this file.
+import {
+  getRoleSlug,
+  canonicalFilenameForSlot,
+  computeAssetSafeRegions,
+  deriveProviderNativeMinimum,
+  getProfileAssetGeometry,
+  type AssetKind,
+  type TextSide,
+  type SubjectSide,
+  type SafeRegionRectPct,
+  type ResolvedSafeRegions,
+  type TextPanelPosition,
+} from "./layoutGeometry";
+export {
+  getRoleSlug,
+  canonicalFilenameForSlot,
+  computeAssetSafeRegions,
+  deriveProviderNativeMinimum,
+  getProfileAssetGeometry,
+};
+export type { AssetKind, TextSide, SubjectSide, SafeRegionRectPct, ResolvedSafeRegions, TextPanelPosition };
 
 /** Compute eligible facing pairs for any page count. Never starts on odd or page 1. */
 export function getEligibleFacingPairs(maxPage: number): [number, number][] {
@@ -319,6 +329,13 @@ export interface ResolvedAssetSlot {
   physicalPages: number[];
   textSide: TextSide;
   subjectSide: SubjectSide;
+  /** One of the six declared story-text-panel positions (see TextPanelPosition
+   *  in layoutGeometry.ts), chosen per scene so the panel never covers the
+   *  main face, required action, companion, secret marker, treasure chest, QR
+   *  code, or other story-critical object. Defaults to "bottom-left" for
+   *  slots resolved outside a StoryEdition (legacy path) or scenes that don't
+   *  declare one explicitly. */
+  textPanelPosition?: TextPanelPosition;
   /** Exact canvas width and height in pixels for the destination print profile. */
   destinationDimensions: { width: number; height: number };
   /** Exact physical trim and bleed dimensions in inches. */
@@ -347,39 +364,19 @@ export interface ResolvedAssetSlot {
   prompt: string;
   storyText: string;
   leaves: ResolvedPhysicalLeaf[];
-}
-
-/** Compute normalized role slug for canonical naming. */
-export function getRoleSlug(kind: PageKind, role?: string): string {
-  if (kind === "cover") return "cover";
-  if (kind === "intro") return "intro";
-  if (kind === "closing") return "closing";
-  if (kind === "backcover") return "backcover";
-  if (!role) return "scene";
-
-  const r = role.toLowerCase().trim();
-  if (r.includes("pilot")) return "pilot";
-  if (r.includes("racer") || r.includes("race car")) return "race-car-driver";
-  if (r.includes("astronaut")) return "astronaut";
-  if (r.includes("doctor")) return "doctor";
-  if (r.includes("firefighter")) return "firefighter";
-  if (r.includes("scientist")) return "scientist";
-  if (r.includes("army officer")) return "army-officer";
-  if (r.includes("soccer")) return "soccer-player";
-  if (r.includes("karate")) return "karate-master";
-  if (r.includes("detective")) return "detective";
-  if (r.includes("magician")) return "magician";
-  if (r.includes("chef")) return "chef";
-  if (r.includes("rockstar")) return "rockstar";
-  if (r.includes("artist") || r.includes("painter")) return "artist";
-  if (r.includes("teacher")) return "teacher";
-  if (r.includes("explorer")) return "explorer";
-  if (r.includes("photographer")) return "photographer";
-  if (r.includes("diver")) return "deep-sea-diver";
-  if (r.includes("vet")) return "veterinarian";
-  if (r.includes("inventor")) return "inventor";
-
-  return r.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  /** "cover" for the separate front/spine/back wrap (never an interior page
+   *  number) or "interior" for the numbered page sequence. Defaults to
+   *  "interior" for legacy (non-StoryEdition) resolution paths that don't
+   *  set it explicitly — those paths already treat cover/backcover as
+   *  distinct assetKinds outside physicalPages numbering. */
+  deliveryGroup?: DeliveryGroup;
+  /** 1-based interior page number (1..interiorPageCount) for a
+   *  StoryEdition-resolved plan. Absent for deliveryGroup "cover" assets and
+   *  for legacy resolution paths. */
+  physicalInteriorPage?: number;
+  /** The StoryEdition id this slot was resolved from (e.g. "standard-24"),
+   *  absent for legacy (non-StoryEdition) resolution paths. */
+  storyEditionId?: string;
 }
 
 export interface ResolvedLayoutPlan {
@@ -396,6 +393,12 @@ export interface ResolvedLayoutPlan {
   /** Validation / limitation warnings or errors (e.g. if story scenes count doesn't match fixed profile page count without an editorial edition) */
   limitations?: string[];
   isValidForProfile: boolean;
+  /** Number of separate cover assets (front + back = 2 for a standard wrap),
+   *  set on a StoryEdition-resolved plan; absent for legacy paths. */
+  coverAssetCount?: number;
+  /** The StoryEdition id this plan was resolved from (e.g. "standard-24"),
+   *  absent for legacy (non-StoryEdition) resolution paths. */
+  storyEditionId?: string;
 }
 
 export interface ResolveLayoutPlanOptions {
@@ -419,267 +422,6 @@ export function defaultSubjectSideFor(textSide: TextSide): SubjectSide {
 }
 
 /**
- * Build canonical filename for an asset slot.
- */
-export function canonicalFilenameForSlot(kind: AssetKind, physicalPages: number[]): string {
-  if (kind === "front-cover") return "front-cover.png";
-  if (kind === "back-cover") return "back-cover.png";
-  if (kind === "spread") {
-    const p1 = String(physicalPages[0]).padStart(2, "0");
-    const p2 = String(physicalPages[1]).padStart(2, "0");
-    return `spread-${p1}-${p2}.png`;
-  }
-  const p = String(physicalPages[0]).padStart(2, "0");
-  return `page-${p}.png`;
-}
-
-/**
- * Compute safe regions for text, subject, and center gutter.
- */
-export function computeAssetSafeRegions(
-  profile: PrintProfile,
-  kind: AssetKind,
-  textSide: TextSide,
-  subjectSide: SubjectSide,
-): ResolvedSafeRegions {
-  const canvas = profile.canvasPx;
-  const safe = profile.safeAreaPx;
-  const marginXPct = ((canvas.width - safe.width) / 2 / canvas.width) * 100;
-  const marginYPct = ((canvas.height - safe.height) / 2 / canvas.height) * 100;
-  const safeWidthPct = (safe.width / canvas.width) * 100;
-  const safeHeightPct = (safe.height / canvas.height) * 100;
-
-  if (kind === "front-cover" || kind === "back-cover") {
-    return {
-      textSafe: {
-        leftPct: 9.0,
-        topPct: 70.0,
-        widthPct: 82.0,
-        heightPct: 20.0,
-      },
-      subjectSafe: {
-        leftPct: 15.0,
-        topPct: 10.0,
-        widthPct: 70.0,
-        heightPct: 58.0,
-      },
-    };
-  }
-
-  if (kind === "spread") {
-    const totalWidthPx = canvas.width * 2;
-    const safeMarginX = (canvas.width - safe.width) / 2;
-    const gutterWidthPx = safeMarginX * 2;
-    const gutterWidthPct = (gutterWidthPx / totalWidthPx) * 100;
-    const gutterLeftPct = 50 - gutterWidthPct / 2;
-
-    const gutter: SafeRegionRectPct = {
-      leftPct: Number(gutterLeftPct.toFixed(2)),
-      topPct: 0,
-      widthPct: Number(gutterWidthPct.toFixed(2)),
-      heightPct: 100,
-    };
-
-    if (textSide === "left") {
-      return {
-        textSafe: { leftPct: 6.0, topPct: 65.0, widthPct: 38.0, heightPct: 25.0 },
-        subjectSafe: { leftPct: 52.0, topPct: marginYPct, widthPct: 42.0, heightPct: safeHeightPct },
-        gutter,
-      };
-    } else if (textSide === "right") {
-      return {
-        textSafe: { leftPct: 56.0, topPct: 65.0, widthPct: 38.0, heightPct: 25.0 },
-        subjectSafe: { leftPct: marginXPct / 2, topPct: marginYPct, widthPct: 42.0, heightPct: safeHeightPct },
-        gutter,
-      };
-    } else {
-      return {
-        textSafe: { leftPct: 0, topPct: 0, widthPct: 0, heightPct: 0 },
-        subjectSafe: {
-          leftPct: marginXPct / 2,
-          topPct: marginYPct,
-          widthPct: 100 - marginXPct,
-          heightPct: safeHeightPct,
-        },
-        gutter,
-      };
-    }
-  }
-
-  // Single interior page
-  return {
-    textSafe: {
-      leftPct: Number(marginXPct.toFixed(2)),
-      topPct: Number((100 - marginYPct - 25).toFixed(2)),
-      widthPct: Number(((safe.width * 0.82 / canvas.width) * 100).toFixed(2)),
-      heightPct: 25.0,
-    },
-    subjectSafe: {
-      leftPct: Number(marginXPct.toFixed(2)),
-      topPct: Number(marginYPct.toFixed(2)),
-      widthPct: Number(safeWidthPct.toFixed(2)),
-      heightPct: Number(safeHeightPct.toFixed(2)),
-    },
-  };
-}
-
-/**
- * Programmatically derive the minimum provider source resolution required to achieve
- * at least 200 native PPI and stay within the maximum 1.5x upscale threshold.
- */
-export function deriveProviderNativeMinimum(
-  targetWidth: number,
-  targetHeight: number,
-  providerAspect: string,
-  maxUpscaleFactor = 1.5,
-): { width: number; height: number; minNativePpi: number; maxUpscaleFactor: number } {
-  const parts = providerAspect.split(":").map(Number);
-  const aspect = parts[0] && parts[1] ? parts[0] / parts[1] : targetWidth / targetHeight;
-
-  const minWidth = Math.ceil(targetWidth / maxUpscaleFactor);
-  const minHeight = Math.round(minWidth / aspect);
-
-  return {
-    width: minWidth,
-    height: minHeight,
-    minNativePpi: 200,
-    maxUpscaleFactor,
-  };
-}
-
-/**
- * Derive target canvas dimensions and aspect string for a profile.
- */
-export function getProfileAssetGeometry(
-  profile: PrintProfile,
-  kind: AssetKind,
-): {
-  dimensions: { width: number; height: number };
-  printDimensionsIn: {
-    trimWidthIn: number;
-    trimHeightIn: number;
-    bleedIn: number;
-    spread: boolean;
-  };
-  targetCanvasAspect: string;
-  trimAspect: string;
-  providerPresetAspect: string;
-  aspect: string;
-  normalizedProductionDimensions: { width: number; height: number };
-  normalizationStrategy: "proportional-cover-crop" | "proportional-contain-backdrop" | "exact-match";
-  minResolution: { width: number; height: number };
-} {
-  const isSpread = kind === "spread";
-  const singleWidth = profile.canvasPx.width;
-  const singleHeight = profile.canvasPx.height;
-  const spreadWidth = singleWidth * 2;
-  const spreadHeight = singleHeight;
-
-  const bleedIn = profile.bleedIn ?? 0.125;
-  const trimWidthIn = isSpread ? profile.nominalSizeIn.width * 2 : profile.nominalSizeIn.width;
-  const trimHeightIn = profile.nominalSizeIn.height;
-  const continuousSpreadWidth = Math.round((trimWidthIn + bleedIn * 2) * profile.dpi);
-
-  const printDimensionsIn = {
-    trimWidthIn,
-    trimHeightIn,
-    bleedIn,
-    spread: isSpread,
-  };
-
-  if (profile.id === "printify-hardcover-square-8x8") {
-    if (isSpread) {
-      return {
-        dimensions: { width: 4800, height: 2400 },
-        printDimensionsIn,
-        targetCanvasAspect: "2:1",
-        trimAspect: "2:1",
-        providerPresetAspect: "2:1",
-        aspect: "2:1",
-        normalizedProductionDimensions: { width: 4800, height: 2400 },
-        normalizationStrategy: "exact-match",
-        minResolution: deriveProviderNativeMinimum(4800, 2400, "2:1"),
-      };
-    }
-    return {
-      dimensions: { width: 2400, height: 2400 },
-      printDimensionsIn,
-      targetCanvasAspect: "1:1",
-      trimAspect: "1:1",
-      providerPresetAspect: "1:1",
-      aspect: "1:1",
-      normalizedProductionDimensions: { width: 2400, height: 2400 },
-      normalizationStrategy: "exact-match",
-      minResolution: deriveProviderNativeMinimum(2400, 2400, "1:1"),
-    };
-  }
-
-  if (profile.id.startsWith("classic-landscape")) {
-    if (isSpread) {
-      // Continuous spread canvas: 22.25 x 8.25 in at 300 DPI = 6675 x 2475 px (89:33 ratio, approx 2.696970).
-      // Closest provider preset is 21:9 (2.333333).
-      // Sliced into 2 separate full-bleed pages: 2 x (11.25 x 8.25 in at 300 DPI) = 2 x 3375 = 6750 px (22.5 in).
-      return {
-        dimensions: { width: 6675, height: 2475 },
-        printDimensionsIn,
-        targetCanvasAspect: "89:33",
-        trimAspect: "11:4",
-        providerPresetAspect: "21:9",
-        aspect: "89:33",
-        normalizedProductionDimensions: { width: 6675, height: 2475 },
-        normalizationStrategy: "proportional-cover-crop",
-        minResolution: deriveProviderNativeMinimum(6675, 2475, "21:9"),
-      };
-    }
-    // Single page: 11.25 x 8.25 in at 300 DPI = 3375 x 2475 px (15:11 ratio, approx 1.363636).
-    // Closest provider preset is 4:3 (1.333333, 2.22% delta vs 3:2 at 10.0% delta).
-    return {
-      dimensions: { width: 3375, height: 2475 },
-      printDimensionsIn,
-      targetCanvasAspect: "15:11",
-      trimAspect: "11:8",
-      providerPresetAspect: "4:3",
-      aspect: "15:11",
-      normalizedProductionDimensions: { width: 3375, height: 2475 },
-      normalizationStrategy: "proportional-cover-crop",
-      minResolution: deriveProviderNativeMinimum(3375, 2475, "4:3"),
-    };
-  }
-
-  // Generic fallback for any other profile (e.g. Lulu)
-  if (isSpread) {
-    const targetCanvasAspect = profile.targetCanvasSpreadAspect ?? profile.spreadAspect;
-    const trimAspect = profile.trimSpreadAspect ?? "11:4";
-    const providerPresetAspect = profile.providerPresetSpreadAspect ?? profile.spreadAspect;
-    return {
-      dimensions: { width: continuousSpreadWidth, height: spreadHeight },
-      printDimensionsIn,
-      targetCanvasAspect,
-      trimAspect,
-      providerPresetAspect,
-      aspect: targetCanvasAspect,
-      normalizedProductionDimensions: { width: continuousSpreadWidth, height: spreadHeight },
-      normalizationStrategy: "proportional-cover-crop",
-      minResolution: deriveProviderNativeMinimum(continuousSpreadWidth, spreadHeight, providerPresetAspect),
-    };
-  }
-  const targetCanvasAspect = profile.targetCanvasAspect ?? profile.singleAspect;
-  const trimAspect = profile.trimAspect ?? "11:8";
-  const providerPresetAspect = profile.providerPresetAspect ?? profile.singleAspect;
-  return {
-    dimensions: { width: singleWidth, height: singleHeight },
-    printDimensionsIn,
-    targetCanvasAspect,
-    trimAspect,
-    providerPresetAspect,
-    aspect: targetCanvasAspect,
-    normalizedProductionDimensions: { width: singleWidth, height: singleHeight },
-    normalizationStrategy: "proportional-cover-crop",
-    minResolution: deriveProviderNativeMinimum(singleWidth, singleHeight, providerPresetAspect),
-  };
-}
-
-/**
  * Resolve the authoritative layout plan for a story, profile, and child.
  *
  * This is the SINGLE SOURCE OF TRUTH across the entire application:
@@ -700,6 +442,27 @@ export function resolveLayoutPlan(opts: ResolveLayoutPlanOptions): ResolvedLayou
   const profile = getPrintProfile(profileId);
 
   const customSpreads = opts.customSpreads ?? [];
+
+  // A StoryEdition (e.g. "standard-24") is a provider-independent editorial
+  // edition — when one is registered for this story, it takes priority over
+  // the legacy per-story PageSpec/PrintEdition machinery below for Standard
+  // Single (and the "no explicit mode" default), for every print profile.
+  // Custom Spreads is only meaningful against a StoryEdition that has
+  // explicitly approved facing pairs as spreads — none currently do, so any
+  // custom-spreads request against a StoryEdition-backed story is rejected
+  // with a clear, actionable message rather than silently combining scenes
+  // or growing the page count past interiorPageCount.
+  const standardEdition = getStoryEdition(bookId, "standard-24");
+  if (standardEdition) {
+    if (opts.mode === "custom-spreads" && customSpreads.length > 0) {
+      const approved = new Set((standardEdition.approvedSpreadPairs ?? []).map(([a, b]) => `${a}-${b}`));
+      const unapproved = customSpreads.filter((s) => !approved.has(`${s.startPage}-${s.endPage}`));
+      if (unapproved.length > 0) {
+        throw new Error("Custom spreads require an approved fixed-24 editorial mapping.");
+      }
+    }
+    return resolveStoryEditionPlan(standardEdition, child, profile);
+  }
 
   // 1. Identify cover and backcover pages from the book template
   const coverSpecIndex = book.pages.findIndex((p) => p.kind === "cover");

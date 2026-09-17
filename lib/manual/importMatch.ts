@@ -147,6 +147,37 @@ const DREAM_BIG_CAREER_ROLES = [
 ];
 
 /**
+ * Dream Big's standard-24 edition splits what used to be one 24-slot legacy
+ * sequence (cover, intro, 20 careers, closing, backcover) into 26 assets:
+ * a separate front/back cover pair plus 24 continuously-numbered interior
+ * pages that now ALSO include 2 brand-new pages with no legacy equivalent
+ * (greeting at interior page 1, and the app-rendered video-QR background at
+ * interior page 24). A 22-file legacy package never had images for those —
+ * so under either guarded-recovery interpretation, greeting and video-qr
+ * always remain missing, alongside whichever cover half that interpretation
+ * doesn't cover. Identifying targets by role/kind (rather than raw array
+ * index arithmetic) keeps this correct regardless of exactly where the new
+ * pages happen to sit in the resolved asset array.
+ */
+function dreamBig22LegacyTargets(resolvedSlots: ResolvedAssetSlot[]): {
+  /** "Files are Pilot through Back Cover": the 20 career scenes, closing, and the back cover. */
+  shiftPlusTwo: ResolvedAssetSlot[];
+  /** "Files are Cover through Inventor": the front cover, intro, and the 20 career scenes. */
+  keepNumeric: ResolvedAssetSlot[];
+} {
+  const careerScenes = resolvedSlots.filter((s) => s.pageKind === "scene");
+  const closing = resolvedSlots.find((s) => s.pageKind === "closing");
+  const intro = resolvedSlots.find((s) => s.pageKind === "intro");
+  const coverFront = resolvedSlots.find((s) => s.assetKind === "front-cover");
+  const coverBack = resolvedSlots.find((s) => s.assetKind === "back-cover");
+
+  return {
+    shiftPlusTwo: [...careerScenes, closing, coverBack].filter((s): s is ResolvedAssetSlot => Boolean(s)),
+    keepNumeric: [coverFront, intro, ...careerScenes].filter((s): s is ResolvedAssetSlot => Boolean(s)),
+  };
+}
+
+/**
  * Checks whether the uploaded 22 files match the career+closing+backcover sequence (pilot to backcover).
  */
 function isDreamBig22LegacySequence(
@@ -275,11 +306,15 @@ export function matchImportedFiles(
       return na - nb;
     });
 
-    // Build SHIFT_PLUS_TWO table: map 01..22 to slots 03..24
+    const { shiftPlusTwo: shiftPlusTwoTargets, keepNumeric: keepNumericTargets } =
+      dreamBig22LegacyTargets(resolvedSlots);
+
+    // Build SHIFT_PLUS_TWO table: "files are Pilot through Back Cover" — map
+    // the 20 career scenes + closing + the separate back cover, in order.
     const shiftPlusTwoTable: LegacyRecoveryProposalTableEntry[] = [];
     for (let i = 0; i < sortedFiles.length; i++) {
       const file = sortedFiles[i];
-      const targetSlot = resolvedSlots[i + 2];
+      const targetSlot = shiftPlusTwoTargets[i];
       if (targetSlot) {
         shiftPlusTwoTable.push({
           filename: file,
@@ -289,18 +324,22 @@ export function matchImportedFiles(
         });
       }
     }
-    const shiftPlusTwoMissing: ImportMissingSlot[] = resolvedSlots.slice(0, 2).map((s) => ({
-      slotId: s.slotId,
-      physicalPages: s.physicalPages,
-      role: s.role,
-      expectedFilename: s.expectedFilename ?? s.filename,
-    }));
+    const shiftPlusTwoTargetIds = new Set(shiftPlusTwoTargets.map((s) => s.slotId));
+    const shiftPlusTwoMissing: ImportMissingSlot[] = resolvedSlots
+      .filter((s) => !shiftPlusTwoTargetIds.has(s.slotId))
+      .map((s) => ({
+        slotId: s.slotId,
+        physicalPages: s.physicalPages,
+        role: s.role,
+        expectedFilename: s.expectedFilename ?? s.filename,
+      }));
 
-    // Build KEEP_NUMERIC_SLOTS table: map 01..22 to slots 01..22
+    // Build KEEP_NUMERIC_SLOTS table: "files are Cover through Inventor" —
+    // map the front cover + intro + the 20 career scenes, in order.
     const keepNumericTable: LegacyRecoveryProposalTableEntry[] = [];
     for (let i = 0; i < sortedFiles.length; i++) {
       const file = sortedFiles[i];
-      const targetSlot = resolvedSlots[i];
+      const targetSlot = keepNumericTargets[i];
       if (targetSlot) {
         keepNumericTable.push({
           filename: file,
@@ -310,12 +349,15 @@ export function matchImportedFiles(
         });
       }
     }
-    const keepNumericMissing: ImportMissingSlot[] = resolvedSlots.slice(22).map((s) => ({
-      slotId: s.slotId,
-      physicalPages: s.physicalPages,
-      role: s.role,
-      expectedFilename: s.expectedFilename ?? s.filename,
-    }));
+    const keepNumericTargetIds = new Set(keepNumericTargets.map((s) => s.slotId));
+    const keepNumericMissing: ImportMissingSlot[] = resolvedSlots
+      .filter((s) => !keepNumericTargetIds.has(s.slotId))
+      .map((s) => ({
+        slotId: s.slotId,
+        physicalPages: s.physicalPages,
+        role: s.role,
+        expectedFilename: s.expectedFilename ?? s.filename,
+      }));
 
     const legacyRecoveryChoices: LegacyRecoveryChoice[] = [
       {
@@ -373,7 +415,11 @@ export function matchImportedFiles(
     };
   }
 
-  // KEEP_NUMERIC_SLOTS explicit path: map 22 files to slots 01..22, keep 23-closing and 24-backcover missing
+  // KEEP_NUMERIC_SLOTS explicit path: "files are Cover through Inventor" —
+  // map to the front cover, intro, and the 20 career scenes; greeting,
+  // closing, video-qr, and the back cover remain missing (see
+  // dreamBig22LegacyTargets's header comment for why this is role/kind-based
+  // rather than raw array-index arithmetic).
   if (is22Legacy && options.legacyInterpretation === "KEEP_NUMERIC_SLOTS" && resolvedSlots && resolvedSlots.length >= 24) {
     const sortedFiles = [...providedFilenames].sort((a, b) => {
       const na = indexFromFilename(a) ?? 0;
@@ -381,11 +427,14 @@ export function matchImportedFiles(
       return na - nb;
     });
 
+    const { keepNumeric: keepNumericTargets } = dreamBig22LegacyTargets(resolvedSlots);
+
     for (let i = 0; i < sortedFiles.length; i++) {
       const file = sortedFiles[i];
-      if (i < resolvedSlots.length) {
-        const slot = resolvedSlots[i];
-        byIndex.set(i, file);
+      const slot = keepNumericTargets[i];
+      if (slot) {
+        const slotIndex = resolvedSlots.indexOf(slot);
+        byIndex.set(slotIndex, file);
         bySlotId.set(slot.slotId, file);
         migrationWarnings.push(
           `Numeric mapping: "${file}" mapped to slot "${slot.slotId}" (Physical page ${slot.physicalPages.join(", ")}).`,
@@ -397,9 +446,8 @@ export function matchImportedFiles(
     const missingSlotDetails: ImportMissingSlot[] = [];
     const missing: string[] = [];
 
-    for (let i = 0; i < resolvedSlots.length; i++) {
-      if (!byIndex.has(i)) {
-        const s = resolvedSlots[i];
+    for (const s of resolvedSlots) {
+      if (!bySlotId.has(s.slotId)) {
         missing.push(s.expectedFilename ?? s.filename);
         missingSlots.push(s.slotId);
         missingSlotDetails.push({
@@ -430,7 +478,9 @@ export function matchImportedFiles(
     };
   }
 
-  // If user explicitly confirmed legacy recovery: map the 22 assets to slots 3..24 (indices 2..23)
+  // If user explicitly confirmed legacy recovery ("files are Pilot through
+  // Back Cover"): map to the 20 career scenes, closing, and the separate
+  // back cover; front cover, greeting, intro, and video-qr remain missing.
   if (legacyRecoveryApplied && resolvedSlots && resolvedSlots.length >= 24) {
     // Sort provided files naturally
     const sortedFiles = [...providedFilenames].sort((a, b) => {
@@ -439,12 +489,14 @@ export function matchImportedFiles(
       return na - nb;
     });
 
+    const { shiftPlusTwo: shiftPlusTwoTargets } = dreamBig22LegacyTargets(resolvedSlots);
+
     for (let i = 0; i < sortedFiles.length; i++) {
       const file = sortedFiles[i];
-      const targetSlotIndex = i + 2; // map to slots 3..24 (0-based index 2..23)
-      if (targetSlotIndex < resolvedSlots.length) {
-        const slot = resolvedSlots[targetSlotIndex];
-        byIndex.set(targetSlotIndex, file);
+      const slot = shiftPlusTwoTargets[i];
+      if (slot) {
+        const slotIndex = resolvedSlots.indexOf(slot);
+        byIndex.set(slotIndex, file);
         bySlotId.set(slot.slotId, file);
         migrationWarnings.push(
           `Legacy recovery: "${file}" mapped to slot "${slot.slotId}" (Physical page ${slot.physicalPages.join(", ")}).`,
@@ -456,9 +508,8 @@ export function matchImportedFiles(
     const missingSlotDetails: ImportMissingSlot[] = [];
     const missing: string[] = [];
 
-    for (let i = 0; i < resolvedSlots.length; i++) {
-      if (!byIndex.has(i)) {
-        const s = resolvedSlots[i];
+    for (const s of resolvedSlots) {
+      if (!bySlotId.has(s.slotId)) {
         missing.push(s.expectedFilename ?? s.filename);
         missingSlots.push(s.slotId);
         missingSlotDetails.push({
@@ -520,7 +571,7 @@ export function matchImportedFiles(
             return (
               exp === norm ||
               fn === norm ||
-              (canon ? canon.replace(/\.[^/.]+$/, "") === base : false)
+              (canon ? canon === base || canon.replace(/\.[^/.]+$/, "") === base : false)
             );
           }) ?? null;
       }
@@ -588,12 +639,28 @@ export function matchImportedFiles(
               (s) => s.assetKind === "single-page" && s.physicalPages.includes(parsed.pageNumber!),
             ) ?? null;
         } else if (parsed.isLegacy && parsed.index !== undefined) {
-          // Guarded legacy numeric index: only map if within bounds and not intercepted by recovery proposal
-          if (!legacyRecoveryProposal && parsed.index >= 0 && parsed.index < resolvedSlots.length) {
-            matchedSlot = resolvedSlots[parsed.index];
-            migrationWarnings.push(
-              `Legacy filename "${filename}" was mapped to slot "${matchedSlot.slotId}".`,
+          // Guarded legacy numeric filename (e.g. "01.png"): only map if not
+          // intercepted by a recovery proposal. A bare number identifies an
+          // INTERIOR PAGE NUMBER, not a raw array position — the cover is a
+          // separate, non-page-numbered asset (assets[0]), so "01.png" must
+          // resolve to interior page 1, never to whatever asset happens to
+          // sit at array index 0. Match by physicalPages first; fall back to
+          // raw array indexing only for a slot list that doesn't carry page
+          // numbers at all.
+          if (!legacyRecoveryProposal && parsed.pageNumber !== undefined) {
+            const byPageNumber = resolvedSlots.find(
+              (s) => s.physicalPages?.length === 1 && s.physicalPages[0] === parsed.pageNumber,
             );
+            if (byPageNumber) {
+              matchedSlot = byPageNumber;
+            } else if (parsed.index >= 0 && parsed.index < resolvedSlots.length) {
+              matchedSlot = resolvedSlots[parsed.index];
+            }
+            if (matchedSlot) {
+              migrationWarnings.push(
+                `Legacy filename "${filename}" was mapped to slot "${matchedSlot.slotId}".`,
+              );
+            }
           }
         }
       }

@@ -29,13 +29,16 @@ describe("lintPromptContract — real Dream Big output passes clean", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("a spread manifest (Pages 22-23) has no lint issues", () => {
-    const manifest = buildManifest(child, "dream-big", "classic-landscape-11x8", "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    const result = lintPromptContract(manifest);
-    expect(result.issues).toEqual([]);
-    expect(result.ok).toBe(true);
+  it("Dream Big now resolves through its registered standard-24 edition, so an unapproved custom-spread request is rejected before it can reach the linter", () => {
+    // Dream Big has a registered "standard-24" StoryEdition with no
+    // approvedSpreadPairs, so Custom Spreads is disabled for it — this used
+    // to produce a real Pages 22-23 spread manifest that passed lint clean,
+    // but that pathway no longer exists: resolution now fails closed instead.
+    expect(() =>
+      buildManifest(child, "dream-big", "classic-landscape-11x8", "custom-spreads", [
+        { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
+      ]),
+    ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
   });
 });
 
@@ -115,26 +118,29 @@ describe("lintPromptContract — catches each reproduced defect class", () => {
 });
 
 describe("lintSubmittedSpreadsMatchResolved", () => {
+  // Synthetic manifests (not a real buildManifest() call): Custom Spreads
+  // against a registered standard-24 story (every book now has one) is
+  // rejected before resolution completes, so there is no longer a real
+  // resolved-spread manifest to exercise this pure comparison utility with.
+  // These fixtures isolate exactly what the function itself checks.
+  const spreadManifest: ManualPage[] = [
+    basePage({ slotId: "22-23-spread", spread: true, filename: "22-23-spread.png", physicalPages: [22, 23] }),
+  ];
+  const noSpreadManifest: ManualPage[] = [basePage({ slotId: "22", filename: "22-x.png", physicalPages: [22] })];
+
   it("passes when the submitted spread is present in the resolved output", () => {
-    const manifest = buildManifest(child, "dream-big", "classic-landscape-11x8", "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    const result = lintSubmittedSpreadsMatchResolved([{ startPage: 22, endPage: 23 }], manifest);
+    const result = lintSubmittedSpreadsMatchResolved([{ startPage: 22, endPage: 23 }], spreadManifest);
     expect(result.ok).toBe(true);
   });
 
   it("flags a submitted spread missing from the resolved output", () => {
-    const manifest = buildManifest(child, "dream-big", "classic-landscape-11x8", "standard-single", []);
-    const result = lintSubmittedSpreadsMatchResolved([{ startPage: 22, endPage: 23 }], manifest);
+    const result = lintSubmittedSpreadsMatchResolved([{ startPage: 22, endPage: 23 }], noSpreadManifest);
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => /missing from the resolved output/.test(i))).toBe(true);
   });
 
   it("flags a resolved spread that was never submitted", () => {
-    const manifest = buildManifest(child, "dream-big", "classic-landscape-11x8", "custom-spreads", [
-      { startPage: 22, endPage: 23, textSide: "left", subjectSide: "right" },
-    ]);
-    const result = lintSubmittedSpreadsMatchResolved([], manifest);
+    const result = lintSubmittedSpreadsMatchResolved([], spreadManifest);
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => /never submitted/.test(i))).toBe(true);
   });

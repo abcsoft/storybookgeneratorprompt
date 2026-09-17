@@ -29,5 +29,7 @@ export const luluPremiumColorLandscape11x85Profile: PrintProfile = {
   spreadAspect: "21:9",
   targetCanvasAspect: "9:7",
   targetCanvasSpreadAspect: "89:35",
+  providerPresetAspect: "4:3",
+  providerPresetSpreadAspect: "21:9",
   exportMode: "lulu-interior-pdf",
 };

@@ -5,6 +5,9 @@ import path from "node:path";
 import sharp from "sharp";
 import { exportPrintifyBook } from "./printifyExport";
 import { buildManifest } from "../manual/manifest";
+import { resolveLayoutPlan, type ResolvedLayoutPlan } from "../story/layoutPlan";
+import { getEditionForProfile } from "../story/editions";
+import { getPrintProfile } from "./registry";
 import type { ProvidedImage } from "../manual/assemble";
 import type { ChildProfile } from "../story/types";
 
@@ -109,37 +112,19 @@ async function containsColor(
   return false;
 }
 
-import { getEditionForProfile } from "../story/editions";
-import { getPrintProfile } from "./registry";
-
 /** Mirrors exportPrintifyBook's page-numbering so the test can find the exact
- *  page-NN.png file(s) a given manifest page ends up as. */
-function pageFileNumbers(
-  bookId: string,
-  profileId: string,
-  manifest: { index: number; kind: string; spread: boolean }[],
-): Map<number, number[]> {
-  const edition = getEditionForProfile(bookId, getPrintProfile(profileId));
-  if (edition) {
-    const map = new Map<number, number[]>();
-    for (const p of edition.physicalPages) {
-      const existing = map.get(p.illustrationIndex) ?? [];
-      existing.push(p.physicalPageNumber);
-      map.set(p.illustrationIndex, existing);
-    }
-    return map;
-  }
+ *  page-NN.png file(s) a given asset ends up as. Reads it directly off the
+ *  real resolveLayoutPlan() authority (slot.physicalPages), rather than
+ *  guessing from the legacy PrintEdition registry — great-adventure (like
+ *  every registered story) now resolves through its standard-24
+ *  StoryEdition on every profile, which takes priority over the legacy
+ *  great-adventure-printify-24 PrintEdition getEditionForProfile() would
+ *  still return, so that edition's own physicalPages numbering no longer
+ *  matches what exportPrintifyBook actually produces. */
+function pageFileNumbers(plan: ResolvedLayoutPlan): Map<number, number[]> {
   const map = new Map<number, number[]>();
-  let pageNumber = 1;
-  for (const m of manifest) {
-    if (m.kind === "cover" || m.kind === "backcover") continue;
-    if (m.spread) {
-      map.set(m.index, [pageNumber, pageNumber + 1]);
-      pageNumber += 2;
-    } else {
-      map.set(m.index, [pageNumber]);
-      pageNumber += 1;
-    }
+  for (const slot of plan.interiorAssets) {
+    map.set(slot.illustrationIndex, slot.physicalPages);
   }
   return map;
 }
@@ -237,29 +222,44 @@ describe("exportPrintifyBook", () => {
       "contain+backdrop instead of a cover-fit crop (regression for the Printify " +
       "preflight/composition bug)",
     async () => {
+      // Great Adventure (like every registered story) now resolves through
+      // its standard-24 StoryEdition on every profile, which has no
+      // approvedSpreadPairs, so there's no longer a reachable "spread" asset
+      // to exercise the split-into-two-halves half of this regression (the
+      // underlying splitSpread() geometry itself is still directly covered
+      // by lib/story/layoutPlan.test.ts's "seamless split without center
+      // line" test). This still exercises the real, fully-reachable part of
+      // the regression: a single interior page whose source is drastically
+      // off-ratio (in either direction) must survive intact via
+      // contain+backdrop, never a cover-fit crop that throws content away.
       const base = await mkdtemp(path.join(os.tmpdir(), "sbtest-"));
       process.env.STORYBOOK_OUT_DIR = base;
       try {
-        const manifest = buildManifest(child, "great-adventure", PROFILE_ID);
-        const numbers = pageFileNumbers("great-adventure", PROFILE_ID, manifest);
-        const firstSingle = manifest.find((m) => !m.spread && m.kind !== "cover" && m.kind !== "backcover");
-        const firstSpread = manifest.find((m) => m.spread);
-        if (!firstSingle || !firstSpread) {
-          throw new Error("Test fixture assumption broken: expected both a single and a spread page.");
+        const plan = resolveLayoutPlan({
+          child,
+          bookId: "great-adventure",
+          profileId: PROFILE_ID,
+          mode: "standard-single",
+        });
+        const numbers = pageFileNumbers(plan);
+        const singleScenes = plan.interiorAssets.filter((a) => a.assetKind === "single-page");
+        const [portraitSlot, wideSlot] = singleScenes;
+        if (!portraitSlot || !wideSlot || portraitSlot.slotId === wideSlot.slotId) {
+          throw new Error("Test fixture assumption broken: expected at least 2 distinct single-page interior assets.");
         }
 
         const portraitMarker = await makePortraitMarkerImage();
         const wideMarker = await makeWideMarkerImage();
 
         const images = new Map<number, ProvidedImage>();
-        for (const m of manifest) {
-          if (m.index === firstSingle.index) {
-            images.set(m.index, { buffer: portraitMarker, mimeType: "image/png" });
-          } else if (m.index === firstSpread.index) {
-            images.set(m.index, { buffer: wideMarker, mimeType: "image/png" });
+        for (const slot of plan.assets) {
+          if (slot.slotId === portraitSlot.slotId) {
+            images.set(slot.sourceSceneIndex, { buffer: portraitMarker, mimeType: "image/png" });
+          } else if (slot.slotId === wideSlot.slotId) {
+            images.set(slot.sourceSceneIndex, { buffer: wideMarker, mimeType: "image/png" });
           } else {
-            images.set(m.index, {
-              buffer: await makeImage(m.spread ? 2 : 1),
+            images.set(slot.sourceSceneIndex, {
+              buffer: await makeImage(1),
               mimeType: "image/png",
             });
           }
@@ -280,17 +280,24 @@ describe("exportPrintifyBook", () => {
 
         const dir = result.dir as string;
 
-        const [singlePageNum] = numbers.get(firstSingle.index)!;
-        expect(await containsColor(path.join(dir, pageFilename(singlePageNum)), RED)).toBe(true);
+        // Strongly-portrait source into a square page: the marker at its
+        // top edge must survive (an old cover-fit crop would have cropped
+        // it away entirely).
+        const [portraitPageNum] = numbers.get(portraitSlot.illustrationIndex)!;
+        expect(await containsColor(path.join(dir, pageFilename(portraitPageNum)), RED)).toBe(true);
 
-        const [leftNum, rightNum] = numbers.get(firstSpread.index)!;
-        expect(await containsColor(path.join(dir, pageFilename(leftNum)), RED)).toBe(true);
-        expect(await containsColor(path.join(dir, pageFilename(rightNum)), BLUE)).toBe(true);
+        // Strongly-wide (6:1) source into the same square page: both its
+        // left (red) and right (blue) edge markers must survive in the one
+        // output file (an old cover-fit crop would have cropped both away,
+        // keeping only the dead center).
+        const [widePageNum] = numbers.get(wideSlot.illustrationIndex)!;
+        expect(await containsColor(path.join(dir, pageFilename(widePageNum)), RED)).toBe(true);
+        expect(await containsColor(path.join(dir, pageFilename(widePageNum)), BLUE)).toBe(true);
 
         // Final geometry is never weakened by any of this.
-        const singleMeta = await sharp(path.join(dir, pageFilename(singlePageNum))).metadata();
-        expect(singleMeta.width).toBe(2400);
-        expect(singleMeta.height).toBe(2400);
+        const portraitMeta = await sharp(path.join(dir, pageFilename(portraitPageNum))).metadata();
+        expect(portraitMeta.width).toBe(2400);
+        expect(portraitMeta.height).toBe(2400);
       } finally {
         await rm(base, { recursive: true, force: true });
       }

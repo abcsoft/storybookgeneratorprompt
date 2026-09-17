@@ -61,6 +61,18 @@ const SPECIAL_OUTFITS: Record<string, string> = {
 
 const STORY_META = { defaultOutfit: DEFAULT_OUTFIT, companion: SCOUT };
 
+/**
+ * The ONE secret-marker symbol used throughout the book. It must be described
+ * with this exact same wording (not paraphrased) everywhere it appears, so
+ * every illustration prompt asks the image model for the identical symbol,
+ * color, material, shape, and orientation instead of two unrelated icons —
+ * see the ancient-ruins (first discovery) and island-marker (later match)
+ * scenes below, plus the semantic-contract lint test that checks this
+ * verbatim reuse (lib/story/greatAdventureSemanticContracts.test.ts).
+ */
+export const SECRET_MARKER =
+  "a single distinctive ancient marker symbol: a plain equal-armed cross inside a circle, carved in pale weathered stone — always this exact same symbol, proportions, and carving style, never a different glyph";
+
 /** Build a full illustration prompt through the shared prompt engine. */
 function illustration(
   scene: string,
@@ -181,7 +193,7 @@ const STORY: Beat[] = [
   {
     scene:
       "Exploring ancient sandstone ruins with tall carved pillars, kneeling to " +
-      "study a mysterious symbol carved into a stone wall that matches the map, " +
+      `study ${SECRET_MARKER}, carved into a stone wall at eye level and matching the symbol drawn on the map, ` +
       "with Scout sniffing curiously nearby; warm dusty light and climbing vines.",
     copy: (c, p) =>
       `The camel brought them to ancient stone ruins, where ${c.name} found ` +
@@ -273,9 +285,11 @@ const STORY: Beat[] = [
   },
   {
     scene:
-      "Aboard a small wooden boat in a splashy ocean storm, gripping the sturdy " +
-      "mast with one hand while the other arm shelters Scout securely against their " +
-      "side, the rolled treasure map safely tucked into the backpack pocket, " +
+      "Just having burst up from underwater onto a small wooden boat in a splashy ocean storm, hair and " +
+      "clothes still visibly wet and dripping, water streaming off their shoulders and pooling on the deck, " +
+      "with Scout also still damp from the same underwater dive, gripping the sturdy mast with one hand " +
+      "while the other arm shelters Scout securely against their side, the rolled treasure map safely " +
+      "tucked into the backpack pocket, " +
       "looking determined and brave; big rolling waves and dramatic clouds, with " +
       "a hopeful break of golden light ahead.",
     copy: (c, p) =>
@@ -285,8 +299,9 @@ const STORY: Beat[] = [
     light:
       "Dramatic stormy grey overcast light with a hopeful warm break of sun from the upper right; eye-level camera amid the waves.",
     compositionNotes:
-      "keep the child's mast-holding arm and hand fully inside the frame — no " +
-      "hand, rope, or rigging may cross the edge of the page.",
+      "keep the child's mast-holding arm and hand fully inside the frame — no hand, rope, or rigging may " +
+      "cross the edge of the page; this page must visually read as the very next moment after emerging from " +
+      "underwater — dripping water and damp, tousled hair are required, not optional.",
   },
   {
     scene:
@@ -322,7 +337,8 @@ const STORY: Beat[] = [
   {
     scene:
       "Standing in a hidden stone chamber before a big old wooden treasure chest " +
-      "that sits on a glowing X marked on the floor, reaching out a hand with a " +
+      "that sits on a glowing X marked on the floor, both hands actively gripping the raised lid and pushing " +
+      "it open — the lid clearly lifted at an angle, hinges visible, not resting closed — with a " +
       "thrilled expression, with Scout beside them; shafts of golden light from above.",
     copy: (c, p) =>
       `Deeper inside, the map's X glowed on the cave floor—and right on top sat ` +
@@ -332,8 +348,9 @@ const STORY: Beat[] = [
     light:
       "Dramatic warm golden shafts of light from above into a dim stone chamber; eye-level camera.",
     compositionNotes:
-      "the reaching hand and arm must stay fully inside the frame — do not crop " +
-      "the reach at the edge of the page.",
+      "both hands, the chest, and the raised lid must all stay fully visible and unobstructed — do not crop " +
+      "the reach at the edge of the page, and do not let any text panel cover the chest or the lid-lifting " +
+      "gesture.",
   },
   {
     scene:
@@ -497,8 +514,7 @@ const greatAdventurePages: PageSpec[] = [
         kind: "backcover",
       },
     ),
-    text: (c) =>
-      `The End…\n...or maybe it's just the beginning of ${c.name}'s next adventure!`,
+    text: (c) => `The End… or maybe it's just the beginning of ${c.name}'s next adventure!`,
   },
 ];
 
@@ -582,4 +598,216 @@ export const greatAdventurePrintify24Edition: PrintEdition = {
 };
 
 registerPrintEdition(greatAdventurePrintify24Edition);
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: 24 interior pages (greeting, intro, 20 scenes,
+// closing, video-qr) + separate cover, resolved identically for every print
+// profile. The 17 existing journey beats are reused verbatim; 3 of them
+// (Arctic, Tropical Island, Flying Home) each combined two narrative
+// moments into one illustration, so each is split into two distinct,
+// non-duplicated scenes to reach exactly 20 — Scout, the map, and travel
+// continuity are preserved throughout. Every reused beat keeps its exact
+// original wording; only the 3 split beats have new text (replacing the
+// single combined beat each was drawn from, not adding filler alongside it).
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function reuseSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return {
+    sceneId,
+    kind: spec.kind,
+    role: spec.role,
+    illustrationPrompt: spec.illustrationPrompt,
+    text: spec.text,
+    legacyFilenames: [],
+  };
+}
+
+/** greatAdventurePages layout: [0]=cover,[1]=intro,[2..18]=17 beats,[19]=closing,[20]=backcover. */
+function reuseBeat(beatIndex: number, sceneId: string): StoryEditionScene {
+  return reuseSpec(greatAdventurePages[2 + beatIndex], sceneId);
+}
+
+/** Override a scene's default (bottom-left) story-text-panel position — used
+ *  for the specific scenes audited against the rendered draft PDF where the
+ *  default position would cover (or was found covering) Scout, the treasure
+ *  chest, or another story-critical object. See
+ *  lib/story/greatAdventureSemanticContracts.ts for the full per-scene audit. */
+function withTextPanelPosition(scene: StoryEditionScene, pos: NonNullable<StoryEditionScene["textPanelPosition"]>): StoryEditionScene {
+  return { ...scene, textPanelPosition: pos };
+}
+
+function newBeat(
+  sceneId: string,
+  scene: string,
+  copy: (c: ChildProfile, p: Pronouns) => string,
+  opts: { light?: string; compositionNotes?: string; outfitOverride?: string } = {},
+): StoryEditionScene {
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(scene, {
+      kind: "scene",
+      light: opts.light,
+      compositionNotes: opts.compositionNotes,
+      outfitOverride: opts.outfitOverride,
+    }),
+    text: (c) => copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+// Split 1 (was beat index 7: Arctic polar bears + aurora combined) into
+// arrival (polar bears) and the aurora-lit departure by boat.
+const arcticArrivalScene = newBeat(
+  "arctic-arrival",
+  "Walking across a wide frozen Arctic shore under a pale afternoon sky, laughing as two friendly polar " +
+    "bears slide and tumble playfully on the ice nearby, with Scout bounding through the snow to join the fun; " +
+    "a little wooden boat waiting at the water's edge in the distance.",
+  (c) =>
+    `Next, the map led them to a land of ice and snow. ${c.name} laughed as two friendly polar bears slid ` +
+    `and tumbled across the frozen ground, and Scout bounced right along with them!`,
+  {
+    light: "Bright, cold, overcast Arctic daylight from above, soft and even on the snow; eye-level camera on the ice.",
+    outfitOverride: SPECIAL_OUTFITS.winter,
+  },
+);
+const arcticAuroraScene = newBeat(
+  "arctic-aurora",
+  "Standing beside a little wooden boat at the water's edge as night falls, looking up in awe at shimmering " +
+    "green-and-pink northern lights swirling overhead, one hand raised toward the glowing sky, with Scout " +
+    "gazing upward too; the boat ready to carry them onward.",
+  (c) =>
+    `As night fell, the sky came alive! Green and pink lights danced and swirled above. ${c.name} and Scout ` +
+    `watched, amazed, as the magical lights lit the way to their little waiting boat.`,
+  {
+    light: "Dark Arctic night lit by the green-and-pink aurora glow from above and cool moonlight on the snow; eye-level camera at the shoreline.",
+    outfitOverride: SPECIAL_OUTFITS.winter,
+  },
+);
+
+// Split 2 (was beat index 11: Tropical Island arrival + marker discovery
+// combined) into landing on the island and finding the rock marker.
+const islandArrivalScene = newBeat(
+  "island-arrival",
+  "Stepping off the little boat onto a sunny, sandy cove lined with swaying palm trees, looking around with " +
+    "wide-eyed wonder at the bright turquoise water and white sand, with Scout leaping out and splashing " +
+    "happily in the shallows.",
+  (c) =>
+    `Just as the storm cleared, they spotted land—a little island with tall, swaying palm trees! ${c.name} ` +
+    `and Scout jumped from the boat onto the warm, soft sand, ready to explore.`,
+  {
+    light: "Bright tropical midday sun from above, warm and clear over turquoise water; eye-level camera on the sandy cove.",
+  },
+);
+const islandMarkerScene = newBeat(
+  "island-marker",
+  "Standing on the sandy cove holding up the treasure map beside a tall rock formation, pointing excitedly at " +
+    `${SECRET_MARKER}, carved into the rock face at the same size and orientation as the one they found earlier ` +
+    "at the ancient ruins and the one drawn on the map, with Scout looking up at the rock too, tail wagging fast.",
+  (c, p) =>
+    `${c.name} looked at the map, then up at a tall rock carved just like the secret marker.\n` +
+    `"Look, Scout—that marks the spot!" ${p.subj} shouted. Scout's tail wagged. "We found it! Our treasure is waiting!"`,
+  {
+    light: "Bright tropical midday sun from the right, warm and clear; eye-level camera on the cove.",
+    compositionNotes:
+      "the pointing hand and arm must stay fully inside the frame — do not crop the pointing gesture at the edge of the page.",
+  },
+);
+
+// Split 3 (was beat index 16: the flying-home spread combined liftoff and
+// the journey itself) into departure and the homeward flight.
+const departureScene = newBeat(
+  "star-trail-departure",
+  "Lifting off from a quiet hilltop into the night sky, one hand waving farewell to the glowing crystal cave " +
+    "far below, the little shining star leading the way forward, with Scout held snugly and safely at their " +
+    "side; the first stars of a glowing star-trail appearing ahead.",
+  (c) =>
+    `With one last wave goodbye, ${c.name} and Scout rose gently into the night sky. The little star led the ` +
+    `way, lighting a glowing trail of stars that stretched out toward home.`,
+  {
+    light: "Cool twilight light with the star's warm glow leading the way; slightly low camera lifting off the hilltop.",
+  },
+);
+const homewardFlightScene = newBeat(
+  "star-trail-homeward-flight",
+  "Soaring high above the clouds along the glowing star-trail, one arm reaching forward with pure delight " +
+    "while the other arm cradles Scout securely against the chest — exactly TWO arms and two hands total, " +
+    "never a third arm or an extra hand — with the moon and twinkling stars all around and the sleepy world " +
+    "glowing softly far below.",
+  (c) =>
+    `Higher and higher they flew, following the star-trail through the twinkling sky. Far below them, the ` +
+    `whole world was fast asleep, glowing gently in the soft moonlight.`,
+  {
+    light: "Soft cool moonlight and starlight from above; slightly low camera high above the clouds.",
+    compositionNotes:
+      "the forward-reaching arm must stay fully within the safe art page and must never cross into the text " +
+      "region — no hand may enter from any edge.",
+  },
+);
+
+export const greatAdventureStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "great-adventure",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment at a sunny harbour at golden hour, sitting comfortably with a rolled " +
+      "treasure map resting nearby and looking toward the viewer with a warm, excited smile, gentle clouds and " +
+      "distant sails drifting behind them.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: reuseSpec(greatAdventurePages[1], "intro"),
+  scenes: [
+    reuseBeat(0, "harbour-departure"),
+    reuseBeat(1, "jungle-trail"),
+    reuseBeat(2, "rope-bridge"),
+    reuseBeat(3, "desert-camel"),
+    reuseBeat(4, "ancient-ruins"),
+    reuseBeat(5, "savanna-riverbank"),
+    reuseBeat(6, "snowy-mountain"),
+    // Default bottom-left would cover the polar bears / Scout huddled at
+    // lower frame center in both Arctic scenes — moved to the open sky.
+    withTextPanelPosition(arcticArrivalScene, "top-right"),
+    withTextPanelPosition(arcticAuroraScene, "top-right"),
+    reuseBeat(8, "coral-reef"),
+    reuseBeat(9, "blue-whale"),
+    reuseBeat(10, "ocean-storm"),
+    // Default bottom-left would cover Scout splashing ashore at lower frame
+    // center — moved to the open palms/sky above.
+    withTextPanelPosition(islandArrivalScene, "top-right"),
+    islandMarkerScene,
+    reuseBeat(12, "crystal-cave"),
+    // Default bottom-left directly covers the chest — moved to the open
+    // shafts-of-light area so the chest, lid, and lifting hands stay visible.
+    withTextPanelPosition(reuseBeat(13, "treasure-chest-reach"), "top-right"),
+    withTextPanelPosition(reuseBeat(14, "chest-bursts-open"), "top-right"),
+    reuseBeat(15, "star-friend"),
+    departureScene,
+    homewardFlightScene,
+  ],
+  closing: reuseSpec(greatAdventurePages[19], "closing"),
+  // Visually continues straight out of the closing bedroom scene (same soft
+  // cool moonlight, same window-with-a-tiny-star motif) rather than jumping
+  // to an unrelated backdrop, so the video-qr page reads as one more quiet
+  // beat after "drifted off to sleep" instead of a disconnected utility page.
+  videoQr: withTextPanelPosition(
+    buildVideoQrScene(
+      STORY_META,
+      "A calm, low-detail continuation of the same cozy moonlit bedroom from the closing page — the same " +
+        "soft cool blue moonlight through the window and the same tiny glowing star resting on the windowsill " +
+        "beside the rolled treasure map, now seen from a little further back so a large calm, uncluttered area " +
+        "of wall and window is open beside it.",
+    ),
+    "bottom-right",
+  ),
+  cover: {
+    front: reuseSpec(greatAdventurePages[0], "cover"),
+    back: reuseSpec(greatAdventurePages[20], "backcover"),
+  },
+};
+
+registerStoryEdition(greatAdventureStandard24Edition);
 

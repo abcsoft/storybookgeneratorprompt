@@ -10,6 +10,8 @@ import {
 } from "./artworkTransform";
 import { printifyHardcoverSquare8x8Profile } from "./profiles/printifyHardcoverSquare8x8";
 import { exportPrintifyBook } from "./printifyExport";
+import { resolveLayoutPlan } from "../story/layoutPlan";
+import { getPrintProfile } from "./registry";
 import type { ProvidedImage } from "../manual/assemble";
 import type { ChildProfile } from "../story/types";
 
@@ -156,11 +158,27 @@ describe("Part 2: Shared Artwork Framing Engine & Transform Math Regression Test
         backgroundMode: "extended",
       };
 
-      for (let i = 0; i < 21; i++) {
-        images.set(i, {
+      // exportPrintifyBook() looks images up by each resolved slot's own
+      // sourceSceneIndex (matching how orchestrator.ts's GeneratedPage.index
+      // is populated in production) — NOT by raw array position. Great
+      // Adventure now resolves through its registered standard-24
+      // StoryEdition, whose sourceSceneIndex numbering reserves 0/1 for the
+      // front/back cover and numbers interior assets from 2 (see
+      // storyEdition.ts's resolveStoryEditionPlan), so a naive "i = 0..N"
+      // key no longer lines up with every interior asset the way it did
+      // under the old per-story PageSpec model.
+      const plan = resolveLayoutPlan({
+        child: dummyChild,
+        bookId: "great-adventure",
+        profileId: "printify-hardcover-square-8x8",
+        mode: "standard-single",
+      });
+      for (const slot of plan.assets) {
+        images.set(slot.sourceSceneIndex, {
           buffer: testPng,
           mimeType: "image/png",
-          transform: i === 1 ? customTransform : undefined, // Apply to Illus 02 spread
+          // Apply to the first career scene (no more spreads on any story).
+          transform: slot.sceneId === "harbour-departure" ? customTransform : undefined,
         });
       }
 

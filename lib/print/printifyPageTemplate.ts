@@ -20,6 +20,8 @@ import {
 import { ARTWORK_FRAME_CSS } from "./artworkFrame";
 import type { PrintProfile, PxSize } from "./types";
 
+export type PrintifyTextPanelPosition = "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
 export interface PrintifyPageInput {
   /** data: URI for this page's artwork, or null to fall back to a soft panel. */
   imageDataUri: string | null;
@@ -28,6 +30,21 @@ export interface PrintifyPageInput {
   ink?: "light" | "dark";
   transform?: ArtworkTransform;
   sourcePx?: PxSize;
+  /** One of the six declared text-panel positions; defaults to bottom-left
+   *  (the prior single hardcoded position) when unset. */
+  textPanelPosition?: PrintifyTextPanelPosition;
+  /** "video-qr" pages render the application QR+CTA overlay instead of the
+   *  verse panel, regardless of `text` (which is always empty for that kind). */
+  kind?: string;
+  /** For a "video-qr" page: the deterministically-rendered QR + fallback URL,
+   *  or a placeholder when not yet configured (draft only). */
+  videoQr?: {
+    dataUri: string | null;
+    url: string | null;
+    isPlaceholder: boolean;
+  };
+  /** Child's name, for the video-qr page's CTA text ("Watch {name}'s..."). */
+  childName?: string;
 }
 
 export interface PageTextGeometryPct {
@@ -92,10 +109,40 @@ export function renderPrintifyPageHtml(
        </div>`
     : `<div class="bg fallback"></div>`;
 
+  const pos = input.textPanelPosition ?? "bottom-left";
+  const vertical = pos.startsWith("top") ? `top: ${marginY}px; bottom: auto;` : `bottom: ${marginY}px; top: auto;`;
+  const horizontal = pos.endsWith("right") ? `right: ${marginX}px; left: auto;` : `left: ${marginX}px; right: auto;`;
+  const verseMaxWidth = Math.round(safe.width * 0.82);
+  const versePosStyle = `position: absolute; ${vertical} ${horizontal} max-width: ${verseMaxWidth}px;`;
+
   const verse =
-    input.text && input.text.trim()
-      ? `<div class="verse" style="${verseStyle}">${formatText(input.text)}</div>`
+    input.kind !== "video-qr" && input.text && input.text.trim()
+      ? `<div class="verse" style="${versePosStyle}${verseStyle}">${formatText(input.text)}</div>`
       : "";
+
+  // Application-rendered QR + CTA + fallback URL for the video-qr page —
+  // deterministic, never AI-generated art or text. Never the generic verse
+  // panel (which would otherwise render empty for this page's blank text).
+  let videoQrHtml = "";
+  if (input.kind === "video-qr") {
+    const name = input.childName ?? "";
+    const qr = input.videoQr;
+    const qrBoxStyle = `${versePosStyle} background: rgba(255,255,255,0.9); padding: 40px 48px; border-radius: 32px; text-align: center; max-width: ${Math.round(safe.width * 0.45)}px;`;
+    if (!qr || qr.isPlaceholder || !qr.dataUri || !qr.url) {
+      videoQrHtml = `<div class="video-qr-overlay" style="${qrBoxStyle}">
+        <div class="video-qr-placeholder-badge">VIDEO LINK NOT SET</div>
+        <div class="video-qr-cta">Watch ${escapeAttr(name)}'s Great Adventure</div>
+        <div class="video-qr-sub">Scan to watch the 1-minute personalized video.</div>
+      </div>`;
+    } else {
+      videoQrHtml = `<div class="video-qr-overlay" style="${qrBoxStyle}">
+        <div class="video-qr-cta">Watch ${escapeAttr(name)}'s Great Adventure</div>
+        <div class="video-qr-sub">Scan to watch the 1-minute personalized video.</div>
+        <img class="video-qr-image" src="${qr.dataUri}" alt="QR code to ${escapeAttr(name)}'s video" />
+        <div class="video-qr-fallback-url">${escapeAttr(qr.url)}</div>
+      </div>`;
+    }
+  }
 
   return `<!doctype html>
 <html lang="en">
@@ -123,10 +170,6 @@ export function renderPrintifyPageHtml(
     background: linear-gradient(165deg, #1f1a4d 0%, #4a3691 55%, #2f9e8f 100%);
   }
   .verse {
-    position: absolute;
-    left: ${marginX}px;
-    bottom: ${marginY}px;
-    max-width: ${Math.round(safe.width * 0.82)}px;
     padding: 28px 36px;
     border-radius: 24px;
   }
@@ -138,15 +181,26 @@ export function renderPrintifyPageHtml(
     line-height: 1.32;
   }
   .verse p:last-child { margin-bottom: 0; }
+  .video-qr-overlay { color: #231d2b; font-family: "Nunito", sans-serif; }
+  .video-qr-cta { font-weight: 800; font-size: 56px; margin-bottom: 12px; }
+  .video-qr-sub { font-weight: 700; font-size: 38px; opacity: 0.85; margin-bottom: 32px; }
+  .video-qr-image { width: 45%; margin: 0 auto 24px; display: block; background: #fff; }
+  .video-qr-fallback-url { font-weight: 700; font-size: 30px; word-break: break-all; }
+  .video-qr-placeholder-badge { font-weight: 800; font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; color: #b3261e; margin-bottom: 16px; }
 </style>
 </head>
 <body>
   <div class="page">
     ${background}
     ${verse}
+    ${videoQrHtml}
   </div>
 </body>
 </html>`;
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**

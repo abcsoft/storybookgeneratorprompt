@@ -54,7 +54,9 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
 
     expect(preflight.ok).toBe(false);
     expect(preflight.issues).toBeDefined();
-    expect(preflight.issues?.length).toBe(24);
+    // Standard-24 edition: 26 assets (2 cover + 24 interior), so the
+    // remaining 26 - 7 = 19 files land in the below-150-PPI bucket.
+    expect(preflight.issues?.length).toBe(26);
 
     const qualityWarnings = preflight.issues?.filter(
       (i) => i.type === "QUALITY_WARNING_UNACKNOWLEDGED"
@@ -64,7 +66,7 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
     );
 
     expect(qualityWarnings?.length).toBe(7);
-    expect(lowPpiErrors?.length).toBe(17);
+    expect(lowPpiErrors?.length).toBe(19);
     expect(preflight.qualityWarnings?.length).toBe(7);
   });
 
@@ -108,7 +110,8 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       acknowledgeQualityWarnings: true,
     });
     expect(preflightGlobalOnly.ok).toBe(false);
-    expect(preflightGlobalOnly.issues?.length).toBe(24);
+    // Standard-24 edition: 26 assets (2 cover + 24 interior).
+    expect(preflightGlobalOnly.issues?.length).toBe(26);
 
     // 2b. Per-slot bound qualityAcknowledgements for the 7 213-PPI slots
     const acks: Record<string, any> = {};
@@ -137,9 +140,9 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       qualityAcknowledgements: acks,
     });
 
-    // Still not ok because 17 files are <150 PPI
+    // Still not ok because 19 files (26 total - 7 acknowledged) are <150 PPI
     expect(preflight.ok).toBe(false);
-    expect(preflight.issues?.length).toBe(17);
+    expect(preflight.issues?.length).toBe(19);
 
     const qualityWarnings = preflight.issues?.filter(
       (i) => i.type === "QUALITY_WARNING_UNACKNOWLEDGED"
@@ -150,8 +153,8 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
 
     // The 7 quality warnings are cleared from blocking issues!
     expect(qualityWarnings?.length).toBe(0);
-    // The 17 below-150-PPI errors remain blocked!
-    expect(lowPpiErrors?.length).toBe(17);
+    // The 19 below-150-PPI errors remain blocked!
+    expect(lowPpiErrors?.length).toBe(19);
   });
 
   // 3. Below-150 PPI issues cannot be acknowledged away
@@ -190,7 +193,8 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
     });
 
     expect(preflight.ok).toBe(false);
-    expect(preflight.issues?.length).toBe(24);
+    // Standard-24 edition: 26 assets (2 cover + 24 interior), all below 150 PPI.
+    expect(preflight.issues?.length).toBe(26);
     expect(preflight.issues?.every((i) => i.type === "LOW_PPI" || i.type === "IMAGE_RESOLUTION_TOO_LOW")).toBe(true);
   });
 
@@ -405,8 +409,8 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
     expect(result.status).not.toBe("MATCH");
   });
 
-  // 10. Exact Page 1–24 role mapping in Dream Big
-  it("maps Page 1 cover through Page 24 backcover authoritatively", () => {
+  // 10. Exact cover + Page 1–24 mapping in Dream Big's standard-24 edition
+  it("maps the separate front cover, Page 1 greeting through Page 24 video-QR, and the separate back cover authoritatively", () => {
     const plan = resolveLayoutPlan({
       child: TEST_CHILD,
       bookId: "dream-big",
@@ -414,13 +418,16 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       mode: "standard-single",
     });
 
-    expect(plan.assets.length).toBe(24);
-    expect(plan.assets[0].expectedFilename).toBe("01-cover.png");
-    expect(plan.assets[1].expectedFilename).toBe("02-intro.png");
-    expect(plan.assets[2].expectedFilename).toBe("03-pilot.png");
-    expect(plan.assets[20].expectedFilename).toBe("21-veterinarian.png");
-    expect(plan.assets[21].expectedFilename).toBe("22-inventor.png");
-    expect(plan.assets[22].expectedFilename).toBe("23-closing.png");
-    expect(plan.assets[23].expectedFilename).toBe("24-backcover.png");
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26 assets,
+    // the cover never assigned an interior page number.
+    expect(plan.assets.length).toBe(26);
+    expect(plan.assets[0].expectedFilename).toBe("cover-front.png");
+    expect(plan.assets[1].expectedFilename).toBe("01-greeting.png");
+    expect(plan.assets[2].expectedFilename).toBe("02-intro.png");
+    expect(plan.assets[3].expectedFilename).toBe("03-scene-01.png");
+    expect(plan.assets[22].expectedFilename).toBe("22-scene-20.png");
+    expect(plan.assets[23].expectedFilename).toBe("23-closing.png");
+    expect(plan.assets[24].expectedFilename).toBe("24-video-qr-background.png");
+    expect(plan.assets[25].expectedFilename).toBe("cover-back.png");
   });
 });

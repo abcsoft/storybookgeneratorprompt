@@ -1,18 +1,44 @@
 import { DEFAULT_PRINT_PROFILE_ID, listPrintProfiles } from "@/lib/print/registry";
 import { listBooks } from "@/lib/story/registry";
+import { getStoryEdition } from "@/lib/story/storyEdition";
 import Studio from "./Studio";
 import styles from "./page.module.css";
 
 export default function Home() {
-  const books = listBooks().map((b) => ({
-    id: b.id,
-    title: b.title,
-    subtitle: b.subtitle,
-    /** Illustrations to generate (one per page spec). */
-    pages: b.pages.length,
-    /** Physical pages once printed — spreads occupy two leaves. */
-    printPages: b.pages.reduce((n, p) => n + (p.spread ? 2 : 1), 0),
-  }));
+  const books = listBooks().map((b) => {
+    // Every registered story now has a "standard-24" StoryEdition — the
+    // authoritative, provider-independent source of truth for its counts.
+    // Never derive the story-card numbers from the raw legacy `b.pages`
+    // array: that array's length reflects the old per-story PageSpec
+    // template (e.g. 14 entries for a 10-beat story), not what
+    // resolveLayoutPlan() actually produces once a StoryEdition is
+    // registered, so counting it would silently lie to the user.
+    const edition = getStoryEdition(b.id, "standard-24");
+    const spreadCount = edition?.approvedSpreadPairs?.length ?? 0;
+    const interiorPageCount = edition?.interiorPageCount ?? b.pages.length;
+    const narrativeSceneCount = edition?.scenes.length ?? b.pages.length;
+    const coverAssetCount = edition ? 2 : 0;
+    const imageAssetCount = interiorPageCount + coverAssetCount;
+    return {
+      id: b.id,
+      title: b.title,
+      subtitle: b.subtitle,
+      /** Ordered narrative scenes (excludes greeting/intro/closing/video-QR/cover). */
+      narrativeSceneCount,
+      /** Numbered interior pages 1..N — the cover is delivered separately and never gets one. */
+      interiorPageCount,
+      /** Front + back cover, delivered separately, never assigned an interior page number. */
+      coverAssetCount,
+      /** Total illustrations to generate: interior pages + separate cover assets. */
+      imageAssetCount,
+      /** Facing pairs rendered as one panoramic spread instead of two singles (0 unless explicitly approved). */
+      spreadCount,
+      /** @deprecated kept only as a safe fallback for books without a registered edition. */
+      pages: b.pages.length,
+      /** @deprecated kept only as a safe fallback for books without a registered edition. */
+      printPages: b.pages.reduce((n, p) => n + (p.spread ? 2 : 1), 0),
+    };
+  });
 
   // Pass the full profile objects (plain JSON-safe data) so the client can
   // read canvas/finished/safe-area geometry for the review-screen overlay

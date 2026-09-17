@@ -28,8 +28,9 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       mode: "standard-single",
     });
 
-    expect(plan.assets.length).toBe(24);
-    expect(plan.interiorPageCount).toBe(22);
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26 assets.
+    expect(plan.assets.length).toBe(26);
+    expect(plan.interiorPageCount).toBe(24);
 
     const files = await Promise.all(
       plan.assets.map(async (slot, idx) => ({
@@ -61,12 +62,12 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       imagesMap,
       "dream-big",
       "classic-landscape-11x8",
-      { mode: "standard-single" },
+      { mode: "standard-single", videoTarget: { token: "test-video", redirectBaseUrl: "https://example.com/v" } },
     );
 
     expect(assembleResult.pdf).toBeDefined();
     expect(assembleResult.pdf.length).toBeGreaterThan(10000);
-    expect(assembleResult.totalPages).toBe(24); // 1 front + 22 interior + 1 back
+    expect(assembleResult.totalPages).toBe(26); // 1 front cover + 24 interior + 1 back cover
   });
 
   // Test 2: Low-PPI policy: 1376x768 (approx 122 PPI on 11.25") is strictly blocked in production
@@ -107,9 +108,16 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
 
   // Test 2b: 1376x768 is allowed in explicit draft mode with visible watermark warning
   it("2b. 1376x768 is accepted in explicit draft mode with watermark warning", async () => {
+    // Standard-24 edition: 26 real required assets (2 cover + 24 interior).
+    const plan26 = resolveLayoutPlan({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
     const files = await Promise.all(
-      Array.from({ length: 24 }, async (_, idx) => ({
-        filename: `${String(idx + 1).padStart(2, "0")}.png`,
+      plan26.assets.map(async (slot) => ({
+        filename: slot.expectedFilename,
         buffer: await makeImage(1376, 768),
       })),
     );
@@ -237,9 +245,16 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     expect(page22Asset?.assetKind).toBe("single-page");
   });
 
-  // Test 4: Custom Spread mode still validates real spread parity
-  it("4. Custom Spread mode still validates real spread parity and fails if spread starts on odd physical page", async () => {
-    // Attempt an invalid custom spread starting on odd page (page 1 is recto)
+  // Test 4: Custom Spread mode is rejected outright for Dream Big
+  it("4. Custom Spread mode is rejected outright — Dream Big's standard-24 edition has no approved spread pairs", async () => {
+    // Dream Big now resolves through its registered standard-24
+    // StoryEdition, which declares no approvedSpreadPairs, so ANY
+    // customSpreads request — even one that would separately fail the old
+    // even-page-start rule — is rejected the same way, before that rule is
+    // even reached. The even-start-page rule itself is still real and
+    // enforced wherever a spread CAN occur (see
+    // lib/story/layoutPlan.test.ts's Invariant 4, and
+    // lib/pdf/imposition.test.ts).
     expect(() => {
       resolveLayoutPlan({
         child,
@@ -248,12 +263,19 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
         mode: "custom-spreads",
         customSpreads: [{ startPage: 1, endPage: 2, textSide: "left", subjectSide: "right" }],
       });
-    }).toThrow(/Invalid spread across physical pages 1–2|Facing spreads can only begin on even-numbered/);
+    }).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
 
-    // Preflight also catches invalid spread attempts
+    // Preflight also catches the rejection (fails closed, never a silent
+    // pass or a 500).
+    const plan26 = resolveLayoutPlan({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
     const files = await Promise.all(
-      Array.from({ length: 24 }, async (_, idx) => ({
-        filename: `${String(idx + 1).padStart(2, "0")}.png`,
+      plan26.assets.map(async (slot) => ({
+        filename: slot.expectedFilename,
         buffer: await makeImage(1500, 1100),
       })),
     );
@@ -268,7 +290,7 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     });
 
     expect(preflight.ok).toBe(false);
-    expect(preflight.errors.some((e) => e.includes("Spreads cannot begin on page 1") || e.includes("Invalid spread across physical pages"))).toBe(true);
+    expect(preflight.errors.some((e) => e.includes("Custom spreads require an approved fixed-24 editorial mapping."))).toBe(true);
   });
 
   // Test 5: Printify fixed-page requirements remain fail-closed
@@ -314,10 +336,21 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
 
   // Test 6: A corrupt or portrait asset still blocks export
   it("6. A corrupt or portrait asset still blocks export with hard structured errors", async () => {
+    // Standard-24 edition: 26 real required assets (2 cover + 24 interior).
+    // "Illustration N" is the asset's true 1-based position in plan.assets
+    // (illustrationIndex + 1 — see preflight.ts), so idx===2 (0-based) is
+    // still "Illustration 3" and idx===5 is still "Illustration 6".
+    const plan26 = resolveLayoutPlan({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
+
     // Portrait asset on Classic Landscape
     const portraitFiles = await Promise.all(
-      Array.from({ length: 24 }, async (_, idx) => ({
-        filename: `${String(idx + 1).padStart(2, "0")}.png`,
+      plan26.assets.map(async (slot, idx) => ({
+        filename: slot.expectedFilename,
         // Illustration 3 is portrait
         buffer: idx === 2 ? await makeImage(800, 1200) : await makeImage(1500, 1100),
       })),
@@ -337,8 +370,8 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
 
     // Corrupt buffer
     const corruptFiles = await Promise.all(
-      Array.from({ length: 24 }, async (_, idx) => ({
-        filename: `${String(idx + 1).padStart(2, "0")}.png`,
+      plan26.assets.map(async (slot, idx) => ({
+        filename: slot.expectedFilename,
         buffer: idx === 5 ? Buffer.from("NOT_AN_IMAGE_GARBAGE_BYTES") : await makeImage(1500, 1100),
       })),
     );
@@ -358,6 +391,16 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
 
   // Test 7: /api/assemble returns detailed structured errors
   it("7. /api/assemble returns detailed structured errors and status 400 when preflight fails", async () => {
+    // Standard-24 edition: 26 real required assets (2 cover + 24 interior).
+    // "Illustration N" is illustrationIndex + 1 (true 1-based position), so
+    // plan26.assets[1] ("01-greeting.png") is "Illustration 2".
+    const plan26 = resolveLayoutPlan({
+      child,
+      bookId: "dream-big",
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
+
     const formData = new FormData();
     formData.append("name", "Mehedi");
     formData.append("age", "4");
@@ -366,15 +409,15 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     formData.append("profileId", "classic-landscape-11x8");
     formData.append("layoutMode", "standard-single");
 
-    // Send a portrait file for illustration 2 (02.png)
+    // Send a portrait file for illustration 2 (01-greeting.png)
     const portraitBuf = await makeImage(800, 1200);
-    formData.append("images", new File([new Uint8Array(portraitBuf)], "02.png", { type: "image/jpeg" }));
+    formData.append("images", new File([new Uint8Array(portraitBuf)], plan26.assets[1].expectedFilename, { type: "image/jpeg" }));
 
-    // Send normal files for others up to 24
-    for (let i = 1; i <= 24; i++) {
-      if (i === 2) continue;
+    // Send normal files for every other required asset
+    for (let i = 0; i < plan26.assets.length; i++) {
+      if (i === 1) continue;
       const normalBuf = await makeImage(1500, 1100);
-      formData.append("images", new File([new Uint8Array(normalBuf)], `${String(i).padStart(2, "0")}.png`, { type: "image/jpeg" }));
+      formData.append("images", new File([new Uint8Array(normalBuf)], plan26.assets[i].expectedFilename, { type: "image/jpeg" }));
     }
 
     const req = new Request("http://localhost:3000/api/assemble", {
@@ -394,7 +437,7 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     // Verify structured issue contains illustration number, filename, expected, actual, recommendation
     const issue = data.issues.find((i: any) => i.illustrationNumber === 2);
     expect(issue).toBeDefined();
-    expect(issue.filename).toBe("02.png");
+    expect(issue.filename).toBe("01-greeting.png");
     expect(issue.expected.toLowerCase()).toContain("landscape");
     expect(issue.actual.toLowerCase()).toContain("portrait");
     expect(issue.recommendation).toBeDefined();

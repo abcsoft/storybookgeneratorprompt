@@ -387,3 +387,228 @@ export const underwaterKingdomBook: StoryTemplate = {
   specialOutfits: SPECIAL_OUTFITS,
   companion: CORAL,
 };
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: each of the 10 original beats becomes two
+// sequential, visually distinct moments. Coral's `companionOverride: null`
+// is preserved on every split half before her true first appearance
+// (originally beat index 3).
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function reuseUKSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return { sceneId, kind: spec.kind, role: spec.role, illustrationPrompt: spec.illustrationPrompt, text: spec.text, legacyFilenames: [] };
+}
+
+function ukScene(
+  sceneId: string,
+  scene: string,
+  copy: (c: ChildProfile, p: Pronouns) => string,
+  opts: {
+    light?: string;
+    spread?: boolean;
+    compositionNotes?: string;
+    outfitOverride?: string;
+    companionOverride?: CompanionSpec | null;
+  } = {},
+): StoryEditionScene {
+  const { spread: _spread, ...promptOpts } = opts;
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(scene, { kind: "scene", ...promptOpts }),
+    text: (c) => copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+const ukScenes: StoryEditionScene[] = [
+  ukScene(
+    "shell-glow-discovered",
+    "Kneeling on warm golden sand at the tideline, brushing away wet sand from a smooth spiral conch shell " +
+      "that glows with warm golden light, eyes widening with wonder.",
+    (c) => `Half-buried at the tideline, ${c.name} brushed away the wet sand — and found a shell that glowed.`,
+    { light: "Bright warm midday sun over the beach, sparkling on the waves; eye-level camera at the tideline.", companionOverride: null },
+  ),
+  ukScene(
+    "shell-lifted",
+    "Lifting the glowing spiral shell fully out of the sand with both hands, marveling at its warm golden " +
+      "light even as cool waves roll in behind them.",
+    (c) => `It glowed softly, warm as sunlight, even though it had come from the cool sea.`,
+    { light: "Bright warm midday sun over the beach, sparkling on the waves; eye-level camera at the tideline.", companionOverride: null },
+  ),
+  ukScene(
+    "shell-brightening",
+    "Wading into the shallows holding the glowing spiral shell up as it brightens with each step, sandy " +
+      "bottom still underfoot.",
+    (c) => `The shell glowed brighter with every step into the water.`,
+    { light: "Cool turquoise light filtering down through the shallows mixing with the shell's warm glow; eye-level camera at the water's surface.", outfitOverride: SPECIAL_OUTFITS.underwater, companionOverride: null },
+  ),
+  ukScene(
+    "bubble-forms",
+    "A soft shimmering magical bubble of light enveloping the child as feet lift gently off the sandy " +
+      "bottom, allowing free breathing and swimming.",
+    (c) => `A soft, shimmering bubble of light wrapped around ${c.name}, and the sea welcomed ${c.name} in.`,
+    { light: "Cool turquoise light filtering down through the shallows mixing with the shell's warm glow; eye-level camera at the water's surface.", outfitOverride: SPECIAL_OUTFITS.underwater, companionOverride: null },
+  ),
+  ukScene(
+    "reef-wonder",
+    "Floating in wide-eyed wonder above a vibrant coral reef bursting with color — pink and orange coral " +
+      "towers, sunbeams streaming down from the surface above.",
+    (c) => `And there it was — a reef bursting with color, sunbeams streaming down like ribbons of light.`,
+    {
+      spread: true,
+      light: "Bright sunbeams streaming down through clear blue water, warm and sparkling; wide eye-level underwater camera at the reef.",
+      compositionNotes: "wide establishing shot — keep the whole child comfortably inside the safe region with nothing crossing the center gutter; keep the child's hands and feet fully inside the frame.",
+      outfitOverride: SPECIAL_OUTFITS.underwater,
+      companionOverride: null,
+    },
+  ),
+  ukScene(
+    "fish-swirl",
+    "Reaching out gently in amazement as a school of bright fish swirls playfully past, weaving around " +
+      "outstretched fingers.",
+    (c) => `Fish swirled past like ribbons of light. ${c.name} had never seen anything so alive.`,
+    {
+      spread: true,
+      light: "Bright sunbeams streaming down through clear blue water, warm and sparkling; wide eye-level underwater camera at the reef.",
+      outfitOverride: SPECIAL_OUTFITS.underwater,
+      companionOverride: null,
+    },
+  ),
+  ukScene(
+    "coral-arrives",
+    "A friendly dolphin shape gliding close for the first time through a swirl of bubbles, a delighted " +
+      "smile of recognition.",
+    (c) => `A friendly shape glided close — Coral the dolphin, gliding through a swirl of happy bubbles.`,
+    { light: "Cool bright blue light with dancing sunbeam patterns; eye-level underwater camera.", compositionNotes: "keep Coral's fins and tail fully inside the frame.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "coral-circling",
+    "Swimming alongside Coral the dolphin, both circling playfully through the bubbles together, delighted " +
+      "smiles all around.",
+    (c) => `Coral circled ${c.name} in a swirl of happy bubbles. A new friendship, sealed instantly.`,
+    { light: "Cool bright blue light with dancing sunbeam patterns; eye-level underwater camera.", compositionNotes: "keep Coral's fins and tail fully inside the frame.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "turtle-signal",
+    "A gentle old sea turtle gliding ahead calmly, pointing the way with a slow wave of its flipper, near a " +
+      "sloping field of swaying sea fans.",
+    (c) => `A wise old sea turtle glided by and gave a slow, knowing wave — this way, it seemed to say.`,
+    { light: "Soft blue-green light filtering through swaying sea fans; eye-level underwater camera.", compositionNotes: "keep the turtle's flippers and shell fully inside the frame.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "turtle-followed",
+    "Following the gentle sea turtle together with Coral past the sloping field of swaying sea fans, curious " +
+      "and eager.",
+    (c) => `${c.name} and Coral followed, curious, past the swaying sea fans.`,
+    { light: "Soft blue-green light filtering through swaying sea fans; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "kelp-garden-entered",
+    "Drifting into a glowing underwater garden of tall swaying kelp and soft glowing anemones in gentle " +
+      "pastel colors, Coral weaving playfully between the kelp stalks.",
+    (c) => `The kelp garden glowed soft pink and gold, swaying like a slow, quiet dance.`,
+    { light: "Soft glowing pastel light from the anemones themselves, gentle and even; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "kelp-garden-glow",
+    "Trailing a hand through the glowing pastel light of the kelp garden, hair drifting gently, Coral " +
+      "circling close by.",
+    (c) => `${c.name} trailed a hand through the light as Coral wove between the stalks.`,
+    { light: "Soft glowing pastel light from the anemones themselves, gentle and even; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "archway-noticed",
+    "Floating before a grand coral archway at the kingdom's heart, noticing the central pedestal is empty " +
+      "and dim.",
+    (c) => `At the kingdom's heart stood a grand coral archway — but its central pedestal sat empty and dark.`,
+    { light: "Cool, dim, slightly muted light around the darkened archway; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "coral-worried",
+    "Gentle concern on their face as Coral nudges closer, worried too, both looking at the empty pedestal.",
+    (c) => `"The guiding pearl is missing," Coral seemed to say with a worried nudge.`,
+    { light: "Cool, dim, slightly muted light around the darkened archway; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "grotto-entered",
+    "Entering a shimmering, gentle underwater grotto lit by glowing crystals in the walls, Coral close " +
+      "behind for company.",
+    (c) => `Inside a glowing grotto, crystals lit the walls like soft lanterns.`,
+    { light: "Warm glow from crystal-lit walls mixing with cool ambient blue water; eye-level underwater camera inside the grotto.", compositionNotes: "keep the child's limbs and Coral's tail fully inside the safe area — no cropping at the frame edges.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "grotto-searched",
+    "Peering carefully into a quiet alcove of the grotto, searching every corner, Coral waiting close by.",
+    (c) => `${c.name} searched every quiet alcove, Coral close behind.`,
+    { light: "Warm glow from crystal-lit walls mixing with cool ambient blue water; eye-level underwater camera inside the grotto.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "pearl-found",
+    "Hovering gently in a low swim pose before a shy, luminous round pearl nestled in a soft anemone and " +
+      "guarded by a ring of tiny curious fish.",
+    (c) => `The luminous pearl glowed shyly, guarded by a ring of tiny curious fish.`,
+    { light: "Soft warm glow from the pearl itself, gentle against the blue water; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "pearl-trust-earned",
+    "Offering an open, patient hand to the ring of tiny fish, waiting quietly until they let the glowing " +
+      "pearl go.",
+    (c) => `${c.name} waited, patient and gentle, until the little fish trusted ${c.name} enough to let it go.`,
+    { light: "Soft warm glow from the pearl itself, gentle against the blue water; eye-level underwater camera.", outfitOverride: SPECIAL_OUTFITS.underwater },
+  ),
+  ukScene(
+    "pearl-restored",
+    "Placing the luminous round pearl gently back onto the coral archway pedestal as radiant light floods " +
+      "outward across the entire reef.",
+    (c) => `${c.name} placed the pearl gently back into the archway pedestal — and brilliant light flooded the entire reef!`,
+    {
+      spread: true,
+      light: "Bright, warm, radiant light flooding outward from the restored pearl; wide eye-level underwater camera at the archway.",
+      compositionNotes: "keep the child and Coral safely inside the frame with roughly a 10-12% margin from the outer edge — a wide celebratory shot; keep all limbs and Coral's fins fully inside the safe area.",
+      outfitOverride: SPECIAL_OUTFITS.underwater,
+    },
+  ),
+  ukScene(
+    "reef-celebration",
+    "Coral leaping joyfully through the water as the warm current guides the child safely upward, fish " +
+      "swirling in celebration all around, a happy wave goodbye.",
+    (c, p) => `Coral leapt with joy, and the warm current guided ${c.name} safely up to the golden beach as ${p.subj} waved a happy goodbye.`,
+    {
+      spread: true,
+      light: "Bright, warm, radiant light flooding outward from the restored pearl; wide eye-level underwater camera at the archway.",
+      compositionNotes: "keep the child and Coral safely inside the frame with roughly a 10-12% margin from the outer edge — a wide celebratory shot; keep all limbs and Coral's fins fully inside the safe area.",
+      outfitOverride: SPECIAL_OUTFITS.underwater,
+    },
+  ),
+];
+
+export const underwaterKingdomStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "underwater-kingdom",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment sitting on warm golden sand at the tideline, holding a small glowing " +
+      "spiral shell and looking toward the viewer with a warm, curious smile, gentle turquoise waves rolling " +
+      "in softly behind them.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: reuseUKSpec(underwaterKingdomPages[1], "intro"),
+  scenes: ukScenes,
+  closing: reuseUKSpec(underwaterKingdomPages[12], "closing"),
+  videoQr: buildVideoQrScene(
+    STORY_META,
+    "A calm, low-detail deep-blue underwater background with soft blurred coral silhouettes, echoing the " +
+      "reef's warm restored glow.",
+  ),
+  cover: {
+    front: reuseUKSpec(underwaterKingdomPages[0], "cover"),
+    back: reuseUKSpec(underwaterKingdomPages[13], "backcover"),
+  },
+};
+
+registerStoryEdition(underwaterKingdomStandard24Edition);

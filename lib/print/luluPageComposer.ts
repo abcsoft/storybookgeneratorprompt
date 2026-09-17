@@ -109,6 +109,10 @@ export async function composeLuluPageRaster(
     ink: page.verseInk ?? "light",
     transform,
     sourcePx,
+    kind: page.kind,
+    textPanelPosition: page.textPanelPosition,
+    videoQr: page.videoQr,
+    childName: child.name,
   });
 
   const puppetPage = await browser.newPage();

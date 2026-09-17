@@ -394,3 +394,226 @@ export const bedtimeDreamBook: StoryTemplate = {
   defaultOutfit: DEFAULT_OUTFIT,
   companion: TWINKLE,
 };
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: each of the 10 original beats becomes two
+// sequential, visually distinct moments. Twinkle's presence pattern is
+// preserved exactly: absent (companionOverride: null) before meeting her
+// (beats 0-2), present through beats 3-7, then absent again once she joins
+// the constellation and is no longer beside the child (beats 8-9).
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function reuseBDSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return { sceneId, kind: spec.kind, role: spec.role, illustrationPrompt: spec.illustrationPrompt, text: spec.text, legacyFilenames: [] };
+}
+
+function bdScene(
+  sceneId: string,
+  scene: string,
+  copy: (c: ChildProfile, p: Pronouns) => string,
+  opts: {
+    light?: string;
+    spread?: boolean;
+    framing?: FramingMode;
+    compositionNotes?: string;
+    companionOverride?: CompanionSpec | null;
+  } = {},
+): StoryEditionScene {
+  const { spread: _spread, ...promptOpts } = opts;
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(scene, { kind: "scene", ...promptOpts }),
+    text: (c) => copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+const bdScenes: StoryEditionScene[] = [
+  bdScene(
+    "star-arrives",
+    "Sitting up gently in bed in soft pajamas as a friendly silver guiding star drifts in through the open " +
+      "window, a warm sleepy smile.",
+    (c) => `Just as ${c.name} was drifting off to sleep, a soft silver guiding star drifted in through the window.`,
+    { light: "Soft warm glow from the silver star mixing with cool moonlight; eye-level camera beside the bed.", companionOverride: null },
+  ),
+  bdScene(
+    "star-invites",
+    "Reaching out a curious hand toward the gentle silver light hovering just past the window, a warm sleepy " +
+      "smile.",
+    (c) => `Glowing gently, it seemed like an invitation to a dream.`,
+    { light: "Soft warm glow from the silver star mixing with cool moonlight; eye-level camera beside the bed.", companionOverride: null },
+  ),
+  bdScene(
+    "floating-out",
+    "Floating gently out through the open window into a soft dream sky following the silver guiding star, " +
+      "calm and weightless, arms out like gentle wings.",
+    (c) => `The silver star led the way, and ${c.name} floated softly out into the night.`,
+    { light: "Soft cool blue night light with warm starlight, calm and even; eye-level camera drifting beside the window.", companionOverride: null },
+  ),
+  bdScene(
+    "night-flight",
+    "Drifting peacefully through the open night sky, calm and light as a held breath, a peaceful smile, the " +
+      "bedroom glowing warmly behind them.",
+    (c) => `Calm and light as a held breath, ${c.name} never fell, only drifted.`,
+    { light: "Soft cool blue night light with warm starlight, calm and even; eye-level camera drifting beside the window.", companionOverride: null },
+  ),
+  bdScene(
+    "cloud-path",
+    "Drifting gently along a wide, soft cloud path led by the silver guiding star under an enormous, calm " +
+      "starry sky.",
+    (c) => `A wide, soft cloud path stretched out beneath a sky full of stars.`,
+    {
+      spread: true,
+      light: "Soft, even, warm starlight over the cloud path, calm and dreamlike; wide eye-level camera among the clouds.",
+      compositionNotes: "use a wide, calm composition with a gentle, level camera angle — avoid any dramatic or steep perspective; keep the whole child comfortably inside the safe region with nothing crossing the center gutter.",
+      companionOverride: null,
+    },
+  ),
+  bdScene(
+    "cloud-rest",
+    "Resting comfortably on a soft cloud as if it were a cushion, utterly peaceful, following the silver " +
+      "guiding star's glow just ahead.",
+    (c) => `Following the silver star, ${c.name} settled onto it as gently as settling onto a cushion.`,
+    {
+      spread: true,
+      light: "Soft, even, warm starlight over the cloud path, calm and dreamlike; wide eye-level camera among the clouds.",
+      companionOverride: null,
+    },
+  ),
+  bdScene(
+    "twinkle-discovered",
+    "Kneeling gently on a soft cloud, noticing Twinkle, a tiny lost golden star sitting alone and glowing dim " +
+      "and tired nearby.",
+    (c) => `There on the cloud path sat Twinkle, a tiny golden star, dimmer than the rest.`,
+    { light: "Soft warm glow from Twinkle mixing with cool starlight; eye-level camera on the cloud path." },
+  ),
+  bdScene(
+    "twinkle-comforted",
+    "Sitting down right beside Twinkle with a warm, comforting smile, listening gently as the little star " +
+      "whispers its worry.",
+    (c) => `"I can't find my constellation family," it whispered. ${c.name} sat down right beside it with a comforting smile.`,
+    { light: "Soft warm glow from Twinkle mixing with cool starlight; eye-level camera on the cloud path." },
+  ),
+  bdScene(
+    "moon-passing",
+    "Floating peacefully past a huge, gentle, smiling crescent moon, listening as it hums a soft, sleepy " +
+      "tune, Twinkle glowing a little brighter with hope nearby.",
+    (c) => `A great sleepy moon smiled as they passed, humming a slow, soft tune.`,
+    { light: "Soft warm moonlight glowing gently from the huge crescent moon; eye-level camera near the moon." },
+  ),
+  bdScene(
+    "moon-guidance",
+    "Listening close to the huge sleepy moon as it yawns a gentle direction, Twinkle glowing softly beside " +
+      "them.",
+    (c) => `"Follow the quiet path," it yawned, "and you'll find the way."`,
+    { light: "Soft warm moonlight glowing gently from the huge crescent moon; eye-level camera near the moon." },
+  ),
+  bdScene(
+    "animals-passing",
+    "Drifting past a cluster of friendly night animals resting peacefully on the cloud path — a soft owl, a " +
+      "gentle fox, and a few calm fireflies glowing quietly.",
+    (c) => `Along the path, an owl blinked slowly, a fox curled up snug, and fireflies glowed like tiny lanterns.`,
+    { light: "Soft warm firefly-glow mixed with cool moonlight, gentle and dim; eye-level camera on the cloud path." },
+  ),
+  bdScene(
+    "animals-waved",
+    "Waving hello softly to the sleeping night animals without waking them, Twinkle floating gently beside " +
+      "the child.",
+    (c) => `${c.name} waved softly, careful not to wake them.`,
+    { light: "Soft warm firefly-glow mixed with cool moonlight, gentle and dim; eye-level camera on the cloud path." },
+  ),
+  bdScene(
+    "garden-arrival",
+    "Arriving at a quiet star garden where little stars grow softly like flowers among the clouds, Twinkle " +
+      "glowing a little brighter in the peaceful hush.",
+    (c) => `They reached a quiet garden where stars grew soft as flowers.`,
+    { light: "Soft, even glow from the star-flowers all around, calm and gentle; eye-level camera in the star garden." },
+  ),
+  bdScene(
+    "garden-wonder",
+    "Walking slowly among the soft glowing star-flowers with Twinkle, both glowing a little brighter, quiet " +
+      "wonder on their face.",
+    (c) => `Twinkle glowed brighter and warmer just being there.`,
+    { light: "Soft, even glow from the star-flowers all around, calm and gentle; eye-level camera in the star garden." },
+  ),
+  bdScene(
+    "constellation-sighted",
+    "Sitting together with Twinkle on a soft cloud, looking up thoughtfully at the quiet night sky above.",
+    (c) => `${c.name} looked up at the quiet night sky, thinking hard.`,
+    { light: "Soft warm starlight from the matching constellation above; eye-level camera looking upward.", compositionNotes: "wide, calm composition with a gentle, level camera angle — avoid any dramatic or steep perspective." },
+  ),
+  bdScene(
+    "constellation-traced",
+    "Gently tracing a constellation of four glowing stars in the sky that leaves one empty spot matching " +
+      "Twinkle, who looks up with quiet, joyful recognition.",
+    (c) => `${c.name} traced four waiting stars in the sky with one open spot — the exact match for Twinkle. "That's your family," ${c.name} whispered gently.`,
+    { light: "Soft warm starlight from the matching constellation above; eye-level camera looking upward.", compositionNotes: "wide, calm composition with a gentle, level camera angle — avoid any dramatic or steep perspective." },
+  ),
+  bdScene(
+    "twinkle-rises",
+    "Watching softly from a cloud as Twinkle drifts up toward the empty fifth position among the four " +
+      "waiting stars, a quiet, hopeful smile.",
+    (c) => `Twinkle drifted up, soft and slow, toward the open spot among the four waiting stars.`,
+    { light: "Soft warm glow from the now-complete five-star constellation; eye-level camera looking upward.", companionOverride: null },
+  ),
+  bdScene(
+    "constellation-complete",
+    "Watching from a cloud in quiet peace as all five stars glow warmly together, the constellation now " +
+      "complete overhead, a soft happy smile.",
+    (c) => `Now five bright stars shone together, and the little constellation glowed warm and whole again.`,
+    { light: "Soft warm glow from the now-complete five-star constellation; eye-level camera looking upward.", companionOverride: null },
+  ),
+  bdScene(
+    "flying-home",
+    "Flying gently home across the peaceful night sky, arms open in a calm, happy glide, while the complete " +
+      "five-star constellation twinkles softly above.",
+    (c) => `Home ${c.name} drifted, calm and happy, the little five-star constellation twinkling softly in the sky above.`,
+    {
+      spread: true,
+      light: "Soft warm glow from the window ahead mixing with gentle starlight; wide eye-level camera drifting toward home.",
+      compositionNotes: "keep this wide and calm — a gentle glide, not a dramatic swoop; nothing crossing the center gutter, the child comfortably inside the safe region.",
+      companionOverride: null,
+    },
+  ),
+  bdScene(
+    "window-arrival",
+    "Gliding gently toward the warmly glowing bedroom window, the five-star constellation twinkling softly " +
+      "in the sky behind them, calm and happy.",
+    (c) => `All the way to the window, the little constellation twinkled softly behind ${c.name}.`,
+    {
+      spread: true,
+      light: "Soft warm glow from the window ahead mixing with gentle starlight; wide eye-level camera drifting toward home.",
+      companionOverride: null,
+    },
+  ),
+];
+
+export const bedtimeDreamStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "bedtime-dream",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment sitting up gently in bed in soft blue pajamas, looking toward the viewer " +
+      "with a warm sleepy smile, soft moonlight and a few gentle stars glowing through the window behind them.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: reuseBDSpec(bedtimeDreamPages[1], "intro"),
+  scenes: bdScenes,
+  closing: reuseBDSpec(bedtimeDreamPages[12], "closing"),
+  videoQr: buildVideoQrScene(
+    STORY_META,
+    "A calm, low-detail deep-blue night sky background with soft blurred star silhouettes, echoing the " +
+      "story's gentle starlight glow.",
+  ),
+  cover: {
+    front: reuseBDSpec(bedtimeDreamPages[0], "cover"),
+    back: reuseBDSpec(bedtimeDreamPages[13], "backcover"),
+  },
+};
+
+registerStoryEdition(bedtimeDreamStandard24Edition);

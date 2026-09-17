@@ -15,8 +15,10 @@ describe("generateBook", () => {
     const generate = vi.fn(async () => stubImage());
     const pages = await generateBook(child, photos, { generate, anchor: false });
 
-    expect(pages.length).toBe(24);
-    expect(generate).toHaveBeenCalledTimes(24);
+    // Standard-24 edition: 26 assets (2 cover delivered separately + 24
+    // interior pages), each still needs its own generated illustration.
+    expect(pages.length).toBe(26);
+    expect(generate).toHaveBeenCalledTimes(26);
     expect(pages.every((p) => p.image !== null && !p.failed)).toBe(true);
   });
 
@@ -26,8 +28,8 @@ describe("generateBook", () => {
     );
     await generateBook(child, photos, { generate });
 
-    // 1 anchor portrait + 24 pages
-    expect(generate).toHaveBeenCalledTimes(25);
+    // 1 anchor portrait + 26 pages (2 cover + 24 interior)
+    expect(generate).toHaveBeenCalledTimes(27);
     // first call is the master character reference, built from the raw photos
     expect(generate.mock.calls[0][0]).toContain("MASTER CHARACTER REFERENCE");
     expect(generate.mock.calls[0][1]).toHaveLength(photos.length);
@@ -41,7 +43,7 @@ describe("generateBook", () => {
       generate: async () => stubImage(),
       onProgress: (completed, total) => seen.push([completed, total]),
     });
-    expect(seen.at(-1)).toEqual([24, 24]);
+    expect(seen.at(-1)).toEqual([26, 26]);
   });
 
   it("never exceeds the concurrency limit", async () => {
@@ -72,7 +74,7 @@ describe("generateBook", () => {
 
     expect(failed.length).toBe(1);
     expect(failed[0].image).toBeNull();
-    // The rest of the book still generated.
-    expect(pages.filter((p) => !p.failed).length).toBe(23);
+    // The rest of the book still generated (26 total - 1 failure).
+    expect(pages.filter((p) => !p.failed).length).toBe(25);
   });
 });

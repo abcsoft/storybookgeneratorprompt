@@ -31,6 +31,12 @@ describe("buildReviewSequence", () => {
   });
 
   it("agrees with layout plan and ensures every spread starts on an even page", () => {
+    // Dream Big now resolves through its registered standard-24
+    // StoryEdition, which declares no approvedSpreadPairs, so its default
+    // plan has zero spreads (no more 22-23 closing spread) — every entry is
+    // single. The even-start-page rule itself is still enforced wherever a
+    // spread CAN occur (see lib/story/layoutPlan.test.ts's Invariant 4,
+    // still exercised there via assertValidFacingPair directly).
     const manifest = buildManifest(child, "dream-big", "printify-hardcover-square-8x8");
     const entries = buildReviewSequence(manifest);
 
@@ -38,15 +44,18 @@ describe("buildReviewSequence", () => {
       (e): e is Extract<typeof e, { layout: "spread" }> => e.layout === "spread",
     );
 
-    expect(spreads.length).toBeGreaterThanOrEqual(1);
+    expect(spreads.length).toBe(0);
     for (const spread of spreads) {
       expect(spread.startPage % 2).toBe(0); // Starts on even page (verso)
       expect(spread.endPage).toBe(spread.startPage + 1); // Ends on facing odd page (recto)
     }
 
-    const closingSpread = spreads.find((s) => s.startPage === 22);
-    expect(closingSpread).toBeDefined();
-    expect(closingSpread?.endPage).toBe(23);
+    // Closing is now a single interior page (23), not a 22-23 spread.
+    const closingEntry = entries.find((e) => e.pageKind === "closing")!;
+    expect(closingEntry.layout).toBe("single");
+    if (closingEntry.layout === "single") {
+      expect(closingEntry.page).toBe(23);
+    }
   });
 
   it("keeps manifest order and carries filename/role/aspect through untouched", () => {

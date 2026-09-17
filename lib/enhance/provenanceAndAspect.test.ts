@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import sharp from "sharp";
 import crypto from "crypto";
 import { runPreflight } from "../print/preflight";
-import { resolveLayoutPlan } from "../story/layoutPlan";
+import { resolveLayoutPlan, getProfileAssetGeometry } from "../story/layoutPlan";
+import { getPrintProfile } from "../print/registry";
 import { processBatchEnhancement } from "./batchProcessor";
 import { enhancementRegistry } from "./registry";
 import { signEnhancementReceipt, signVisualApprovalRecord } from "./receipt";
@@ -116,18 +117,21 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
     const squareAspectWarning = squareRes.warnings.find((w) => w.includes("aspect ratio differs"));
     expect(squareAspectWarning).toBeUndefined();
 
-    // 3b. Classic Landscape spread slot (6675x2475 continuous spread)
-    const landscapePlan = resolveLayoutPlan({
-      child,
-      bookId: "dream-big",
-      profileId: "classic-landscape-11x8",
-      mode: "custom-spreads",
-      customSpreads: [{ startPage: 20, endPage: 21, textSide: "left", subjectSide: "right" }],
-    });
-    const spreadSlot = landscapePlan.assets.find((s) => s.assetKind === "spread")!;
-    expect(spreadSlot).toBeDefined();
-    expect(spreadSlot.destinationDimensions.width).toBe(6675);
-    expect(spreadSlot.destinationDimensions.height).toBe(2475);
+    // 3b. Classic Landscape spread geometry (6675x2475 continuous spread).
+    // Dream Big (like every registered story) now resolves through its
+    // standard-24 StoryEdition, which declares no approvedSpreadPairs, so
+    // Custom Spreads — and therefore any resolveLayoutPlan() output actually
+    // containing a "spread" assetKind slot — is rejected outright for every
+    // story (see storyEdition.ts / layoutPlan.ts). A "spread" is still a
+    // real, profile-level geometry concept (getProfileAssetGeometry is what
+    // a future edition's approvedSpreadPairs branch in
+    // resolveStoryEditionPlan() calls), so this checks that reusable
+    // geometry function directly instead of round-tripping through a story
+    // resolution that can no longer produce a spread slot.
+    const classicLandscapeProfile = getPrintProfile("classic-landscape-11x8");
+    const spreadGeometry = getProfileAssetGeometry(classicLandscapeProfile, "spread");
+    expect(spreadGeometry.dimensions.width).toBe(6675);
+    expect(spreadGeometry.dimensions.height).toBe(2475);
 
     const bufSpread = await makeImage(6675, 2475);
     const spreadRes = await runPreflight({
@@ -135,8 +139,11 @@ describe("Resolution Provenance, Aspect Ratios, and Quality Gates", () => {
       profileId: "classic-landscape-11x8",
       child,
       draft: true,
-      files: [{ filename: spreadSlot.filename, buffer: bufSpread }],
+      files: [{ filename: "spread-20-21.png", buffer: bufSpread }],
     });
+    // No registered edition can resolve a spread slot, so this file simply
+    // doesn't match any required slot in the standard-24 plan — it produces
+    // an unmatched/extra-file issue, not an aspect-ratio warning.
     const spreadAspectWarning = spreadRes.warnings.find((w) => w.includes("aspect ratio differs"));
     expect(spreadAspectWarning).toBeUndefined();
   });

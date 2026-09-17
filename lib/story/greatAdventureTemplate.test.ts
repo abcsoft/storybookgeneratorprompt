@@ -129,15 +129,15 @@ describe("greatAdventureTemplate", () => {
     expect(flyingHome?.prompt.toLowerCase()).toContain("safe art page");
   });
 
-  it("strictly maps all 19 interior scene IDs across 24 physical pages in edition mode, and 19 pages in single mode", () => {
-    // 1. Template-level interior scene count: 1 intro + 17 journey + 1 closing = 19 scenes
+  it("template-level interior scene count is still 1 intro + 17 journey + 1 closing = 19 scenes", () => {
+    // The underlying PageSpec template (used for the legacy, now-superseded
+    // great-adventure-printify-24 PrintEdition) is unchanged.
     const interiorPages = greatAdventureBook.pages.filter(
       (p) => p.kind !== "cover" && p.kind !== "backcover",
     );
     expect(interiorPages.length).toBe(19);
 
-    // 2. Exact scene IDs in chronological narrative order
-    const expectedSceneIds = [
+    const expectedLegacySceneIds = [
       "intro",
       "scene-02", "scene-03", "scene-04", "scene-05", "scene-06",
       "scene-07", "scene-08", "scene-09", "scene-10", "scene-11",
@@ -145,9 +145,29 @@ describe("greatAdventureTemplate", () => {
       "scene-17", "scene-18",
       "closing",
     ];
-    expect(expectedSceneIds.length).toBe(19);
+    expect(expectedLegacySceneIds.length).toBe(19);
+  });
 
-    // 3. Supported Edition Mode (great-adventure-printify-24)
+  it("strictly maps all 24 standard-24 interior scene IDs on every print profile — no spreads, no fixed-page mismatch", () => {
+    // Great Adventure now has a registered "standard-24" StoryEdition (like
+    // every story), which takes priority over the legacy
+    // great-adventure-printify-24 PrintEdition's 5-spread, 19-scene mapping
+    // for ALL profiles, including Printify. 17 of the original 19 interior
+    // beats are reused verbatim; 3 of them (Arctic, Tropical Island, Flying
+    // Home) are each split into 2 distinct scenes to reach exactly 20 — see
+    // greatAdventureTemplate.ts's greatAdventureStandard24Edition.
+    const expectedSceneIds = [
+      "greeting", "intro",
+      "harbour-departure", "jungle-trail", "rope-bridge", "desert-camel", "ancient-ruins",
+      "savanna-riverbank", "snowy-mountain", "arctic-arrival", "arctic-aurora", "coral-reef",
+      "blue-whale", "ocean-storm", "island-arrival", "island-marker", "crystal-cave",
+      "treasure-chest-reach", "chest-bursts-open", "star-friend",
+      "star-trail-departure", "star-trail-homeward-flight",
+      "closing", "video-qr",
+    ];
+    expect(expectedSceneIds.length).toBe(24);
+
+    // Printify 24-page hardcover: standard-24 resolves cleanly, no spreads.
     const editionPlan = resolveLayoutPlan({
       child,
       bookId: BOOK_ID,
@@ -155,30 +175,37 @@ describe("greatAdventureTemplate", () => {
     });
     expect(editionPlan.isValidForProfile).toBe(true);
     expect(editionPlan.interiorPageCount).toBe(24);
-    expect(editionPlan.interiorAssets.length).toBe(19);
+    expect(editionPlan.interiorAssets.length).toBe(24);
+    expect(editionPlan.interiorAssets.map((a) => a.sceneId)).toEqual(expectedSceneIds);
+    expect(editionPlan.interiorAssets.every((a) => a.layout === "single-page")).toBe(true);
 
-    const editionSceneIds = editionPlan.interiorAssets.map((a) => a.sceneId);
-    expect(editionSceneIds).toEqual(expectedSceneIds);
-
-    const spreads = editionPlan.interiorAssets.filter((a) => a.layout !== "single-page");
-    const singles = editionPlan.interiorAssets.filter((a) => a.layout === "single-page");
-    expect(spreads.length).toBe(5);
-    expect(singles.length).toBe(14);
-    expect(spreads.length * 2 + singles.length).toBe(24);
-
-    // 4. Standard Single Mode (all 19 scenes forced to single-page, rejecting 24-page fixed profile)
+    // Standard Single mode (explicit) resolves identically — same edition,
+    // same 24 interior pages, valid on the fixed-page Printify profile too
+    // (unlike the old per-story model, which rejected 19 interior scenes
+    // against Printify's required 24).
     const singlePlan = resolveLayoutPlan({
       child,
       bookId: BOOK_ID,
       profileId: "printify-hardcover-square-8x8",
       mode: "standard-single",
     });
-    expect(singlePlan.interiorPageCount).toBe(19);
-    expect(singlePlan.interiorAssets.length).toBe(19);
+    expect(singlePlan.interiorPageCount).toBe(24);
+    expect(singlePlan.interiorAssets.length).toBe(24);
     expect(singlePlan.interiorAssets.every((a) => a.layout === "single-page")).toBe(true);
     expect(singlePlan.interiorAssets.map((a) => a.sceneId)).toEqual(expectedSceneIds);
-    expect(singlePlan.isValidForProfile).toBe(false);
-    expect(singlePlan.limitations?.[0]).toContain("resolves to 19 interior pages, but Printify Hardcover Square 8×8 requires exactly 24 interior pages");
+    expect(singlePlan.isValidForProfile).toBe(true);
+    expect(singlePlan.limitations).toBeUndefined();
+
+    // Classic Landscape (a variable-page profile) resolves identically too —
+    // standard-24 is uniform across every print profile.
+    const landscapePlan = resolveLayoutPlan({
+      child,
+      bookId: BOOK_ID,
+      profileId: "classic-landscape-11x8",
+      mode: "standard-single",
+    });
+    expect(landscapePlan.interiorPageCount).toBe(24);
+    expect(landscapePlan.interiorAssets.map((a) => a.sceneId)).toEqual(expectedSceneIds);
   });
 
   it("verifies authentic narrative fingerprints for all 19 interior beats (not hallucinated titles)", () => {

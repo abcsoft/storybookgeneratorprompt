@@ -16,8 +16,10 @@
   },
   "dependencies": {
     "@google/genai": "^2.9.0",
+    "@types/qrcode": "^1.5.6",
     "next": "16.2.9",
     "puppeteer": "^25.2.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "^0.35.2",
@@ -27,6 +29,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "jsqr": "^1.4.0",
     "playwright": "^1.49.0",
     "tsx": "^4.22.4",
     "typescript": "^5",

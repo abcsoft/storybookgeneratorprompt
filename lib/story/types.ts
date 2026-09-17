@@ -16,7 +16,19 @@ export interface ReferencePhoto {
   base64: string;
 }
 
-export type PageKind = "cover" | "intro" | "scene" | "closing" | "backcover";
+export type PageKind =
+  | "cover"
+  | "backcover"
+  | "greeting"
+  | "intro"
+  | "scene"
+  | "closing"
+  | "video-qr";
+
+/** Whether an asset belongs to the separate cover wrap (front/spine/back —
+ *  never assigned an interior physical page number) or the numbered
+ *  interior page sequence. See lib/story/storyEdition.ts. */
+export type DeliveryGroup = "cover" | "interior";
 
 export type PageLayout = "single" | "spread";
 
@@ -151,4 +163,29 @@ export interface GeneratedPage {
   slotId?: string;
   /** Why this page failed to generate (surfaced to the user). */
   error?: string;
+  /** One of the six declared story-text-panel positions for this page's
+   *  application-rendered verse (see TextPanelPosition in layoutGeometry.ts).
+   *  Read by lib/pdf/page-template.ts so the panel is never hardcoded to a
+   *  single corner. Defaults to "bottom-left" when unset. */
+  textPanelPosition?: "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  /** For a "video-qr" page only: the deterministically application-rendered
+   *  QR code + CTA/fallback-URL data. Never set from AI-generated content —
+   *  see lib/story/qr.ts. When absent on a "video-qr" page, the page renders
+   *  a clearly-labelled placeholder (draft only) or fails production export. */
+  videoQr?: {
+    /** data: URI of the rendered QR PNG, or null for the placeholder state.
+     *  Used by the raster (screenshot-flattened) page pipelines, where a
+     *  vector/raster distinction makes no difference — the whole page is
+     *  always flattened to one image regardless. */
+    dataUri: string | null;
+    /** Raw `<svg>...</svg>` markup of the same QR, for the vector-PDF page
+     *  pipeline (lib/pdf/page-template.ts / buildBook.ts) — kept as real
+     *  vector paths in the output PDF rather than an extra embedded raster
+     *  image, and scans just as reliably at any print resolution. */
+    svgMarkup?: string | null;
+    /** The exact URL encoded in the QR, or null for the placeholder state. */
+    url: string | null;
+    /** True when no real, production-valid video target is configured yet. */
+    isPlaceholder: boolean;
+  };
 }

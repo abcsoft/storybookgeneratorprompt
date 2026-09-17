@@ -117,12 +117,25 @@ describe("runPreflight", () => {
     expect(result.warnings.some((w) => w.includes("aspect ratio"))).toBe(true);
   });
 
-  it("still blocks a genuinely incompatible orientation on Printify (portrait source for a wide spread)", async () => {
+  it("Printify square target is never orientation-incompatible — every registered story now resolves entirely single-page 1:1 there, and square accepts any source orientation", async () => {
+    // Originally this fed a portrait source to what used to be a wide
+    // spread slot (via the legacy great-adventure-printify-24 PrintEdition)
+    // to prove a genuinely incompatible orientation still blocks export.
+    // Great Adventure (like every registered story) now resolves through
+    // its standard-24 StoryEdition on every profile, which has no
+    // approvedSpreadPairs — every Printify interior slot is single-page
+    // 1:1 (square), and square is deliberately compatible with BOTH
+    // portrait and landscape sources (see lib/print/aspectCheck.ts's
+    // orientationsAreOpposite — only portrait-vs-landscape is ever
+    // "error"), so there is no longer any source orientation that can
+    // trigger INCOMPATIBLE_ORIENTATION on this profile. This asserts that
+    // new invariant directly: a strongly portrait source passes orientation
+    // classification cleanly (at most a ratio-mismatch warning).
     const manifest = buildManifest(child, "great-adventure", "printify-hardcover-square-8x8");
     const files = await Promise.all(
       manifest.map(async (m) => ({
         filename: m.filename,
-        buffer: await makeImage(m.spread ? 2 / 3 : 1),
+        buffer: await makeImage(2 / 3), // strongly portrait
       })),
     );
 
@@ -134,10 +147,8 @@ describe("runPreflight", () => {
       allowLowResolutionForTesting: true,
     });
 
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes("portrait") && e.includes("landscape"))).toBe(
-      true,
-    );
+    expect(result.errors.some((e) => e.includes("portrait") && e.includes("landscape"))).toBe(false);
+    expect(result.issues?.some((i) => i.type === "INCOMPATIBLE_ORIENTATION")).toBe(false);
   });
 
   it("warns about the Printify placeholder spine width, not for the landscape profile", async () => {
@@ -174,6 +185,12 @@ describe("runPreflight", () => {
   // --- Strict Invariant Tests ---
 
   it("fails closed when custom spread begins on an odd physical page", async () => {
+    // Dream Big now resolves through its registered standard-24
+    // StoryEdition, which has no approvedSpreadPairs — ANY custom-spreads
+    // request against it (odd start page or otherwise) is rejected before
+    // the even-start-page rule is even reached. The rule itself is still
+    // real and enforced wherever a spread CAN occur (see
+    // lib/story/layoutPlan.test.ts's Invariant 4).
     const manifest = buildManifest(child, "dream-big");
     const files = await Promise.all(
       manifest.map(async (m) => ({
@@ -192,7 +209,7 @@ describe("runPreflight", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.includes("even physical page"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Custom spreads require an approved fixed-24 editorial mapping."))).toBe(true);
   });
 
   it("fails closed when custom spread maps to physically invalid pairs 1-2 or 23-24", async () => {

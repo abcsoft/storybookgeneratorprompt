@@ -26,33 +26,51 @@ import type { ChildProfile } from "./types";
 
 const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
 
-// Independent source of truth for the 24 Dream Big physical pages and roles.
-// This does NOT import or derive from the production mapping code under test.
+// Independent source of truth for Dream Big's standard-24 edition: cover is
+// delivered as 2 separate assets (never assigned an interior page number),
+// and the 24 interior pages are numbered continuously 1-24 (greeting, intro,
+// 20 careers, closing, video-qr). This does NOT import or derive from the
+// production mapping code under test.
+const INDEPENDENT_COVER_ASSETS = [
+  { assetKind: "front-cover", slotId: "cover-front", filename: "cover-front.png" },
+  { assetKind: "back-cover", slotId: "cover-back", filename: "cover-back.png" },
+];
+
 const INDEPENDENT_24_PAGE_SEQUENCE = [
-  { page: 1, roleSlug: "cover", slotId: "01-cover", filename: "01-cover.png", displayTitle: "Cover" },
+  { page: 1, roleSlug: "greeting", slotId: "01-greeting", filename: "01-greeting.png", displayTitle: "Greeting" },
   { page: 2, roleSlug: "intro", slotId: "02-intro", filename: "02-intro.png", displayTitle: "Intro" },
-  { page: 3, roleSlug: "pilot", slotId: "03-pilot", filename: "03-pilot.png", displayTitle: "Pilot" },
-  { page: 4, roleSlug: "race-car-driver", slotId: "04-race-car-driver", filename: "04-race-car-driver.png", displayTitle: "Race-car driver" },
-  { page: 5, roleSlug: "astronaut", slotId: "05-astronaut", filename: "05-astronaut.png", displayTitle: "Astronaut" },
-  { page: 6, roleSlug: "doctor", slotId: "06-doctor", filename: "06-doctor.png", displayTitle: "Doctor" },
-  { page: 7, roleSlug: "firefighter", slotId: "07-firefighter", filename: "07-firefighter.png", displayTitle: "Firefighter" },
-  { page: 8, roleSlug: "scientist", slotId: "08-scientist", filename: "08-scientist.png", displayTitle: "Scientist" },
-  { page: 9, roleSlug: "army-officer", slotId: "09-army-officer", filename: "09-army-officer.png", displayTitle: "Army officer" },
-  { page: 10, roleSlug: "soccer-player", slotId: "10-soccer-player", filename: "10-soccer-player.png", displayTitle: "Soccer player" },
-  { page: 11, roleSlug: "karate-master", slotId: "11-karate-master", filename: "11-karate-master.png", displayTitle: "Karate master" },
-  { page: 12, roleSlug: "detective", slotId: "12-detective", filename: "12-detective.png", displayTitle: "Detective" },
-  { page: 13, roleSlug: "magician", slotId: "13-magician", filename: "13-magician.png", displayTitle: "Magician" },
-  { page: 14, roleSlug: "chef", slotId: "14-chef", filename: "14-chef.png", displayTitle: "Chef" },
-  { page: 15, roleSlug: "rockstar", slotId: "15-rockstar", filename: "15-rockstar.png", displayTitle: "Rockstar" },
-  { page: 16, roleSlug: "artist", slotId: "16-artist", filename: "16-artist.png", displayTitle: "Artist" },
-  { page: 17, roleSlug: "teacher", slotId: "17-teacher", filename: "17-teacher.png", displayTitle: "Teacher" },
-  { page: 18, roleSlug: "explorer", slotId: "18-explorer", filename: "18-explorer.png", displayTitle: "Explorer" },
-  { page: 19, roleSlug: "photographer", slotId: "19-photographer", filename: "19-photographer.png", displayTitle: "Photographer" },
-  { page: 20, roleSlug: "deep-sea-diver", slotId: "20-deep-sea-diver", filename: "20-deep-sea-diver.png", displayTitle: "Deep-sea diver" },
-  { page: 21, roleSlug: "veterinarian", slotId: "21-veterinarian", filename: "21-veterinarian.png", displayTitle: "Veterinarian" },
-  { page: 22, roleSlug: "inventor", slotId: "22-inventor", filename: "22-inventor.png", displayTitle: "Inventor" },
+  { page: 3, roleSlug: "pilot", slotId: "03-scene-01", filename: "03-scene-01.png", displayTitle: "Pilot" },
+  { page: 4, roleSlug: "race-car-driver", slotId: "04-scene-02", filename: "04-scene-02.png", displayTitle: "Race-car driver" },
+  { page: 5, roleSlug: "astronaut", slotId: "05-scene-03", filename: "05-scene-03.png", displayTitle: "Astronaut" },
+  { page: 6, roleSlug: "doctor", slotId: "06-scene-04", filename: "06-scene-04.png", displayTitle: "Doctor" },
+  { page: 7, roleSlug: "firefighter", slotId: "07-scene-05", filename: "07-scene-05.png", displayTitle: "Firefighter" },
+  { page: 8, roleSlug: "scientist", slotId: "08-scene-06", filename: "08-scene-06.png", displayTitle: "Scientist" },
+  { page: 9, roleSlug: "army-officer", slotId: "09-scene-07", filename: "09-scene-07.png", displayTitle: "Army officer" },
+  { page: 10, roleSlug: "soccer-player", slotId: "10-scene-08", filename: "10-scene-08.png", displayTitle: "Soccer player" },
+  { page: 11, roleSlug: "karate-master", slotId: "11-scene-09", filename: "11-scene-09.png", displayTitle: "Karate master" },
+  { page: 12, roleSlug: "detective", slotId: "12-scene-10", filename: "12-scene-10.png", displayTitle: "Detective" },
+  { page: 13, roleSlug: "magician", slotId: "13-scene-11", filename: "13-scene-11.png", displayTitle: "Magician" },
+  { page: 14, roleSlug: "chef", slotId: "14-scene-12", filename: "14-scene-12.png", displayTitle: "Chef" },
+  { page: 15, roleSlug: "rockstar", slotId: "15-scene-13", filename: "15-scene-13.png", displayTitle: "Rockstar" },
+  { page: 16, roleSlug: "artist", slotId: "16-scene-14", filename: "16-scene-14.png", displayTitle: "Artist" },
+  { page: 17, roleSlug: "teacher", slotId: "17-scene-15", filename: "17-scene-15.png", displayTitle: "Teacher" },
+  { page: 18, roleSlug: "explorer", slotId: "18-scene-16", filename: "18-scene-16.png", displayTitle: "Explorer" },
+  { page: 19, roleSlug: "photographer", slotId: "19-scene-17", filename: "19-scene-17.png", displayTitle: "Photographer" },
+  { page: 20, roleSlug: "deep-sea-diver", slotId: "20-scene-18", filename: "20-scene-18.png", displayTitle: "Deep-sea diver" },
+  { page: 21, roleSlug: "veterinarian", slotId: "21-scene-19", filename: "21-scene-19.png", displayTitle: "Veterinarian" },
+  { page: 22, roleSlug: "inventor", slotId: "22-scene-20", filename: "22-scene-20.png", displayTitle: "Inventor" },
   { page: 23, roleSlug: "closing", slotId: "23-closing", filename: "23-closing.png", displayTitle: "Closing" },
-  { page: 24, roleSlug: "backcover", slotId: "24-backcover", filename: "24-backcover.png", displayTitle: "Back cover" },
+  { page: 24, roleSlug: "video-qr", slotId: "24-video-qr-background", filename: "24-video-qr-background.png", displayTitle: "Video-qr" },
+];
+
+// Legacy (pre standard-24) filenames used by test 3's simulated 22-file
+// legacy upload — kept as the old role-based names since that is exactly
+// what a real legacy package on disk would contain.
+const LEGACY_ROLE_FILENAMES = [
+  "pilot", "race-car-driver", "astronaut", "doctor", "firefighter", "scientist",
+  "army-officer", "soccer-player", "karate-master", "detective", "magician",
+  "chef", "rockstar", "artist", "teacher", "explorer", "photographer",
+  "deep-sea-diver", "veterinarian", "inventor", "closing", "backcover",
 ];
 
 /** Create a deterministic, role-labelled image buffer with exact dimensions */
@@ -70,7 +88,7 @@ async function makeDeterministicFixture(role: string, width = 3375, height = 247
 describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
   const profileId = "classic-landscape-11x8";
 
-  it("1. Slot resolution: exactly 24 required Dream Big standard-single slots mapped 1-to-1 to physical pages 1..24", () => {
+  it("1. Slot resolution: cover-front + cover-back + exactly 24 required Dream Big standard-single interior slots mapped 1-to-1 to physical pages 1..24", () => {
     const plan = resolveLayoutPlan({
       child,
       bookId: "dream-big",
@@ -78,12 +96,14 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
       mode: "standard-single",
     });
 
-    expect(plan.assets.length).toBe(24);
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26 assets.
+    expect(plan.assets.length).toBe(26);
     expect(plan.assets.every((a) => a.required)).toBe(true);
 
     for (let i = 0; i < INDEPENDENT_24_PAGE_SEQUENCE.length; i++) {
       const expected = INDEPENDENT_24_PAGE_SEQUENCE[i];
-      const slot = plan.assets[i];
+      // plan.assets[0] is the separate front cover, so interior page N sits at index N.
+      const slot = plan.assets[i + 1];
 
       expect(slot.slotId).toBe(expected.slotId);
       expect(slot.roleSlug).toBe(expected.roleSlug);
@@ -98,39 +118,42 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
       // Verify 1-based review label
       const reviewLabel = formatPhysicalPageLabel(slot);
       expect(reviewLabel.toLowerCase()).toContain(`physical page ${expected.page}`);
-      const checkWord =
-        expected.roleSlug === "veterinarian"
-          ? "vet"
-          : expected.roleSlug === "backcover"
-            ? "back cover"
-            : expected.roleSlug.replace(/-/g, " ").split(" ")[0];
+      const checkWord = expected.roleSlug === "veterinarian" ? "vet" : expected.roleSlug.replace(/-/g, " ").split(" ")[0];
       expect(reviewLabel.toLowerCase()).toContain(checkWord);
       expect(reviewLabel).not.toContain("Page 0");
     }
 
-    // Physical page 1 = cover
-    expect(plan.assets[0].slotId).toBe("01-cover");
-    expect(plan.assets[0].physicalPages).toEqual([1]);
+    // Cover is delivered as 2 separate assets, never assigned an interior page number.
+    expect(plan.assets[0].slotId).toBe(INDEPENDENT_COVER_ASSETS[0].slotId);
+    expect(plan.assets[0].assetKind).toBe(INDEPENDENT_COVER_ASSETS[0].assetKind);
+    expect(plan.assets[0].physicalPages).toEqual([]);
+    expect(plan.assets[25].slotId).toBe(INDEPENDENT_COVER_ASSETS[1].slotId);
+    expect(plan.assets[25].assetKind).toBe(INDEPENDENT_COVER_ASSETS[1].assetKind);
+    expect(plan.assets[25].physicalPages).toEqual([]);
+
+    // Physical page 1 = greeting
+    expect(plan.assets[1].slotId).toBe("01-greeting");
+    expect(plan.assets[1].physicalPages).toEqual([1]);
 
     // Physical page 2 = intro
-    expect(plan.assets[1].slotId).toBe("02-intro");
-    expect(plan.assets[1].physicalPages).toEqual([2]);
+    expect(plan.assets[2].slotId).toBe("02-intro");
+    expect(plan.assets[2].physicalPages).toEqual([2]);
 
-    // Physical page 3 = pilot
-    expect(plan.assets[2].slotId).toBe("03-pilot");
-    expect(plan.assets[2].physicalPages).toEqual([3]);
+    // Physical page 3 = pilot (first career scene)
+    expect(plan.assets[3].slotId).toBe("03-scene-01");
+    expect(plan.assets[3].physicalPages).toEqual([3]);
 
-    // Physical page 22 = inventor
-    expect(plan.assets[21].slotId).toBe("22-inventor");
-    expect(plan.assets[21].physicalPages).toEqual([22]);
+    // Physical page 22 = inventor (last career scene)
+    expect(plan.assets[22].slotId).toBe("22-scene-20");
+    expect(plan.assets[22].physicalPages).toEqual([22]);
 
     // Physical page 23 = closing
-    expect(plan.assets[22].slotId).toBe("23-closing");
-    expect(plan.assets[22].physicalPages).toEqual([23]);
+    expect(plan.assets[23].slotId).toBe("23-closing");
+    expect(plan.assets[23].physicalPages).toEqual([23]);
 
-    // Physical page 24 = backcover
-    expect(plan.assets[23].slotId).toBe("24-backcover");
-    expect(plan.assets[23].physicalPages).toEqual([24]);
+    // Physical page 24 = app-rendered, character-free video-QR background
+    expect(plan.assets[24].slotId).toBe("24-video-qr-background");
+    expect(plan.assets[24].physicalPages).toEqual([24]);
   });
 
   it("2. Back cover narrative agreement: approved 'happy dreamer' waving cheerfully prompt", () => {
@@ -179,15 +202,23 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
       "Cover and intro appear to be missing. Map these 22 assets to slots 3–24?",
     );
     expect(matchWithoutConfirm.assignedCount).toBe(0);
-    expect(matchWithoutConfirm.missingSlots.length).toBe(24);
+    // Standard-24 edition: cover-front + 24 interior + cover-back = 26 assets,
+    // all reported missing before the user confirms an interpretation.
+    expect(matchWithoutConfirm.missingSlots.length).toBe(26);
 
-    // Case B: Even WITH explicit user confirmation, slots 1 (cover) and 2 (intro) remain visibly missing
+    // Case B: Even WITH explicit user confirmation, the front cover, greeting,
+    // intro, and video-qr (none of which any legacy package ever had an image
+    // for) remain visibly missing.
     const matchWithConfirm = matchImportedFiles(files22, plan.assets, true);
     expect(matchWithConfirm.assignedCount).toBe(22);
-    expect(matchWithConfirm.missingSlots).toContain("01-cover");
+    expect(matchWithConfirm.missingSlots).toContain("cover-front");
+    expect(matchWithConfirm.missingSlots).toContain("01-greeting");
     expect(matchWithConfirm.missingSlots).toContain("02-intro");
-    expect(matchWithConfirm.matchedSlots.get("03-pilot")).toBe("01-pilot.png");
-    expect(matchWithConfirm.matchedSlots.get("24-backcover")).toBe("22-backcover.png");
+    expect(matchWithConfirm.missingSlots).toContain("24-video-qr-background");
+    expect(matchWithConfirm.matchedSlots.get("03-scene-01")).toBe("01-pilot.png");
+    // The 22nd (back cover) file lands on the separate cover-back asset, not
+    // an interior page — video-qr (interior page 24) has no legacy equivalent.
+    expect(matchWithConfirm.matchedSlots.get("cover-back")).toBe("22-backcover.png");
 
     // Case C: Production API export with these 22 files MUST first offer guarded legacy recovery (HTTP 409)
     const formData = new FormData();
@@ -242,11 +273,13 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
     expect(Array.isArray(data.missingSlots)).toBe(true);
 
     const missingSlotIds = data.missingSlots.map((s: any) => s.slotId);
-    expect(missingSlotIds).toContain("01-cover");
+    expect(missingSlotIds).toContain("cover-front");
+    expect(missingSlotIds).toContain("01-greeting");
     expect(missingSlotIds).toContain("02-intro");
+    expect(missingSlotIds).toContain("24-video-qr-background");
   });
 
-  it("4. Full production Book Review export: 24 required illustrations produce 24-page PDF with 3375x2475 rasters at 300 PPI", async () => {
+  it("4. Full production Book Review export: 26 required illustrations (2 cover + 24 interior) produce a 26-page PDF with 3375x2475 rasters at 300 PPI", async () => {
     const formData = new FormData();
     formData.append("name", "Alex");
     formData.append("age", "4");
@@ -254,8 +287,13 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
     formData.append("bookId", "dream-big");
     formData.append("profileId", profileId);
     formData.append("layoutMode", "standard-single");
+    formData.append("videoUrl", "https://example.com/watch/dream-big-test-video");
 
-    // Create 24 deterministic 3375x2475 images
+    // Create 26 deterministic 3375x2475 images: front cover, 24 interior, back cover.
+    for (const item of INDEPENDENT_COVER_ASSETS) {
+      const buf = await makeDeterministicFixture(item.assetKind, 3375, 2475);
+      formData.append("images", new File([new Uint8Array(buf)], item.filename, { type: "image/png" }));
+    }
     for (const item of INDEPENDENT_24_PAGE_SEQUENCE) {
       const buf = await makeDeterministicFixture(item.roleSlug, 3375, 2475);
       formData.append("images", new File([new Uint8Array(buf)], item.filename, { type: "image/png" }));
@@ -276,13 +314,13 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
     // Deep byte-level inspection of the generated production PDF
     const inspection = inspectPdfPreflight(pdfBuffer, 11, 8, 0.125);
 
-    // 1. Exactly 24 physical PDF pages
-    expect(inspection.pageCount).toBe(24);
+    // 1. Exactly 26 physical PDF pages (2 cover + 24 interior)
+    expect(inspection.pageCount).toBe(26);
 
-    // 2. Exactly 24 raster images embedded in the PDF
-    expect(inspection.embeddedRasterDimensions.length).toBe(24);
+    // 2. Exactly 26 raster images embedded in the PDF
+    expect(inspection.embeddedRasterDimensions.length).toBe(26);
 
-    // 3. All 24 page backgrounds are exactly 3375 x 2475 pixels
+    // 3. All 26 page backgrounds are exactly 3375 x 2475 pixels
     for (const dim of inspection.embeddedRasterDimensions) {
       expect(dim.width).toBe(3375);
       expect(dim.height).toBe(2475);
@@ -295,5 +333,5 @@ describe("Dream Big Illustration-to-Page Pipeline Repairs", () => {
       expect(img.placedWidthIn).toBeCloseTo(11.25, 2);
       expect(img.placedHeightIn).toBeCloseTo(8.25, 2);
     }
-  }, 90000); // Allow Puppeteer sufficient time for 24-page PDF rendering
+  }, 90000); // Allow Puppeteer sufficient time for 26-page PDF rendering
 });

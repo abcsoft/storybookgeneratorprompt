@@ -69,8 +69,11 @@ describe("renderBookHtml (landscape)", () => {
     ];
     const out = renderBookHtml(mixed, child);
     const verseCount = out.match(/<div class="verse"/g)?.length ?? 0;
-    const panelCount =
-      out.match(/<div class="verse" style="color:#231d2b;background:rgba\(255,255,255/g)?.length ?? 0;
+    // The style attribute now leads with the per-scene position rule (see
+    // versePositionStyle) before the ink/panel rule from verseStyle() —
+    // check the panel is present anywhere in each verse's style, not
+    // anchored at the very start of the attribute.
+    const panelCount = out.match(/<div class="verse" style="[^"]*color:#231d2b;background:rgba\(255,255,255/g)?.length ?? 0;
     expect(verseCount).toBe(4); // 2 scenes + intro + closing (cover/backcover have no .verse)
     // Every verse carries the panel — including the verseInk:"light" page.
     expect(panelCount).toBe(verseCount);
@@ -106,6 +109,70 @@ describe("renderBookHtml (landscape)", () => {
     const longOut = renderBookHtml(longNamePages, { name: "Alexander Bartholomew", age: 5, gender: "boy" });
     expect(longOut).toContain('class="detective-sign-overlay"');
     expect(longOut).toContain("font-size: 13pt;");
+  });
+});
+
+describe("video-qr page — application-rendered QR/CTA, never the blank verse capsule", () => {
+  const withoutQr = page({ index: 0, kind: "video-qr", text: "" });
+  const outNoQr = renderBookHtml([withoutQr], child);
+
+  it("never renders the generic empty verse panel for a video-qr page", () => {
+    // Regression test for the confirmed "blank white capsule" bug: the
+    // generic `.verse` div used to render unconditionally even for this
+    // page's deliberately-empty text, producing an empty rounded-rect panel.
+    expect(outNoQr).not.toMatch(/<div class="verse"[^>]*><\/div>/);
+  });
+
+  it("renders a clearly-labelled placeholder badge when no QR is configured", () => {
+    expect(outNoQr).toContain('class="video-qr-overlay"');
+    expect(outNoQr).toContain("VIDEO LINK NOT SET");
+    expect(outNoQr).toContain("Watch Alex's Great Adventure");
+    expect(outNoQr).toContain("Scan to watch the 1-minute personalized video.");
+  });
+
+  it("renders the real QR image and fallback URL when a production QR is set (PNG fallback, no SVG markup)", () => {
+    const withQr = page({
+      index: 0,
+      kind: "video-qr",
+      text: "",
+      videoQr: { dataUri: "data:image/png;base64,AAA=", url: "https://storybook.example/v/abc123", isPlaceholder: false },
+    });
+    const out = renderBookHtml([withQr], child);
+    expect(out).not.toContain("VIDEO LINK NOT SET");
+    expect(out).toContain('src="data:image/png;base64,AAA="');
+    expect(out).toContain("https://storybook.example/v/abc123");
+  });
+
+  it("prefers the inline vector <svg> markup over the PNG when both are available — no extra embedded raster", () => {
+    const withQr = page({
+      index: 0,
+      kind: "video-qr",
+      text: "",
+      videoQr: {
+        dataUri: "data:image/png;base64,AAA=",
+        svgMarkup: '<svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg>',
+        url: "https://storybook.example/v/abc123",
+        isPlaceholder: false,
+      },
+    });
+    const out = renderBookHtml([withQr], child);
+    expect(out).toContain('<svg viewBox="0 0 10 10">');
+    expect(out).not.toContain('src="data:image/png;base64,AAA="');
+  });
+});
+
+describe("dynamic story-text panel position", () => {
+  it("defaults to bottom-left when a scene declares no textPanelPosition", () => {
+    const p = page({ index: 0, kind: "scene", text: "Hello" });
+    const out = renderBookHtml([p], child);
+    expect(out).toMatch(/class="verse" style="[^"]*left:\s*1\.25in;[^"]*bottom:\s*0\.95in/);
+  });
+
+  it("moves the panel to top-right when the scene declares it", () => {
+    const p = page({ index: 0, kind: "scene", text: "Hello", textPanelPosition: "top-right" });
+    const out = renderBookHtml([p], child);
+    expect(out).toMatch(/class="verse" style="[^"]*right:\s*1\.25in;[^"]*top:\s*0\.85in/);
+    expect(out).not.toMatch(/class="verse" style="[^"]*left:\s*1\.25in;[^"]*bottom:\s*0\.95in/);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   resolveLayoutPlan,
   recalculateAndValidatePhysicalPagePlan,
   getProfileAssetGeometry,
+  computeAssetSafeRegions,
   type LayoutMode,
 } from "./layoutPlan";
 import { getEditionForProfile } from "./editions";
@@ -139,37 +140,51 @@ describe("Comprehensive Story Pipeline & Layout Contract Audit", () => {
   });
 
   describe("Requirement 4: Spread Composition Invariants", () => {
+    // Dream Big's registered standard-24 StoryEdition declares no
+    // approvedSpreadPairs, so Custom Spreads — and therefore any
+    // resolveLayoutPlan() output actually containing a "spread" assetKind
+    // slot — is rejected outright for it (and for every other of the 10
+    // registered stories, all standard-24 too; see layoutPlan.test.ts
+    // Invariants 2/7/8). A scene's own illustrationPrompt() function still
+    // accepts a spread layout override directly — exactly how the legacy
+    // custom-spreads resolution branch built a spread prompt — so this
+    // exercises the same composition contract without going through the
+    // now-rejected mode.
     it("custom spreads have continuous environment, clear gutter, and no 3D book mockup elements", () => {
-      const plan = resolveLayoutPlan({
-        child: testChild,
-        bookId: "dream-big",
-        profileId: "printify-hardcover-square-8x8",
-        mode: "custom-spreads",
-        customSpreads: [{ startPage: 2, endPage: 3, textSide: "left" }],
+      expect(() =>
+        resolveLayoutPlan({
+          child: testChild,
+          bookId: "dream-big",
+          profileId: "printify-hardcover-square-8x8",
+          mode: "custom-spreads",
+          customSpreads: [{ startPage: 2, endPage: 3, textSide: "left" }],
+        }),
+      ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
+
+      const b = getBook("dream-big");
+      const profile = getPrintProfile("printify-hardcover-square-8x8");
+      const scene = b.pages[1];
+      const prompt = scene.illustrationPrompt(testChild, profile.id, {
+        layout: "text-left-subject-right",
+        textSide: "left",
+        subjectSide: "right",
       });
 
-      const spreadAsset = plan.interiorAssets.find((a) => a.assetKind === "spread");
-      expect(spreadAsset).toBeDefined();
-      expect(spreadAsset?.physicalPages).toEqual([2, 3]);
-      expect(spreadAsset?.leaves.length).toBe(2);
-      expect(spreadAsset?.leaves[0].leafSide).toBe("left");
-      expect(spreadAsset?.leaves[1].leafSide).toBe("right");
+      const geom = getProfileAssetGeometry(profile, "spread");
+      expect(geom.dimensions.width).toBe(4800);
+      expect(geom.dimensions.height).toBe(2400);
+      expect(geom.providerPresetAspect).toBe("2:1");
 
-      // Dimensions must be 2x width
-      expect(spreadAsset?.destinationDimensions.width).toBe(4800);
-      expect(spreadAsset?.destinationDimensions.height).toBe(2400);
-      expect(spreadAsset?.expectedSourceAspect).toBe("2:1");
-
-      // Gutter region must be defined
-      expect(spreadAsset?.safeRegions.gutter).toBeDefined();
-      expect(spreadAsset?.safeRegions.gutter?.widthPct).toBeGreaterThan(0);
+      const safeRegions = computeAssetSafeRegions(profile, "spread", "left", "right");
+      expect(safeRegions.gutter).toBeDefined();
+      expect(safeRegions.gutter?.widthPct).toBeGreaterThan(0);
 
       // Prompt must include spread rules and explicit negatives against open books/curved pages
-      expect(spreadAsset?.prompt).toContain("COMPOSITION (two-page continuous spread)");
-      expect(spreadAsset?.prompt).toContain("Create one uninterrupted panoramic scene across one wide canvas");
-      expect(spreadAsset?.prompt).toContain("Keep the central gutter-safe zone free of faces, eyes, hands, feet, text, and important props");
-      expect(spreadAsset?.prompt).toContain("Do not generate a photographed open book, curved or curled pages, 3D book mockup, fake seam or binding line");
-      expect(spreadAsset?.prompt).toContain("Reserve the LEFT-HAND region as calm, low-detail environmental space for story text");
+      expect(prompt).toContain("COMPOSITION (two-page continuous spread)");
+      expect(prompt).toContain("Create one uninterrupted panoramic scene across one wide canvas");
+      expect(prompt).toContain("Keep the central gutter-safe zone free of faces, eyes, hands, feet, text, and important props");
+      expect(prompt).toContain("Do not generate a photographed open book, curved or curled pages, 3D book mockup, fake seam or binding line");
+      expect(prompt).toContain("Reserve the LEFT-HAND region as calm, low-detail environmental space for story text");
     });
   });
 
@@ -213,18 +228,32 @@ describe("Comprehensive Story Pipeline & Layout Contract Audit", () => {
     }
 
     it("classic-landscape-11x8 spread prompt explicitly specifies 22×8 in spread before bleed", () => {
-      const plan = resolveLayoutPlan({
-        child: testChild,
-        bookId: "great-adventure",
-        profileId: "classic-landscape-11x8",
-        mode: "custom-spreads",
-        customSpreads: [{ startPage: 2, endPage: 3, textSide: "left" }],
+      // Great Adventure (like every registered story) now has a standard-24
+      // edition with no approvedSpreadPairs, so Custom Spreads is rejected
+      // outright for it too — exercise the scene's illustrationPrompt()
+      // directly with a spread layout override instead (see Requirement 4's
+      // comment above for why this is the faithful equivalent).
+      expect(() =>
+        resolveLayoutPlan({
+          child: testChild,
+          bookId: "great-adventure",
+          profileId: "classic-landscape-11x8",
+          mode: "custom-spreads",
+          customSpreads: [{ startPage: 2, endPage: 3, textSide: "left" }],
+        }),
+      ).toThrow("Custom spreads require an approved fixed-24 editorial mapping.");
+
+      const b = getBook("great-adventure");
+      const profile = getPrintProfile("classic-landscape-11x8");
+      const scene = b.pages[1];
+      const prompt = scene.illustrationPrompt(testChild, profile.id, {
+        layout: "text-left-subject-right",
+        textSide: "left",
+        subjectSide: "right",
       });
-      const spreadAsset = plan.interiorAssets.find((a) => a.assetKind === "spread");
-      expect(spreadAsset).toBeDefined();
-      expect(spreadAsset?.prompt).toContain("trim is 11×8 in per page, totaling 22×8 in spread before bleed");
-      expect(spreadAsset?.prompt).toContain("6675×2475 px target at 300 DPI");
-      expect(spreadAsset?.prompt).toContain("full-bleed spread 22.25×8.25 in");
+      expect(prompt).toContain("trim is 11×8 in per page, totaling 22×8 in spread before bleed");
+      expect(prompt).toContain("6675×2475 px target at 300 DPI");
+      expect(prompt).toContain("full-bleed spread 22.25×8.25 in");
     });
   });
 
@@ -343,20 +372,36 @@ describe("Comprehensive Story Pipeline & Layout Contract Audit", () => {
         mode: "standard-single",
       });
 
-      // Great adventure has 19 interior scenes
-      expect(gaPlan.interiorPageCount).toBe(19);
-      expect(gaPlan.interiorAssets.length).toBe(19);
+      // Great Adventure now resolves through its registered standard-24
+      // edition (like every story), so it always has exactly 24 interior
+      // pages here, not its old 19-scene variable-profile count.
+      expect(gaPlan.interiorPageCount).toBe(24);
+      expect(gaPlan.interiorAssets.length).toBe(24);
 
-      // Verify strict 1:1 narrative order with unique source scene indices
+      // Verify strict 1:1 narrative order with unique source scene indices.
+      // resolveStoryEditionPlan() reserves index 0 for the front cover and
+      // 1 for the back cover, then assigns the 24 interior pages indices
+      // 2..25 in physical order (see storyEdition.ts's resolveStoryEditionPlan) —
+      // still unique and monotonic, just not "0 is cover, 1..N are interior"
+      // like the old per-story PageSpec model.
       const sourceIndices = gaPlan.interiorAssets.map((a) => a.sourceSceneIndex);
       const uniqueIndices = new Set(sourceIndices);
-      expect(uniqueIndices.size).toBe(19);
+      expect(uniqueIndices.size).toBe(24);
       for (let i = 0; i < sourceIndices.length; i++) {
-        expect(sourceIndices[i]).toBe(i + 1); // 0 is cover, 1..19 are interior
+        expect(sourceIndices[i]).toBe(i + 2);
       }
     });
 
     it("flags limitations when a story lacks an editorial edition for Printify 24-page hardcover", () => {
+      // recalculateAndValidatePhysicalPagePlan() is a separate, older
+      // preview utility (still used by app/SpreadConfigurator.tsx) that
+      // only knows about the legacy PrintEdition registry (getEditionForProfile)
+      // — it was already documented as an approximation, not the resolution
+      // authority (see its own comments in lib/story/layoutPlan.ts). It has
+      // not been made aware of the new standard-24 StoryEdition registry, so
+      // for a story with no *legacy* PrintEdition on this profile it still
+      // reports the old-model mismatch here — unchanged, pre-existing
+      // behavior, not something this migration altered.
       const validation = recalculateAndValidatePhysicalPagePlan(
         "kindness-garden",
         "printify-hardcover-square-8x8",
@@ -365,17 +410,19 @@ describe("Comprehensive Story Pipeline & Layout Contract Audit", () => {
       expect(validation.valid).toBe(false);
       expect(validation.errors.some((e) => e.includes("requires exactly 24 interior pages"))).toBe(true);
 
+      // But the real resolution authority, resolveLayoutPlan(), now DOES
+      // route through kindness-garden's registered standard-24 edition (every
+      // story has one), so it resolves cleanly on Printify 24-page hardcover —
+      // it no longer "lacks an editorial edition" in reality.
       const plan = resolveLayoutPlan({
         child: testChild,
         bookId: "kindness-garden",
         profileId: "printify-hardcover-square-8x8",
         mode: "standard-single",
       });
-      expect(plan.isValidForProfile).toBe(false);
-      expect(plan.limitations).toBeDefined();
-      expect(plan.limitations![0]).toContain("requires exactly 24 interior pages");
-      // Scenes are NOT duplicated to 24 (12 natural interior beats: 1 intro + 10 garden beats + 1 closing)
-      expect(plan.interiorAssets.length).toBe(12);
+      expect(plan.isValidForProfile).toBe(true);
+      expect(plan.limitations).toBeUndefined();
+      expect(plan.interiorAssets.length).toBe(24);
     });
 
     it("Dream Big on Printify 24-page hardcover is valid because an editorial edition exists", () => {
@@ -388,12 +435,17 @@ describe("Comprehensive Story Pipeline & Layout Contract Audit", () => {
       expect(validation.valid).toBe(true);
       expect(validation.errors.length).toBe(0);
 
+      // resolveLayoutPlan() itself now routes through Dream Big's registered
+      // standard-24 edition unconditionally (it takes priority over the
+      // legacy PrintEdition the validation call above still reasons about),
+      // resolving to exactly 24 interior pages — never the old 23
+      // (intro + 20 careers + a 22-23 closing spread).
       const plan = resolveLayoutPlan({
         child: testChild,
         bookId: "dream-big",
         profileId: "printify-hardcover-square-8x8",
       });
-      expect(plan.interiorPageCount).toBe(23);
+      expect(plan.interiorPageCount).toBe(24);
     });
   });
 });

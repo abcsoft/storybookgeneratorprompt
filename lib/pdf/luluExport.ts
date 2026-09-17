@@ -26,6 +26,33 @@ export async function buildLuluInteriorBook(
     (p) => p.kind !== "cover" && p.kind !== "backcover",
   );
 
+  // 3. Fail-closed structural invariants — never ship an interior PDF with a
+  // cover page inside it, a duplicated slot, or (for a StoryEdition-backed
+  // book) the greeting/video-qr pages out of position.
+  if (interiorPages.some((p) => p.kind === "cover" || p.kind === "backcover")) {
+    throw new Error("Lulu interior PDF invariant violated: a cover/backcover page survived the interior filter.");
+  }
+  const seenSlotIds = new Set<string>();
+  for (const p of interiorPages) {
+    if (p.slotId) {
+      if (seenSlotIds.has(p.slotId)) {
+        throw new Error(`Lulu interior PDF invariant violated: duplicate slot "${p.slotId}" in the interior page sequence.`);
+      }
+      seenSlotIds.add(p.slotId);
+    }
+  }
+  const hasStandardEditionKinds = interiorPages.some((p) => p.kind === "greeting" || p.kind === "video-qr");
+  if (hasStandardEditionKinds) {
+    const greetingIndex = interiorPages.findIndex((p) => p.kind === "greeting");
+    const videoQrIndex = interiorPages.findIndex((p) => p.kind === "video-qr");
+    if (greetingIndex !== -1 && greetingIndex !== 0) {
+      throw new Error("Lulu interior PDF invariant violated: the greeting page must be interior page 1.");
+    }
+    if (videoQrIndex !== -1 && videoQrIndex !== interiorPages.length - 1) {
+      throw new Error("Lulu interior PDF invariant violated: the video-qr page must be the last interior page.");
+    }
+  }
+
   const canvas = profile.canvasPx;
   const pageWIn = profile.finalPageIn?.width ?? canvas.width / profile.dpi;
   const pageHIn = profile.finalPageIn?.height ?? canvas.height / profile.dpi;

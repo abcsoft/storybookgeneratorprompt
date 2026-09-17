@@ -82,7 +82,13 @@ describe("matchImportedFiles", () => {
       "back cover",
     ];
 
-    it("requires explicit confirmation for 22 legacy files; does NOT assign 01.png to cover or 02.png to intro", () => {
+    // Dream Big's standard-24 edition splits the old 24-slot sequence into
+    // cover-front + 24 interior pages (including 2 brand-new pages with no
+    // legacy equivalent: greeting at page 1, video-qr at page 24) +
+    // cover-back — see importMatch.ts's dreamBig22LegacyTargets() for the
+    // exact mapping this guarded recovery now uses.
+
+    it("requires explicit confirmation for 22 legacy files; does NOT assign 01.png to the front cover or greeting", () => {
       // Input files 01.png through 22.png without confirmation
       const report = matchImportedFiles(files22, dreamBigSlots, false);
 
@@ -92,41 +98,41 @@ describe("matchImportedFiles", () => {
       expect(report.legacyRecoveryTable).toBeDefined();
       expect(report.legacyRecoveryTable?.length).toBe(22);
 
-      // DO NOT assign 01.png to 01-cover
-      expect(report.bySlotId.get("01-cover")).toBeUndefined();
-      expect(report.byIndex.get(0)).toBeUndefined();
+      // DO NOT assign 01.png to cover-front or 01-greeting
+      expect(report.bySlotId.get("cover-front")).toBeUndefined();
+      expect(report.bySlotId.get("01-greeting")).toBeUndefined();
 
       // DO NOT assign 02.png to 02-intro
       expect(report.bySlotId.get("02-intro")).toBeUndefined();
-      expect(report.byIndex.get(1)).toBeUndefined();
 
-      // Slots 01-cover and 02-intro remain visibly missing
-      expect(report.missingSlots).toContain("01-cover");
+      // All 4 slots with no image among these 22 legacy files remain visibly missing
+      expect(report.missingSlots).toContain("cover-front");
+      expect(report.missingSlots).toContain("01-greeting");
       expect(report.missingSlots).toContain("02-intro");
+      expect(report.missingSlots).toContain("24-video-qr-background");
       expect(report.assignedCount).toBe(0);
     });
 
-    it("after explicit confirmation, maps 01.png..22.png to slots 03–24 and keeps 01-cover & 02-intro visibly missing", () => {
+    it("after explicit confirmation (\"files are Pilot through Back Cover\"), maps 01.png..22.png to the 20 careers + closing + the back cover", () => {
       // Explicit confirmation provided
       const report = matchImportedFiles(files22, dreamBigSlots, true);
 
       expect(report.legacyRecoveryApplied).toBe(true);
       expect(report.assignedCount).toBe(22);
 
-      // 01.png mapped to slot 03-pilot
-      expect(report.bySlotId.get("03-pilot")).toBe("01.png");
-      expect(report.byIndex.get(2)).toBe("01.png");
+      // 01.png mapped to slot 03-scene-01 (first career scene, was "pilot")
+      expect(report.bySlotId.get("03-scene-01")).toBe("01.png");
 
-      // 02.png mapped to slot 04-race-car-driver
-      expect(report.bySlotId.get("04-race-car-driver")).toBe("02.png");
+      // 02.png mapped to slot 04-scene-02 (second career scene)
+      expect(report.bySlotId.get("04-scene-02")).toBe("02.png");
 
-      // 22.png mapped to slot 24-backcover
-      expect(report.bySlotId.get("24-backcover")).toBe("22.png");
-      expect(report.byIndex.get(23)).toBe("22.png");
+      // 22.png (the old "backcover" file) mapped to the separate cover-back asset
+      expect(report.bySlotId.get("cover-back")).toBe("22.png");
 
-      // 01-cover and 02-intro remain visibly missing
-      expect(report.missingSlots).toEqual(["01-cover", "02-intro"]);
-      expect(report.bySlotId.get("01-cover")).toBeUndefined();
+      // cover-front, greeting, intro, and video-qr remain visibly missing —
+      // none of them existed in any legacy package.
+      expect(report.missingSlots).toEqual(["cover-front", "01-greeting", "02-intro", "24-video-qr-background"]);
+      expect(report.bySlotId.get("cover-front")).toBeUndefined();
       expect(report.bySlotId.get("02-intro")).toBeUndefined();
     });
 
@@ -143,33 +149,49 @@ describe("matchImportedFiles", () => {
       });
 
       expect(report.assignedCount).toBe(22);
-      expect(report.bySlotId.get("03-pilot")).toBe("01.png");
-      expect(report.bySlotId.get("24-backcover")).toBe("22.png");
-      expect(report.missingSlots).toEqual(["01-cover", "02-intro"]);
+      expect(report.bySlotId.get("03-scene-01")).toBe("01.png");
+      expect(report.bySlotId.get("cover-back")).toBe("22.png");
+      expect(report.missingSlots).toEqual(["cover-front", "01-greeting", "02-intro", "24-video-qr-background"]);
     });
 
-    it("accepts a valid 24-file legacy set where 01.png really is cover and 02.png really is intro", () => {
-      const files24 = Array.from({ length: 24 }, (_, i) => `${String(i + 1).padStart(2, "0")}.png`);
-      const report = matchImportedFiles(files24, dreamBigSlots);
+    it("accepts a valid 26-file canonical set: cover-front.png, cover-back.png, and all 24 canonical interior filenames", () => {
+      // Real canonical filenames (as buildManifest/renderPromptsMarkdown
+      // instruct), not bare "01.png".."24.png" — a bare "NN.png" is
+      // deliberately still interpreted as the OLD legacy single-cover-image
+      // convention for "01.png" (see cover-front's hardcoded legacyAliases),
+      // so mixing it with an explicit cover-front.png would be a genuinely
+      // ambiguous, self-conflicting input, not a realistic canonical upload.
+      const files26 = dreamBigSlots.map((s) => s.expectedFilename);
+      const report = matchImportedFiles(files26, dreamBigSlots);
 
-      expect(report.required).toBe(24);
-      expect(report.matched).toBe(24);
+      expect(report.required).toBe(26);
+      expect(report.matched).toBe(26);
       expect(report.missingSlots).toEqual([]);
       expect(report.legacyRecoveryProposal).toBeNull();
 
-      // 01.png really is cover
-      expect(report.bySlotId.get("01-cover")).toBe("01.png");
-      expect(report.byIndex.get(0)).toBe("01.png");
+      // cover-front.png / cover-back.png really are the separate cover assets
+      expect(report.bySlotId.get("cover-front")).toBe("cover-front.png");
+      expect(report.bySlotId.get("cover-back")).toBe("cover-back.png");
 
-      // 02.png really is intro
+      // 01-greeting.png really is greeting (interior page 1), 02-intro.png really is intro
+      expect(report.bySlotId.get("01-greeting")).toBe("01-greeting.png");
+      expect(report.bySlotId.get("02-intro")).toBe("02-intro.png");
+
+      // 03-scene-01.png is the first career scene
+      expect(report.bySlotId.get("03-scene-01")).toBe("03-scene-01.png");
+
+      // 24-video-qr-background.png is the video-qr background (interior page 24)
+      expect(report.bySlotId.get("24-video-qr-background")).toBe("24-video-qr-background.png");
+    });
+
+    it("a bare legacy-numbered file (no hardcoded alias) resolves by interior page number, not raw array position — '02.png' is intro, never greeting", () => {
+      // Regression: cover-front sits at array index 0 now (a separate,
+      // non-page-numbered asset), so a naive "array index N-1" mapping for
+      // a bare "NN.png" would put "02.png" on whatever asset happens to sit
+      // at index 1 (greeting) instead of interior page 2 (intro).
+      const report = matchImportedFiles(["02.png"], dreamBigSlots);
       expect(report.bySlotId.get("02-intro")).toBe("02.png");
-      expect(report.byIndex.get(1)).toBe("02.png");
-
-      // 03.png is pilot
-      expect(report.bySlotId.get("03-pilot")).toBe("03.png");
-
-      // 24.png is back cover
-      expect(report.bySlotId.get("24-backcover")).toBe("24.png");
+      expect(report.bySlotId.get("01-greeting")).toBeUndefined();
     });
 
     it("22-file unconfirmed report includes legacyRecoveryChoices with both SHIFT_PLUS_TWO and KEEP_NUMERIC_SLOTS", () => {
@@ -184,14 +206,20 @@ describe("matchImportedFiles", () => {
 
       const shiftChoice = report.legacyRecoveryChoices?.find((c) => c.interpretation === "SHIFT_PLUS_TWO");
       expect(shiftChoice).toBeDefined();
-      expect(shiftChoice!.resultingMissingSlots.map((s) => s.slotId)).toEqual(["01-cover", "02-intro"]);
+      expect(shiftChoice!.resultingMissingSlots.map((s) => s.slotId)).toEqual([
+        "cover-front", "01-greeting", "02-intro", "24-video-qr-background",
+      ]);
 
       const keepChoice = report.legacyRecoveryChoices?.find((c) => c.interpretation === "KEEP_NUMERIC_SLOTS");
       expect(keepChoice).toBeDefined();
-      expect(keepChoice!.resultingMissingSlots.map((s) => s.slotId)).toEqual(["23-closing", "24-backcover"]);
+      // All 20 career scenes get a file (cover + intro + 20 careers = 22),
+      // so only greeting, closing, video-qr, and the back cover are missing.
+      expect(keepChoice!.resultingMissingSlots.map((s) => s.slotId)).toEqual([
+        "01-greeting", "23-closing", "24-video-qr-background", "cover-back",
+      ]);
     });
 
-    it("KEEP_NUMERIC_SLOTS maps files to slots 01-22, keeps 23-closing and 24-backcover missing", () => {
+    it("KEEP_NUMERIC_SLOTS maps files to cover-front, intro, and all 20 careers; keeps greeting, closing, video-qr, and cover-back missing", () => {
       const report = matchImportedFiles(files22, dreamBigSlots, undefined, {
         bookId: "dream-big",
         legacyInterpretation: "KEEP_NUMERIC_SLOTS",
@@ -199,21 +227,23 @@ describe("matchImportedFiles", () => {
 
       expect(report.assignedCount).toBe(22);
 
-      // 01.png mapped to 01-cover (the user said these ARE cover/intro)
-      expect(report.bySlotId.get("01-cover")).toBe("01.png");
+      // 01.png mapped to cover-front (the user said these ARE cover/intro)
+      expect(report.bySlotId.get("cover-front")).toBe("01.png");
       expect(report.bySlotId.get("02-intro")).toBe("02.png");
-      expect(report.bySlotId.get("03-pilot")).toBe("03.png");
-      expect(report.bySlotId.get("22-inventor")).toBe("22.png");
+      expect(report.bySlotId.get("03-scene-01")).toBe("03.png");
+      expect(report.bySlotId.get("22-scene-20")).toBe("22.png");
 
-      // Exact missing slots — only 23-closing and 24-backcover
-      expect(report.missingSlots).toEqual(["23-closing", "24-backcover"]);
+      // Exact missing slots — greeting, closing, video-qr, and cover-back
+      expect(report.missingSlots).toEqual(["01-greeting", "23-closing", "24-video-qr-background", "cover-back"]);
       expect(report.missingSlotDetails).toEqual([
+        expect.objectContaining({ slotId: "01-greeting" }),
         expect.objectContaining({ slotId: "23-closing" }),
-        expect.objectContaining({ slotId: "24-backcover" }),
+        expect.objectContaining({ slotId: "24-video-qr-background" }),
+        expect.objectContaining({ slotId: "cover-back" }),
       ]);
 
-      // Must NOT have 01-cover or 02-intro missing
-      expect(report.missingSlots).not.toContain("01-cover");
+      // Must NOT have cover-front or 02-intro missing
+      expect(report.missingSlots).not.toContain("cover-front");
       expect(report.missingSlots).not.toContain("02-intro");
     });
 
@@ -226,14 +256,16 @@ describe("matchImportedFiles", () => {
 
       expect(report.legacyRecoveryApplied).toBe(true);
       expect(report.missingSlotDetails).toEqual([
-        expect.objectContaining({ slotId: "01-cover", physicalPages: [1] }),
+        expect.objectContaining({ slotId: "cover-front", physicalPages: [] }),
+        expect.objectContaining({ slotId: "01-greeting", physicalPages: [1] }),
         expect.objectContaining({ slotId: "02-intro", physicalPages: [2] }),
+        expect.objectContaining({ slotId: "24-video-qr-background", physicalPages: [24] }),
       ]);
 
-      // Must NOT report 23-closing or 24-backcover
+      // Must NOT report 23-closing or cover-back — both got a file.
       const missingIds = report.missingSlots;
       expect(missingIds).not.toContain("23-closing");
-      expect(missingIds).not.toContain("24-backcover");
+      expect(missingIds).not.toContain("cover-back");
     });
 
     it("does not use totalSlots === 24 as proof of Dream Big (scoped to exact bookId)", () => {
@@ -256,11 +288,11 @@ describe("matchImportedFiles", () => {
 
       expect(() => {
         const report = matchImportedFiles(
-          ["01-cover.png", "02-intro.png", "03-pilot.png"],
+          ["cover-front.png", "01-greeting.png", "02-intro.png"],
           slotsWithoutFilename,
         );
         expect(report.matched).toBe(3);
-        expect(report.bySlotId.get("01-cover")).toBe("01-cover.png");
+        expect(report.bySlotId.get("cover-front")).toBe("cover-front.png");
       }).not.toThrow();
     });
 
@@ -273,11 +305,11 @@ describe("matchImportedFiles", () => {
 
       expect(() => {
         const report = matchImportedFiles(
-          ["01-cover.png", "02-intro.png", "03-pilot.png"],
+          ["cover-front.png", "01-greeting.png", "02-intro.png"],
           slotsWithoutExpected,
         );
         expect(report.matched).toBe(3);
-        expect(report.bySlotId.get("01-cover")).toBe("01-cover.png");
+        expect(report.bySlotId.get("cover-front")).toBe("cover-front.png");
       }).not.toThrow();
     });
   });

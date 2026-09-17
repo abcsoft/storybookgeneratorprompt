@@ -371,3 +371,214 @@ export const safariFriendshipBook: StoryTemplate = {
   defaultOutfit: DEFAULT_OUTFIT,
   specialOutfits: SPECIAL_OUTFITS,
 };
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: each of the 10 original beats becomes two
+// sequential, visually distinct moments. This story has no ongoing
+// companion, so there is no introduction-timing constraint to preserve —
+// only the calf's own first appearance (originally beat index 5) and the
+// footprint/journal props stay in their original order.
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function reuseSFSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return { sceneId, kind: spec.kind, role: spec.role, illustrationPrompt: spec.illustrationPrompt, text: spec.text, legacyFilenames: [] };
+}
+
+function sfScene(
+  sceneId: string,
+  scene: string,
+  copy: (c: ChildProfile, p: Pronouns) => string,
+  opts: { light?: string; spread?: boolean; compositionNotes?: string; outfitOverride?: string } = {},
+): StoryEditionScene {
+  const { spread: _spread, ...promptOpts } = opts;
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(scene, { kind: "scene", ...promptOpts }),
+    text: (c) => copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+const sfScenes: StoryEditionScene[] = [
+  sfScene(
+    "journal-opened",
+    "Sitting on a wooden porch step at sunrise, carefully opening a worn brown leather field journal, eyes " +
+      "bright with excitement as the morning sun crests the horizon.",
+    (c) => `On the porch at sunrise, ${c.name} opened a worn field journal.`,
+    { light: "Warm early-morning sunrise light from the low sun; eye-level camera on the porch." },
+  ),
+  sfScene(
+    "map-discovered",
+    "Still on the porch step, looking down at the journal's open page showing a hand-drawn pencil trail map " +
+      "(no readable lettering), tracing the path with a finger, eager to begin.",
+    (c) => `Inside, a hand-drawn map traced a trail straight into the golden grass beyond the gate.`,
+    { light: "Warm early-morning sunrise light from the low sun; eye-level camera on the porch." },
+  ),
+  sfScene(
+    "gate-walk",
+    "Walking through a wooden savanna gate, journal held ready in one hand, stepping out onto the path with " +
+      "purposeful excitement.",
+    (c) => `${c.name} walked through the gate, journal held ready, eager for the trail ahead.`,
+    { light: "Bright warm mid-morning light over the golden grassland; eye-level camera at the gate." },
+  ),
+  sfScene(
+    "savanna-opens",
+    "Standing just past the gate, one hand shading their eyes as they look out across the endless golden " +
+      "grassland path stretching to the horizon.",
+    (c) => `Through the gate, the savanna opened up wide and golden as far as ${c.name} could see. The real adventure had begun.`,
+    { light: "Bright warm mid-morning light over the golden grassland; eye-level camera at the gate." },
+  ),
+  sfScene(
+    "giraffes-spotted",
+    "Standing in golden grass among scattered acacia trees, looking up in delight at a small gentle herd of " +
+      "giraffes grazing peacefully on the high leaves.",
+    (c) => `Beneath the acacia trees, a herd of giraffes stretched their long necks to the leaves.`,
+    {
+      light: "Bright warm midday sunlight over the acacia trees and golden grass; wide eye-level camera on the savanna.",
+      compositionNotes: "wide establishing shot — keep the giraffes' heads and necks fully inside the frame, no cropping at the top edge.",
+    },
+  ),
+  sfScene(
+    "giraffes-sketched",
+    "Standing in the same spot, journal open, sketching the giraffes quickly with a pencil, glancing up and " +
+      "down between the page and the herd, focused and happy.",
+    (c) => `${c.name} sketched them quickly, trying to catch every detail.`,
+    { light: "Bright warm midday sunlight over the acacia trees; eye-level camera on the savanna." },
+  ),
+  sfScene(
+    "wallow-approach",
+    "Approaching the edge of a muddy watering hole, slowing down curiously at the sound of playful splashing " +
+      "ahead, journal tucked under one arm.",
+    (c) => `At a muddy wallow, playful splashing sounds drew ${c.name} closer.`,
+    { light: "Warm midday light reflecting off the muddy water; eye-level camera at the wallow's edge." },
+  ),
+  sfScene(
+    "wallow-elephants",
+    "Crouching at the edge of the muddy watering hole, watching a small group of elephants splash and cool " +
+      "themselves playfully, a big smile at the gentle chaos.",
+    (c) => `A family of elephants splashed and sprayed water, cooling off together. ${c.name} laughed at their happy splashing.`,
+    { light: "Warm midday light reflecting off the muddy water; eye-level camera at the wallow's edge.", compositionNotes: "keep every elephant trunk and ear fully inside the frame, away from the crop edges." },
+  ),
+  sfScene(
+    "zebras-approaching",
+    "Standing still on the dirt path, noticing a long line of striped zebras approaching from the grass, " +
+      "journal pressed to their chest, watching with growing anticipation.",
+    (c) => `A whole line of zebras approached along the dirt path, stripe after stripe.`,
+    { light: "Bright, clear afternoon sunlight over the dirt path; eye-level camera on the path." },
+  ),
+  sfScene(
+    "zebras-crossing",
+    "Standing still and watching with wide eyes as the long line of striped zebras crosses the dirt path just " +
+      "ahead, in quiet awe.",
+    (c) => `Stripe after stripe crossed right in front of ${c.name}, like a moving puzzle.`,
+    { light: "Bright, clear afternoon sunlight over the dirt path; eye-level camera on the path." },
+  ),
+  sfScene(
+    "calf-heard",
+    "Pausing near tall grass at the sound of a small worried cry, listening carefully, journal lowered, " +
+      "concern on their face.",
+    (c) => `A small worried cry came from the tall grass. ${c.name} stopped to listen.`,
+    { light: "Soft warm late-afternoon light through the tall grass; eye-level camera at listening height." },
+  ),
+  sfScene(
+    "calf-found",
+    `Parting the tall grass to discover ${CALF} standing alone, ears drooping, calling out for its family.`,
+    (c) => `There stood a lost elephant calf, all alone, calling for a family that couldn't hear.`,
+    { light: "Soft warm late-afternoon light through the tall grass; eye-level camera at the calf's height." },
+  ),
+  sfScene(
+    "footprints-noticed",
+    `Kneeling beside ${CALF} in the tall grass, noticing a trail of large, round adult elephant footprints ` +
+      "stamped into the sandy soil leading toward the distant trees, leaning in to look closer.",
+    (c) => `${c.name} knelt beside the calf and noticed a line of deep, giant elephant tracks pressed into the sandy earth.`,
+    { light: "Warm late-afternoon light slanting across the grass; eye-level camera at kneeling height." },
+  ),
+  sfScene(
+    "footprints-traced",
+    `Still kneeling beside ${CALF}, comparing the footprints with a sketch in the open field journal, ` +
+      "pointing gently down the trail with a warm, reassuring smile.",
+    (c, p) => `"Look," ${p.subj} whispered warmly. "Your family went this way."`,
+    { light: "Warm late-afternoon light slanting across the grass; eye-level camera at kneeling height." },
+  ),
+  sfScene(
+    "watering-hole-wading",
+    `Stepping carefully into the shallow edge of a watering hole alongside ${CALF}, one hand resting gently ` +
+      "on its side, golden late-afternoon reflections on the water.",
+    (c) => `At a shallow watering hole, ${c.name} stepped in carefully alongside the calf.`,
+    { light: "Warm golden late-afternoon light reflecting off the water; eye-level camera at the water's edge." },
+  ),
+  sfScene(
+    "watering-hole-crossed",
+    `Guiding ${CALF} safely across the shallow watering hole, hand steady on its side, both reaching the far ` +
+      "bank together.",
+    (c) => `${c.name} guided the calf safely across, hand steady, step by step.`,
+    { light: "Warm golden late-afternoon light reflecting off the water; eye-level camera at the water's edge.", compositionNotes: "keep the calf's trunk, legs, and the child's limbs fully inside the safe area — no cropping at the frame edges." },
+  ),
+  sfScene(
+    "calling-out",
+    `Standing at sunset with ${CALF} close beside them, a hand cupped to their mouth calling out across the ` +
+      "golden horizon, hope on their face.",
+    (c) => `As the sun dipped low, ${c.name} called out across the golden grass.`,
+    { light: "Warm golden sunset light low on the horizon; eye-level camera on the savanna." },
+  ),
+  sfScene(
+    "trumpet-answer",
+    `Standing still with ${CALF}, both ears perked toward the distance, listening as a deep, low trumpet call ` +
+      "answers faintly from far across the savanna.",
+    (c) => `For a long moment, only silence answered — then, far away, a deep, low trumpet call.`,
+    { light: "Warm golden sunset light low on the horizon; eye-level camera on the savanna." },
+  ),
+  sfScene(
+    "herd-approaching",
+    `Watching with ${CALF} as a gentle herd of elephants approaches across the golden sunset grassland, trunks ` +
+      "raised, the calf's ears perking up in recognition.",
+    (c) => `The herd had heard! Across the golden grass, familiar shapes were coming closer.`,
+    {
+      spread: true,
+      light: "Warm golden-hour light glowing across the savanna at sunset; wide eye-level camera on the grassland.",
+      compositionNotes: "keep the elephant herd calm and at a comfortable middle distance — a warm gathering, not a crowd looming over the child.",
+    },
+  ),
+  sfScene(
+    "herd-reunion",
+    `A joyful reunion at golden sunset as ${CALF} runs to meet the gentle herd of elephants, trunks reaching ` +
+      "out warmly, the child watching with a big happy smile a comfortable distance away.",
+    (c) => `${c.name} watched, smiling, as the little calf ran to meet them, trunks reaching out in a warm and happy reunion.`,
+    {
+      spread: true,
+      light: "Warm golden-hour light glowing across the savanna at sunset; wide eye-level camera on the grassland.",
+      compositionNotes: "keep the elephant herd calm and at a comfortable middle distance — a warm gathering, not a crowd looming over the child; keep every trunk and ear fully inside the frame.",
+    },
+  ),
+];
+
+export const safariFriendshipStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "safari-friendship",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment on a wooden savanna porch at sunrise, sitting comfortably with a worn " +
+      "leather field journal resting nearby and looking toward the viewer with a warm, curious smile, golden " +
+      "grassland glowing softly behind them.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: reuseSFSpec(safariFriendshipPages[1], "intro"),
+  scenes: sfScenes,
+  closing: reuseSFSpec(safariFriendshipPages[12], "closing"),
+  videoQr: buildVideoQrScene(
+    STORY_META,
+    "A calm, low-detail golden savanna background at dusk with soft blurred acacia tree silhouettes, echoing " +
+      "the journey's warm sunset glow.",
+  ),
+  cover: {
+    front: reuseSFSpec(safariFriendshipPages[0], "cover"),
+    back: reuseSFSpec(safariFriendshipPages[13], "backcover"),
+  },
+};
+
+registerStoryEdition(safariFriendshipStandard24Edition);

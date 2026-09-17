@@ -9,6 +9,7 @@ import {
   type SubjectSide,
   type TextSide,
 } from "@/lib/story/layoutPlan";
+import { getStoryEdition } from "@/lib/story/storyEdition";
 import styles from "./page.module.css";
 
 interface SpreadConfiguratorProps {
@@ -127,9 +128,22 @@ export default function SpreadConfigurator({
   onCustomSpreadsChange,
   childName = "Child",
 }: SpreadConfiguratorProps) {
+  // Every registered story now resolves through a "standard-24" StoryEdition
+  // (see lib/story/storyEdition.ts), and Custom Spreads is disabled for any
+  // edition with no explicitly approved facing pairs — none currently have
+  // any. resolveLayoutPlan() rejects a custom-spreads request against such a
+  // story outright, so this UI must not let the user reach that state: show
+  // the truthful reason instead of the interactive spread picker.
+  const standardEdition = getStoryEdition(bookId, "standard-24");
+  const approvedSpreadPairs = standardEdition?.approvedSpreadPairs ?? [];
+  const customSpreadsUnavailable = Boolean(standardEdition) && approvedSpreadPairs.length === 0;
+
   const planCheck = useMemo(
-    () => recalculateAndValidatePhysicalPagePlan(bookId, profileId, mode, customSpreads),
-    [bookId, profileId, mode, customSpreads],
+    () =>
+      customSpreadsUnavailable
+        ? null
+        : recalculateAndValidatePhysicalPagePlan(bookId, profileId, mode, customSpreads),
+    [bookId, profileId, mode, customSpreads, customSpreadsUnavailable],
   );
 
   const spreadMap = useMemo(() => {
@@ -267,17 +281,28 @@ export default function SpreadConfigurator({
           type="button"
           role="radio"
           aria-checked={mode === "custom-spreads"}
+          aria-disabled={customSpreadsUnavailable}
+          disabled={customSpreadsUnavailable}
           className={`${styles.layoutModeCard} ${mode === "custom-spreads" ? styles.layoutModeCardActive : ""}`}
-          onClick={() => onModeChange("custom-spreads")}
+          onClick={() => !customSpreadsUnavailable && onModeChange("custom-spreads")}
         >
           <div className={styles.layoutModeCardTop}>
             <span className={styles.layoutModeCardIcon}>📖</span>
             <span className={styles.layoutModeCardName}>Expanded Hybrid</span>
-            <span className={styles.layoutModeCardPill}>Selected scenes add pages</span>
+            <span className={styles.layoutModeCardPill}>
+              {customSpreadsUnavailable ? "Unavailable for this story" : "Selected scenes add pages"}
+            </span>
           </div>
           <p className={styles.layoutModeCardDesc}>
-            Pick which scenes become wide panoramic spreads. Nothing is dropped or rewritten — every scene is kept,
-            so <strong>each spread you select adds one physical page</strong> beyond the standard 24-page book.
+            {customSpreadsUnavailable
+              ? "Custom spreads require an approved fixed-24 editorial mapping."
+              : (
+                <>
+                  Pick which scenes become wide panoramic spreads. Nothing is dropped or rewritten — every scene is
+                  kept, so <strong>each spread you select adds one physical page</strong> beyond the standard 24-page
+                  book.
+                </>
+              )}
           </p>
         </button>
 
@@ -285,8 +310,10 @@ export default function SpreadConfigurator({
           type="button"
           role="radio"
           aria-checked={mode === "full-spread-24"}
+          aria-disabled={customSpreadsUnavailable}
+          disabled={customSpreadsUnavailable}
           className={`${styles.layoutModeCard} ${mode === "full-spread-24" ? styles.layoutModeCardActive : ""}`}
-          onClick={() => onModeChange("full-spread-24")}
+          onClick={() => !customSpreadsUnavailable && onModeChange("full-spread-24")}
         >
           <div className={styles.layoutModeCardTop}>
             <span className={styles.layoutModeCardIcon}>🔒</span>
@@ -294,52 +321,64 @@ export default function SpreadConfigurator({
             <span className={styles.layoutModeCardPill}>Coming soon — editorial mapping required</span>
           </div>
           <p className={styles.layoutModeCardDesc}>
-            A fixed 24-physical-page edition with 11 interior spreads (13 image assets total) requires rewriting the
-            story's 22 scenes down to 11 spread beats — an editorial content decision, not a layout setting. Not
-            available until that mapping is written and approved.
+            {customSpreadsUnavailable
+              ? "Custom spreads require an approved fixed-24 editorial mapping."
+              : "A fixed 24-physical-page edition with 11 interior spreads (13 image assets total) requires rewriting the story's 22 scenes down to 11 spread beats — an editorial content decision, not a layout setting. Not available until that mapping is written and approved."}
           </p>
         </button>
       </div>
 
-      {/* Validation / Truthful Page-Count Status Banner */}
-      <div
-        className={`${styles.pagePlanBanner} ${planCheck.valid ? styles.pagePlanBannerValid : styles.pagePlanBannerInvalid}`}
-      >
-        {!planCheck.unavailable && (
-          <div className={styles.pagePlanStats}>
-            <span>
-              Story scenes: <strong>{planCheck.storySceneCount}</strong>
-            </span>
-            <span className={styles.pagePlanDivider}>•</span>
-            <span>
-              Image assets: <strong>{planCheck.imageAssetCount}</strong> ({planCheck.spreadAssetCount} spread
-              {planCheck.spreadAssetCount === 1 ? "" : "s"}, {planCheck.singleAssetCount} single
-              {planCheck.singleAssetCount === 1 ? "" : "s"})
-            </span>
-            <span className={styles.pagePlanDivider}>•</span>
-            <span>
-              Total physical PDF pages: <strong>{planCheck.totalPdfLeafCount}</strong>
-            </span>
-          </div>
-        )}
-        <div className={styles.pagePlanExplanation}>{planCheck.explanation}</div>
-        {mode === "custom-spreads" && planCheck.spreadCount > 0 && planCheck.totalPdfLeafCount !== planCheck.storySceneCount + 2 && (
-          <div className={styles.pagePlanWarning} role="alert">
-            ⚠️ Each selected spread adds one physical page. Selecting {planCheck.spreadCount} spread
-            {planCheck.spreadCount === 1 ? "" : "s"} produces a {planCheck.totalPdfLeafCount}-page book.
-          </div>
-        )}
-      </div>
-
-      {mode === "full-spread-24" && (
-        <div className={styles.pagePlanExplanation} data-testid="full-spread-24-coming-soon">
-          Full Spread 24-Page Edition is coming soon — editorial mapping required. Use Standard Single or Expanded
-          Hybrid for now.
+      {customSpreadsUnavailable ? (
+        <div className={styles.pagePlanExplanation} data-testid="custom-spreads-unavailable" role="status">
+          Custom spreads require an approved fixed-24 editorial mapping. This story always prints as exactly 24
+          interior pages (greeting, intro, 20 narrative scenes, closing, video-QR) plus a separate cover — use
+          Standard Single.
         </div>
+      ) : (
+        planCheck && (
+          <>
+            {/* Validation / Truthful Page-Count Status Banner */}
+            <div
+              className={`${styles.pagePlanBanner} ${planCheck.valid ? styles.pagePlanBannerValid : styles.pagePlanBannerInvalid}`}
+            >
+              {!planCheck.unavailable && (
+                <div className={styles.pagePlanStats}>
+                  <span>
+                    Story scenes: <strong>{planCheck.storySceneCount}</strong>
+                  </span>
+                  <span className={styles.pagePlanDivider}>•</span>
+                  <span>
+                    Image assets: <strong>{planCheck.imageAssetCount}</strong> ({planCheck.spreadAssetCount} spread
+                    {planCheck.spreadAssetCount === 1 ? "" : "s"}, {planCheck.singleAssetCount} single
+                    {planCheck.singleAssetCount === 1 ? "" : "s"})
+                  </span>
+                  <span className={styles.pagePlanDivider}>•</span>
+                  <span>
+                    Total physical PDF pages: <strong>{planCheck.totalPdfLeafCount}</strong>
+                  </span>
+                </div>
+              )}
+              <div className={styles.pagePlanExplanation}>{planCheck.explanation}</div>
+              {mode === "custom-spreads" && planCheck.spreadCount > 0 && planCheck.totalPdfLeafCount !== planCheck.storySceneCount + 2 && (
+                <div className={styles.pagePlanWarning} role="alert">
+                  ⚠️ Each selected spread adds one physical page. Selecting {planCheck.spreadCount} spread
+                  {planCheck.spreadCount === 1 ? "" : "s"} produces a {planCheck.totalPdfLeafCount}-page book.
+                </div>
+              )}
+            </div>
+
+            {mode === "full-spread-24" && (
+              <div className={styles.pagePlanExplanation} data-testid="full-spread-24-coming-soon">
+                Full Spread 24-Page Edition is coming soon — editorial mapping required. Use Standard Single or
+                Expanded Hybrid for now.
+              </div>
+            )}
+          </>
+        )
       )}
 
       {/* Expanded Hybrid Scene Spread Selector (only active in that mode) */}
-      {mode === "custom-spreads" && (
+      {!customSpreadsUnavailable && planCheck && mode === "custom-spreads" && (
         <div className={styles.spreadPairsSection}>
           <div className={styles.spreadPairsIntro}>
             <h4>Expanded Hybrid — selectable scene spreads</h4>

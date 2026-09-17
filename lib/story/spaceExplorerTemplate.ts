@@ -403,3 +403,217 @@ export const spaceExplorerBook: StoryTemplate = {
   specialOutfits: SPECIAL_OUTFITS,
   companion: ORBIT,
 };
+
+// ---------------------------------------------------------------------------
+// standard-24 StoryEdition: each of the 10 original beats becomes two
+// sequential, visually distinct moments. Orbit is not shown until its
+// introduction beat (originally beat index 4, on the Moon) — every earlier
+// split keeps companionOverride: null, matching the original.
+// ---------------------------------------------------------------------------
+
+import { registerStoryEdition, type StoryEdition, type StoryEditionScene } from "./storyEdition";
+import { buildGreetingScene, buildVideoQrScene } from "./standardEditionScenes";
+
+function reuseSETSpec(spec: PageSpec, sceneId: string): StoryEditionScene {
+  return { sceneId, kind: spec.kind, role: spec.role, illustrationPrompt: spec.illustrationPrompt, text: spec.text, legacyFilenames: [] };
+}
+
+function setScene(
+  sceneId: string,
+  scene: string,
+  copy: (c: ChildProfile, p: Pronouns) => string,
+  opts: { light?: string; compositionNotes?: string; outfitOverride?: string; companionOverride?: CompanionSpec | null } = {},
+): StoryEditionScene {
+  return {
+    sceneId,
+    kind: "scene",
+    illustrationPrompt: illustration(scene, { kind: "scene", ...opts }),
+    text: (c) => copy(c, pronouns(c.gender)),
+    legacyFilenames: [],
+  };
+}
+
+const setScenes: StoryEditionScene[] = [
+  setScene(
+    "stars-move",
+    "Standing at a bedroom desk beside an open window at dusk, looking through a small brass telescope at the " +
+      "twinkling night sky as the stars begin to trace themselves into a glowing constellation path, eyes wide with wonder.",
+    (c) => `Through the telescope, ${c.name} saw the stars begin to move — tracing themselves into a glowing pattern across the sky.`,
+    { light: "Soft golden-blue dusk light through the window mixing with starlight; eye-level camera at the desk.", outfitOverride: SPECIAL_OUTFITS.pajamas, companionOverride: null },
+  ),
+  setScene(
+    "star-chart-sketched",
+    "Still at the bedroom desk, holding a pencil and finishing the glowing constellation pattern onto a paper " +
+      "star chart, holding it up with pride as it glows softly in the dusk light.",
+    (c) => `With quick strokes, ${c.name} sketched the stellar path into a paper star chart.`,
+    { light: "Soft golden-blue dusk light mixing with the star chart's gentle glow; eye-level camera at the desk.", outfitOverride: SPECIAL_OUTFITS.pajamas, companionOverride: null },
+  ),
+  setScene(
+    "cockpit-boarding",
+    "Climbing into the brightly lit cockpit of the small friendly rocket ship on a backyard launch pad, " +
+      "tucking the sketched star chart safely beside the console, settling into the pilot's seat.",
+    (c) => `${c.name} climbed into the little rocket and tucked the star chart safely by the console.`,
+    { light: "Warm interior glow from cockpit dials against a deep blue night sky; eye-level camera looking through the rocket window.", outfitOverride: SPECIAL_OUTFITS.cockpitSuit, companionOverride: null },
+  ),
+  setScene(
+    "cockpit-ready",
+    "Sitting securely in the cockpit, smiling warmly and giving a confident thumbs-up through the clear rocket " +
+      "window while checking glowing control dials, ready for launch.",
+    (c) => `${c.name} checked every glowing dial and gave a thumbs-up to the waiting stars. It was time to go.`,
+    { light: "Warm interior glow from cockpit dials against a deep blue night sky; eye-level camera looking through the rocket window.", outfitOverride: SPECIAL_OUTFITS.cockpitSuit, companionOverride: null },
+  ),
+  setScene(
+    "liftoff-ignition",
+    "The small friendly rocket's engines igniting in a brilliant burst of light on the launch pad, visible " +
+      "through the round window with a huge excited grin, ready to rise.",
+    (c) => `Three, two, one — liftoff! The little rocket's engines roared to life.`,
+    { light: "Bright glowing rocket exhaust igniting against a deep starry night sky; wide eye-level camera tracking the rocket.", companionOverride: null },
+  ),
+  setScene(
+    "liftoff-ascent",
+    "The small friendly rocket soaring up into a brilliant starry sky, trailing a bright glowing exhaust " +
+      "plume, the child visible through the rocket's round window laughing with pure delight.",
+    (c) => `The little rocket soared up through the clouds and into the stars, and ${c.name} laughed with pure delight.`,
+    {
+      light: "Bright glowing rocket exhaust against a deep starry night sky; wide eye-level camera tracking the rocket.",
+      compositionNotes: "keep the rocket at a scale where it clearly reads as a small ship against the vast sky — the child, visible through the window, stays recognizable and never shrinks to an unreadable speck.",
+      companionOverride: null,
+    },
+  ),
+  setScene(
+    "window-approach",
+    "Floating gently inside the cozy, colorful spaceship cockpit without helmet, drifting toward the forward " +
+      "observation window, the glowing blue Earth just coming into view below.",
+    (c) => `Inside the cockpit, ${c.name} drifted toward the window. Far below, Earth was just coming into view.`,
+    { light: "Soft blue glow from Earth below mixing with warm cockpit control lights; eye-level camera inside the cockpit.", outfitOverride: SPECIAL_OUTFITS.cockpitSuit, companionOverride: null },
+  ),
+  setScene(
+    "earth-shrinking",
+    "Both hands resting lightly on the forward observation window as the glowing blue Earth shrinks softly " +
+      "below, an expression of pure wonder; soft control-panel lights all around.",
+    (c) => `Earth glowed like a soft blue marble, smaller and smaller.`,
+    { light: "Soft blue glow from Earth below mixing with warm cockpit control lights; eye-level camera inside the cockpit.", outfitOverride: SPECIAL_OUTFITS.cockpitSuit, companionOverride: null },
+  ),
+  setScene(
+    "orbit-spotted",
+    "Kneeling gently on the pale grey Moon in low gravity wearing the clear transparent bubble helmet, " +
+      "noticing a small, still robot resting quietly beside a crater, powered down.",
+    (c) => `On the quiet Moon, ${c.name} bounced from crater to crater until a small, still robot came into view.`,
+    { light: "Bright stark sunlight across the grey lunar craters with soft reflections on the clear bubble helmet; eye-level camera on the Moon." },
+  ),
+  setScene(
+    "orbit-revived",
+    "Kneeling beside the small robot, offering a small glowing solar power cell; Orbit's eye-lights flicker " +
+      "back to life with a grateful soft blue glow.",
+    (c) => `${c.name} shared a warm solar battery from the ship, and Orbit's eye-lights blinked gratefully back to life!`,
+    { light: "Bright stark sunlight across the grey lunar craters with soft blue reflections; eye-level camera on the Moon." },
+  ),
+  setScene(
+    "asteroids-entering",
+    "Gliding into a calm asteroid field inside the cozy spaceship cockpit without helmets, the first large " +
+      "slow-drifting asteroids coming into view through the panoramic observation glass.",
+    (c) => `With Orbit's power humming strong again, they glided into a field of slow, tumbling asteroids.`,
+    {
+      light: "Cool starlight with soft warm highlights from Orbit's chest light; eye-level camera inside the ship cockpit.",
+      compositionNotes: "keep the asteroids calmly drifting in the background at a safe distance — never crowding or looming toward the ship's window.",
+      outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
+    },
+  ),
+  setScene(
+    "asteroids-drifting",
+    "Sitting together in the cockpit, watching large asteroids drift like quiet giants in the dark at a safe " +
+      "distance, Orbit's chest light glowing steady and bright beside the child.",
+    (c) => `They drifted together past the tumbling asteroids, quiet giants in the dark.`,
+    {
+      light: "Cool starlight with soft warm highlights from Orbit's chest light; eye-level camera inside the ship cockpit.",
+      compositionNotes: "keep the asteroids calmly drifting in the background at a safe distance.",
+      outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
+    },
+  ),
+  setScene(
+    "nebula-entering",
+    "Flying into a swirling, colorful nebula full of soft pink, purple, and gold clouds of light, wearing the " +
+      "clear bubble helmet, eyes wide with wonder as the colors surround them.",
+    (c) => `Next came a nebula of swirling color — soft pinks and golds like a painting brought to life.`,
+    { light: "Soft, colorful glow from the surrounding nebula clouds, pink-gold-purple tones reflecting off the clear bubble helmet; eye-level camera among the clouds." },
+  ),
+  setScene(
+    "nebula-play",
+    "Laughing with arms spread wide in the swirling nebula clouds as Orbit tumbles playfully alongside in the " +
+      "weightless glow, pure joy on both their faces.",
+    (c) => `${c.name} laughed as Orbit tumbled playfully through the light.`,
+    { light: "Soft, colorful glow from the surrounding nebula clouds; eye-level camera among the clouds." },
+  ),
+  setScene(
+    "crystal-arrival",
+    "Standing on a glittering crystal planet's surface wearing the clear bubble helmet, surrounded by tall " +
+      "glowing crystal spires in every color, looking around in awe.",
+    (c) => `The crystal planet sparkled with tall glowing spires in every color, chiming like tiny bells with every step.`,
+    { light: "Cool, sparkling multicolor light reflecting off the crystal formations; eye-level camera on the crystal surface." },
+  ),
+  setScene(
+    "crystal-chime",
+    "Reaching out gently to touch a glowing crystal spire as it chimes softly in reply, Orbit's chest light " +
+      "reflecting in the sparkling crystal facets beside them.",
+    (c) => `${c.name} reached out and touched a glowing crystal — it rang a soft, sweet note in reply.`,
+    { light: "Cool, sparkling multicolor light reflecting off the crystal formations; eye-level camera on the crystal surface." },
+  ),
+  setScene(
+    "compass-problem",
+    "Kneeling beside Orbit on the crystal planet, noticing Orbit's small star-shaped navigation compass has " +
+      "slipped loose from its chest panel, looking at it thoughtfully.",
+    (c) => `Orbit was powered, but still needed to find home — a little star-shaped navigation compass had slipped loose.`,
+    { light: "Warm green beam glow mixing with cool planet starlight; eye-level camera at kneeling height." },
+  ),
+  setScene(
+    "compass-fixed",
+    "Kneeling beside Orbit, clicking the star-shaped navigation compass gently back into place on Orbit's " +
+      "chest panel, both watching with joy as a bright green homeward beam points toward the stars.",
+    (c) => `With careful hands, ${c.name} clicked it into place, and it beamed a bright green course toward home.`,
+    { light: "Warm green beam from the repaired compass mixing with cool planet starlight; eye-level camera at kneeling height." },
+  ),
+  setScene(
+    "orbit-farewell",
+    "Inside the spaceship cockpit, looking out the side viewport as Orbit waves happily beside a flashing " +
+      "friendly star beacon, ready to turn toward its own constellation.",
+    (c) => `Near Earth, Orbit's compass signaled a friendly beacon from home. With a joyful wave goodbye, Orbit turned toward its own constellation.`,
+    { light: "Warm atmospheric blue glow mixing with interior control console lights; eye-level camera inside the cockpit.", outfitOverride: SPECIAL_OUTFITS.cockpitSuit },
+  ),
+  setScene(
+    "homeward-descent",
+    "Sitting at the cockpit controls smiling warmly through the panoramic front viewport as the glowing blue " +
+      "Earth looms large and beautiful directly ahead, steering smoothly downward.",
+    (c) => `${c.name}'s little ship steered smoothly down toward the glowing blue Earth.`,
+    {
+      light: "Warm atmospheric blue glow from Earth ahead mixing with interior control console lights; eye-level camera inside the cockpit looking past the child.",
+      compositionNotes: "coherent cockpit view: the child at the controls is the clear foreground focus, looking forward at the magnificent glowing Earth filling the forward viewport.",
+      outfitOverride: SPECIAL_OUTFITS.cockpitSuit,
+    },
+  ),
+];
+
+export const spaceExplorerStandard24Edition: StoryEdition = {
+  id: "standard-24",
+  storyId: "space-explorer",
+  interiorPageCount: 24,
+  greeting: buildGreetingScene(
+    STORY_META,
+    "A calm, dreamy portrait moment in a cozy bedroom at dusk, sitting comfortably beside the window with the " +
+      "small brass telescope nearby and looking toward the viewer with a warm, wondering smile, soft starlight glowing outside.",
+    (c) => `A special adventure created just for ${c.name}.`,
+  ),
+  intro: reuseSETSpec(spaceExplorerPages[1], "intro"),
+  scenes: setScenes,
+  closing: reuseSETSpec(spaceExplorerPages[12], "closing"),
+  videoQr: buildVideoQrScene(
+    STORY_META,
+    "A calm, low-detail starry night sky background with soft twinkling stars and a faint distant nebula glow, " +
+      "echoing the journey's cosmic wonder.",
+  ),
+  cover: {
+    front: reuseSETSpec(spaceExplorerPages[0], "cover"),
+    back: reuseSETSpec(spaceExplorerPages[13], "backcover"),
+  },
+};
+
+registerStoryEdition(spaceExplorerStandard24Edition);

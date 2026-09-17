@@ -142,9 +142,70 @@ function coverLockup(page: GeneratedPage, child: ChildProfile): string {
  *  a blurred text-shadow does not (some viewers rasterize it into hard boxes). */
 function verseStyle(): string {
   return (
-    ` style="color:#231d2b;background:rgba(255,255,255,0.55);` +
-    `padding:0.16in 0.24in;border-radius:0.16in"`
+    `color:#231d2b;background:rgba(255,255,255,0.55);` +
+    `padding:0.16in 0.24in;border-radius:0.16in`
   );
+}
+
+/** Inline position rules for one of the six declared text-panel positions
+ *  (see TextPanelPosition in layoutGeometry.ts). Replaces the single
+ *  hardcoded bottom-left `.verse` position so a scene whose subject, action,
+ *  companion, marker, or chest sits in the lower-left of the frame can move
+ *  its panel elsewhere instead of covering it. Horizontal inset matches the
+ *  profile-aware text-safe margin already used by the bottom-left default
+ *  (1.25in / 4.8-5.2in max-width); vertical inset mirrors it at the top. */
+function versePositionStyle(pos: GeneratedPage["textPanelPosition"]): string {
+  const maxWidth = "max-width:5.2in;";
+  switch (pos) {
+    case "top-left":
+      return `position:absolute;left:1.25in;right:auto;top:0.85in;bottom:auto;${maxWidth}text-align:left;`;
+    case "top-right":
+      return `position:absolute;right:1.25in;left:auto;top:0.85in;bottom:auto;${maxWidth}text-align:left;`;
+    case "bottom-right":
+      return `position:absolute;right:1.25in;left:auto;bottom:0.95in;top:auto;${maxWidth}text-align:left;`;
+    case "left":
+      return `position:absolute;left:1.25in;right:auto;top:1.2in;bottom:1.2in;${maxWidth}text-align:left;display:flex;flex-direction:column;justify-content:center;`;
+    case "right":
+      return `position:absolute;right:1.25in;left:auto;top:1.2in;bottom:1.2in;${maxWidth}text-align:left;display:flex;flex-direction:column;justify-content:center;`;
+    case "bottom-left":
+    default:
+      return `position:absolute;left:1.25in;right:auto;bottom:0.95in;top:auto;${maxWidth}text-align:left;`;
+  }
+}
+
+/**
+ * The application-rendered video-QR block for the "video-qr" interior page:
+ * a real, deterministically-generated QR image (never AI-drawn), a vector CTA,
+ * and a visible fallback URL — or, in draft mode with no real target yet, a
+ * clearly-labelled placeholder. Production export never reaches this with an
+ * unset/placeholder QR (lib/manual/assemble.ts fails closed before this
+ * point), so the placeholder branch below is reachable in draft only.
+ */
+function videoQrOverlay(page: GeneratedPage, child: ChildProfile): string {
+  const qr = page.videoQr;
+  const pos = page.textPanelPosition ?? "bottom-right";
+  const boxStyle = versePositionStyle(pos) + "color:#231d2b;background:rgba(255,255,255,0.85);" +
+    "padding:0.28in 0.32in;border-radius:0.2in;text-align:center;max-width:2.6in;";
+  if (!qr || qr.isPlaceholder || !qr.dataUri || !qr.url) {
+    return `<div class="video-qr-overlay" style="${boxStyle}">
+      <div class="video-qr-placeholder-badge">VIDEO LINK NOT SET</div>
+      <div class="video-qr-cta">Watch ${escapeHtml(child.name)}'s Great Adventure</div>
+      <div class="video-qr-sub">Scan to watch the 1-minute personalized video.</div>
+    </div>`;
+  }
+  // Prefer the inline <svg> markup: it renders as real vector paths in the
+  // final PDF (kept crisp at any print resolution, and doesn't add an extra
+  // embedded raster image to a page that already has its background art) —
+  // fall back to the PNG data URI only if no SVG markup was provided.
+  const qrMarkup = qr.svgMarkup
+    ? `<div class="video-qr-image">${qr.svgMarkup}</div>`
+    : `<img class="video-qr-image" src="${qr.dataUri}" alt="QR code to ${escapeHtml(child.name)}'s video" />`;
+  return `<div class="video-qr-overlay" style="${boxStyle}">
+    <div class="video-qr-cta">Watch ${escapeHtml(child.name)}'s Great Adventure</div>
+    <div class="video-qr-sub">Scan to watch the 1-minute personalized video.</div>
+    ${qrMarkup}
+    <div class="video-qr-fallback-url">${escapeHtml(qr.url)}</div>
+  </div>`;
 }
 
 function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): string {
@@ -188,7 +249,7 @@ function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): 
     return `<section class="page spread spread-left">
       ${background(page, "left", isDraft)}
       <div class="scrim"></div>
-      <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
+      <div class="verse" style="${verseStyle()}">${formatText(page.text)}</div>
       ${draftWatermark}
     </section>
     <section class="page spread spread-right">
@@ -197,11 +258,26 @@ function pageHtml(page: GeneratedPage, child: ChildProfile, isDraft?: boolean): 
     </section>`;
   }
 
-  // Single full-bleed page with verse woven into the art.
+  // Video-QR page: application-rendered QR + CTA + fallback URL over the
+  // reserved background art — NEVER the generic verse panel (which would
+  // otherwise render as an empty, unlabeled white capsule for this page's
+  // deliberately-empty `text`).
+  if (page.kind === "video-qr") {
+    return `<section class="page single video-qr-page">
+      ${background(page, "full", isDraft)}
+      <div class="scrim"></div>
+      ${videoQrOverlay(page, child)}
+      ${draftWatermark}
+    </section>`;
+  }
+
+  // Single full-bleed page with verse woven into the art, positioned per this
+  // scene's declared text-safe region (see TextPanelPosition) rather than a
+  // single hardcoded corner.
   return `<section class="page single">
     ${background(page, "full", isDraft)}
     <div class="scrim"></div>
-    <div class="verse"${verseStyle()}>${formatText(page.text)}</div>
+    <div class="verse" style="${versePositionStyle(page.textPanelPosition)}${verseStyle()}">${formatText(page.text)}</div>
     ${draftWatermark}
   </section>`;
 }
@@ -343,6 +419,48 @@ export function renderBookHtml(
     /* Ink + optional panel are set per-page on the .verse wrapper by verseStyle(). */
   }
   .verse p:last-child { margin-bottom: 0; }
+
+  /* Application-rendered QR + CTA + fallback URL for the video-qr page —
+     deterministic vector/raster overlay, never AI-generated art or text. */
+  .video-qr-overlay {
+    font-family: "Nunito", sans-serif;
+  }
+  .video-qr-cta {
+    font-weight: 800;
+    font-size: 15pt;
+    margin-bottom: 0.06in;
+  }
+  .video-qr-sub {
+    font-weight: 700;
+    font-size: 10.5pt;
+    opacity: 0.85;
+    margin-bottom: 0.16in;
+  }
+  .video-qr-image {
+    width: 1.7in;
+    height: 1.7in;
+    display: block;
+    margin: 0 auto 0.12in;
+    background: #ffffff;
+  }
+  .video-qr-image svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .video-qr-fallback-url {
+    font-weight: 700;
+    font-size: 9pt;
+    word-break: break-all;
+  }
+  .video-qr-placeholder-badge {
+    font-weight: 800;
+    font-size: 9pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #b3261e;
+    margin-bottom: 0.1in;
+  }
 
   /* Cover title sits directly on the art (no dark glow); legibility via outline. */
   .cover-title {

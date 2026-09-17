@@ -29,5 +29,7 @@ export const luluPremiumColorSquare85x85Profile: PrintProfile = {
   spreadAspect: "2:1",
   targetCanvasAspect: "1:1",
   targetCanvasSpreadAspect: "2:1",
+  providerPresetAspect: "1:1",
+  providerPresetSpreadAspect: "2:1",
   exportMode: "lulu-interior-pdf",
 };
