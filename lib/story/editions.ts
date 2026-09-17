@@ -67,6 +67,13 @@ export interface PrintEdition {
   coverIllustrationIndex: number;
   /** 0-based index of illustration used for back cover. */
   backCoverIllustrationIndex: number;
+  /** Slot-ID pairs this edition explicitly declares as intentionally
+   *  reusable artwork (e.g. a book whose cover deliberately reuses a
+   *  narrative scene). Absent/empty means NO cross-slot duplicate is
+   *  intentional — any two slots sharing identical artwork content (by
+   *  SHA-256) are treated as an unintended duplicate and block production.
+   *  Never inferred from filenames — only an explicit declaration here. */
+  allowedDuplicateSlotPairs?: [string, string][];
 }
 
 const editionRegistry = new Map<string, PrintEdition>();

@@ -6,11 +6,13 @@ import type { ChildProfile } from "../story/types";
 
 const child: ChildProfile = { name: "Alex", age: 4, gender: "boy" };
 
-/** A solid-color PNG at a given width:height ratio. */
-async function makeImage(ratio: number, height: number = 200): Promise<Buffer> {
+/** A solid-color PNG at a given width:height ratio. `seed` varies the pixel
+ *  content (real artwork is never byte-identical across slots, and the
+ *  duplicate-artwork-across-slots gate now correctly flags it if it is). */
+async function makeImage(ratio: number, height: number = 200, seed = 0): Promise<Buffer> {
   const width = Math.round(height * ratio);
   return sharp({
-    create: { width, height, channels: 3, background: { r: 200, g: 150, b: 120 } },
+    create: { width, height, channels: 3, background: { r: 200, g: (150 + seed * 7) % 255, b: (120 + seed * 11) % 255 } },
   })
     .png()
     .toBuffer();
@@ -20,9 +22,9 @@ describe("runPreflight", () => {
   it("passes ok on a complete, correctly-shaped set of images", async () => {
     const manifest = buildManifest(child, "dream-big");
     const files = await Promise.all(
-      manifest.map(async (m) => ({
+      manifest.map(async (m, idx) => ({
         filename: m.filename,
-        buffer: await makeImage(m.spread ? 21 / 9 : 3 / 2),
+        buffer: await makeImage(m.spread ? 21 / 9 : 3 / 2, 200, idx),
       })),
     );
 
@@ -98,9 +100,9 @@ describe("runPreflight", () => {
   it("does NOT hard-fail Printify pages whose source is a usable-but-non-ideal ratio", async () => {
     const manifest = buildManifest(child, "great-adventure", "printify-hardcover-square-8x8");
     const files = await Promise.all(
-      manifest.map(async (m) => ({
+      manifest.map(async (m, idx) => ({
         filename: m.filename,
-        buffer: await makeImage(m.spread ? 16 / 9 : 3 / 2),
+        buffer: await makeImage(m.spread ? 16 / 9 : 3 / 2, 200, idx),
       })),
     );
 

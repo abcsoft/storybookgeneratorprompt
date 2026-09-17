@@ -20,11 +20,14 @@ afterEach(() => {
   else process.env.STORYBOOK_OUT_DIR = original;
 });
 
-async function makeImage(ratio: number): Promise<Buffer> {
+/** `seed` varies pixel content — real artwork is never byte-identical
+ *  across slots, and the duplicate-artwork-across-slots gate now correctly
+ *  flags it if it is. */
+async function makeImage(ratio: number, seed = 0): Promise<Buffer> {
   const height = 40;
   const width = Math.round(height * ratio);
   return sharp({
-    create: { width, height, channels: 3, background: { r: 200, g: 150, b: 120 } },
+    create: { width, height, channels: 3, background: { r: 200, g: (150 + seed * 7) % 255, b: (120 + seed * 11) % 255 } },
   })
     .png()
     .toBuffer();
@@ -171,7 +174,7 @@ describe("exportPrintifyBook", () => {
         const images = new Map<number, ProvidedImage>();
         for (const m of manifest) {
           images.set(m.index, {
-            buffer: await makeImage(m.spread ? 2 : 1),
+            buffer: await makeImage(m.spread ? 2 : 1, m.index),
             mimeType: "image/png",
           });
         }
@@ -259,7 +262,7 @@ describe("exportPrintifyBook", () => {
             images.set(slot.sourceSceneIndex, { buffer: wideMarker, mimeType: "image/png" });
           } else {
             images.set(slot.sourceSceneIndex, {
-              buffer: await makeImage(1),
+              buffer: await makeImage(1, slot.sourceSceneIndex),
               mimeType: "image/png",
             });
           }

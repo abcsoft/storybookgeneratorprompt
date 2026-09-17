@@ -777,27 +777,52 @@ export const greatAdventureStandard24Edition: StoryEdition = {
     reuseBeat(4, "ancient-ruins"),
     reuseBeat(5, "savanna-riverbank"),
     reuseBeat(6, "snowy-mountain"),
-    // Default bottom-left would cover the polar bears / Scout huddled at
-    // lower frame center in both Arctic scenes — moved to the open sky.
-    withTextPanelPosition(arcticArrivalScene, "top-right"),
+    // Re-audited against the actual rendered draft PDF (not just the prompt
+    // description): the boy's head sits in the top-right corner in this
+    // render, so top-right clips it — top-left (open sky above the bears)
+    // is genuinely clear instead.
+    withTextPanelPosition(arcticArrivalScene, "top-left"),
     withTextPanelPosition(arcticAuroraScene, "top-right"),
-    reuseBeat(8, "coral-reef"),
+    // Default bottom-left covered Scout almost entirely inside the shared
+    // air bubble (rendered draft PDF page 13) — moved to the open water/
+    // sunbeam area top-right, clear of both the child+Scout bubble and the
+    // turtle/archway.
+    withTextPanelPosition(reuseBeat(8, "coral-reef"), "top-right"),
     reuseBeat(9, "blue-whale"),
     reuseBeat(10, "ocean-storm"),
-    // Default bottom-left would cover Scout splashing ashore at lower frame
-    // center — moved to the open palms/sky above.
-    withTextPanelPosition(islandArrivalScene, "top-right"),
+    // Re-audited against the rendered draft PDF: Scout actually splashes
+    // ashore at bottom-RIGHT in this render (not lower-center as assumed
+    // previously), so the default bottom-left is genuinely clear — the
+    // earlier top-right override instead covered the child's face. Reverted
+    // to the default.
+    islandArrivalScene,
     islandMarkerScene,
-    reuseBeat(12, "crystal-cave"),
-    // Default bottom-left directly covers the chest — moved to the open
-    // shafts-of-light area so the chest, lid, and lifting hands stay visible.
-    withTextPanelPosition(reuseBeat(13, "treasure-chest-reach"), "top-right"),
-    withTextPanelPosition(reuseBeat(14, "chest-bursts-open"), "top-right"),
-    reuseBeat(15, "star-friend"),
+    // Default bottom-left covered Scout almost entirely (rendered draft PDF
+    // page 18) — moved to the crystal-only top-right corner.
+    withTextPanelPosition(reuseBeat(12, "crystal-cave"), "top-right"),
+    // CRITICAL (rendered draft PDF page 19 — hard failure): the earlier
+    // top-right override covered the child's reaching hand and part of the
+    // chest-opening action itself — the one thing this page must show
+    // unmistakably. Re-audited: top-left (dim cave ceiling / carved pillar,
+    // no chest, no child) is genuinely clear in this render.
+    withTextPanelPosition(reuseBeat(13, "treasure-chest-reach"), "top-left"),
+    // Same re-audit for the chest bursting open (rendered draft PDF page
+    // 20) — top-right clipped the child's head/light-swirl focal area;
+    // top-left is clear.
+    withTextPanelPosition(reuseBeat(14, "chest-bursts-open"), "top-left"),
+    // Default bottom-left clipped the treasure chest's front-lower edge
+    // (rendered draft PDF page 21) — moved to the lantern/crystal corner,
+    // clear of the child, Scout, and the chest.
+    withTextPanelPosition(reuseBeat(15, "star-friend"), "top-right"),
     departureScene,
     homewardFlightScene,
   ],
-  closing: reuseSpec(greatAdventurePages[19], "closing"),
+  // Default bottom-left covered Scout almost entirely at the foot of the bed
+  // (rendered draft PDF page 24) — moved to bottom-right, which keeps the
+  // child's face, Scout, the glowing star, and the window all visible (the
+  // nightstand is the only thing it grazes, and it isn't a protected
+  // element).
+  closing: withTextPanelPosition(reuseSpec(greatAdventurePages[19], "closing"), "bottom-right"),
   // Visually continues straight out of the closing bedroom scene (same soft
   // cool moonlight, same window-with-a-tiny-star motif) rather than jumping
   // to an unrelated backdrop, so the video-qr page reads as one more quiet

@@ -143,12 +143,6 @@ describe("Part 2: Shared Artwork Framing Engine & Transform Math Regression Test
       const dummyChild: ChildProfile = { name: "Test", age: 5, gender: "boy" };
       const images = new Map<number, ProvidedImage>();
 
-      const testPng = await sharp({
-        create: { width: 2000, height: 1000, channels: 4, background: { r: 100, g: 150, b: 200, alpha: 1 } },
-      })
-        .png()
-        .toBuffer();
-
       // Custom transform with scale and offset
       const customTransform: ArtworkTransform = {
         mode: "manual",
@@ -173,9 +167,18 @@ describe("Part 2: Shared Artwork Framing Engine & Transform Math Regression Test
         profileId: "printify-hardcover-square-8x8",
         mode: "standard-single",
       });
-      for (const slot of plan.assets) {
+      for (let i = 0; i < plan.assets.length; i++) {
+        const slot = plan.assets[i];
+        // Distinct per-slot content — real artwork is never byte-identical
+        // across slots, and the duplicate-artwork-across-slots gate now
+        // correctly flags it if it is.
+        const slotPng = await sharp({
+          create: { width: 2000, height: 1000, channels: 4, background: { r: 100, g: (150 + i * 7) % 255, b: (200 + i * 11) % 255, alpha: 1 } },
+        })
+          .png()
+          .toBuffer();
         images.set(slot.sourceSceneIndex, {
-          buffer: testPng,
+          buffer: slotPng,
           mimeType: "image/png",
           // Apply to the first career scene (no more spreads on any story).
           transform: slot.sceneId === "harbour-departure" ? customTransform : undefined,

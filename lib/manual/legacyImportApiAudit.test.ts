@@ -64,9 +64,12 @@ async function makeRoleLabelledImage(role: string, index: number): Promise<Buffe
     .toBuffer();
 }
 
-async function makeHighResImage(width = 3375, height = 2475): Promise<Buffer> {
+/** `seed` varies pixel content — real artwork is never byte-identical
+ *  across slots, and the duplicate-artwork-across-slots gate now correctly
+ *  flags it if it is. */
+async function makeHighResImage(width = 3375, height = 2475, seed = 0): Promise<Buffer> {
   return sharp({
-    create: { width, height, channels: 3, background: { r: 100, g: 150, b: 200 } },
+    create: { width, height, channels: 3, background: { r: 100, g: (150 + seed * 7) % 255, b: (200 + seed * 11) % 255 } },
   })
     .png()
     .toBuffer();
@@ -292,7 +295,7 @@ describe("Legacy 22-file Import API Audit", () => {
 
     for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
-      const buf = await makeHighResImage();
+      const buf = await makeHighResImage(3375, 2475, i);
       formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
     }
 
@@ -320,11 +323,11 @@ describe("Legacy 22-file Import API Audit", () => {
     formData.append("profileId", "classic-landscape-11x8");
     formData.append("layoutMode", "standard-single");
 
-    // 2000x1500 ≈ 178 PPI (between 150 and 300)
+    // 2000x1500 ≈ 178 PPI (between 150 and 300); distinct per-slot content.
     for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
       const buf = await sharp({
-        create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
+        create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: (150 + i * 7) % 255, b: (200 + i * 11) % 255 } },
       }).png().toBuffer();
       formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));
     }
@@ -366,8 +369,12 @@ describe("Legacy 22-file Import API Audit", () => {
     const acks: Record<string, any> = {};
     for (let i = 0; i < 26; i++) {
       const slot = dreamBigSlots[i];
+      // Distinct per-slot content — real artwork is never byte-identical
+      // across slots, and the duplicate-artwork-across-slots gate now
+      // correctly flags it if it is. Each slot's own SHA is acknowledged
+      // individually below.
       const buf = await sharp({
-        create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: 150, b: 200 } },
+        create: { width: 2000, height: 1500, channels: 3, background: { r: 100, g: (150 + i * 7) % 255, b: (200 + i * 11) % 255 } },
       }).png().toBuffer();
       const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
       formData.append("images", new File([new Uint8Array(buf)], slot.expectedFilename, { type: "image/png" }));

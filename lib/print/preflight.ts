@@ -393,6 +393,49 @@ export async function runPreflight(
     ? opts.resolvedSlotMapping
     : matchFilesToSlots(opts.files, plan.assets, errors, warnings, issues);
 
+  // 6b. Duplicate-artwork-across-slots detection — the SAME uploaded file
+  // content (by SHA-256, not filename) must never be silently assigned to
+  // two different required slots (e.g. cover-front and 01-greeting both
+  // resolving to the same bytes). Confirmed production defect: a rendered
+  // draft PDF showed the cover and greeting pages using visually identical
+  // artwork. Default to blocking production for ANY unintended duplicate —
+  // no Great Adventure edition currently declares an intentionally-reusable
+  // pair, so every cross-slot content match here is unintended.
+  {
+    const shaToSlotIds = new Map<string, string[]>();
+    for (const [slotId, file] of bySlotId.entries()) {
+      const sha = calculateSha256(file.buffer);
+      const existing = shaToSlotIds.get(sha);
+      if (existing) existing.push(slotId);
+      else shaToSlotIds.set(sha, [slotId]);
+    }
+    const allowedPairs = new Set(
+      (edition?.allowedDuplicateSlotPairs ?? []).map(([a, b]) => [a, b].sort().join("::")),
+    );
+    for (const [sha, slotIds] of shaToSlotIds.entries()) {
+      if (slotIds.length < 2) continue;
+      for (let i = 0; i < slotIds.length; i++) {
+        for (let j = i + 1; j < slotIds.length; j++) {
+          const [slotA, slotB] = [slotIds[i], slotIds[j]];
+          const pairKey = [slotA, slotB].sort().join("::");
+          if (allowedPairs.has(pairKey)) continue; // explicitly declared intentional reuse
+          const fileA = bySlotId.get(slotA)!;
+          const fileB = bySlotId.get(slotB)!;
+          const dupMsg = `The same artwork (SHA-256 ${sha.slice(0, 12)}…) is assigned to both slot "${slotA}" (${fileA.filename}) and slot "${slotB}" (${fileB.filename}). One uploaded file must not be silently assigned to two different required slots.`;
+          errors.push(dupMsg);
+          issues.push({
+            type: "DUPLICATE_ARTWORK_ACROSS_SLOTS",
+            code: "DUPLICATE_ARTWORK_ACROSS_SLOTS",
+            expected: "Distinct artwork per required slot (unless the edition explicitly allowlists this exact pair)",
+            actual: `slotA="${slotA}" filenameA="${fileA.filename}" slotB="${slotB}" filenameB="${fileB.filename}" sha256="${sha}"`,
+            recommendation: `Re-import a distinct illustration for one of "${slotA}" or "${slotB}" — they currently share identical artwork content.`,
+            message: dupMsg,
+          } as any);
+        }
+      }
+    }
+  }
+
   // 7. Check for Missing Required Assets
   const missingSlots = plan.assets.filter((slot) => !bySlotId.has(slot.slotId));
   if (missingSlots.length > 0) {
@@ -745,6 +788,32 @@ export async function runPreflight(
       } else if (nativeEffectivePpi < 300) {
         if (isGenuineAiEnhanced && isApproved) {
           // Approved genuine AI-enhancement passes directly with no warnings or blocking issues!
+        } else if (isGenuineAiEnhanced && !isApproved) {
+          // BUG FIX: a genuine, pending (not-yet-approved) AI enhancement must
+          // classify identically regardless of which native-PPI bracket its
+          // source happens to land in — this mirrors the <150 PPI bracket's
+          // ENHANCEMENT_APPROVAL_REQUIRED case above. Previously this branch
+          // had no such case, so a pending enhancement whose native PPI
+          // landed at 150-299 (e.g. 2400×1760 on an 11.25×8.25 canvas ≈ 213
+          // PPI) silently fell through into the QUALITY_WARNING_UNACKNOWLEDGED
+          // path below instead — the SAME underlying "pending approval" state
+          // reported as two different, contradictory issue codes depending on
+          // source resolution, even though the asset card correctly showed
+          // "Status: pending" for all of them. A pending enhancement is never
+          // a plain-quality warning: it has already been genuinely enhanced
+          // and only needs visual approval, not a quality acknowledgement.
+          const unapprovedMsg = `AI-enhanced illustration "${file.filename}" (native ${Math.round(nativeEffectivePpi)} PPI) requires explicit visual approval before production export.`;
+          errors.push(unapprovedMsg);
+          issues.push({
+            type: "ENHANCEMENT_APPROVAL_REQUIRED",
+            code: "ENHANCEMENT_APPROVAL_REQUIRED",
+            illustrationNumber: illoNum,
+            filename: file.filename,
+            expected: "Explicit visual user approval of AI super-resolution result",
+            actual: "Unapproved enhancement",
+            recommendation: "Review before/after preview and explicitly approve the enhanced illustration.",
+            message: unapprovedMsg,
+          });
         } else {
           let isSlotQualityAcknowledged = false;
           let ackRejectReason = "";
@@ -801,7 +870,15 @@ export async function runPreflight(
               illustrationNumber: illoNum,
               filename: file.filename,
               expected: `Minimum 300 native effective PPI, verified genuine AI enhancement, or valid bound quality acknowledgement`,
-              actual: `${actualWidth}×${actualHeight} px (${Math.round(nativeEffectivePpi)} native PPI)`,
+              // Never combine the CURRENT file's pixel dimensions (which may
+              // already be resampled/enhanced to the destination canvas
+              // size, e.g. 3375×2475) with the ORIGINAL source's native
+              // detail PPI in one ambiguous string like "3375×2475 px (213
+              // native PPI)" — that reads as if the enhanced-size image has
+              // only 213 PPI of real detail, when 213 PPI describes the
+              // ORIGINAL 2400×1760 source, not the current file. State both
+              // explicitly and separately instead.
+              actual: `Original source: ${originalWidth}×${originalHeight} px (native effective PPI: ${Math.round(nativeEffectivePpi)}). Current file: ${actualWidth}×${actualHeight} px. Output grid: ${finalOutputGridPpi} PPI.`,
               recommendation: `Enhance with Real-ESRGAN, provide higher-resolution images (300+ PPI), or explicitly acknowledge the quality warning for this slot.`,
               message: ackMsg,
             });

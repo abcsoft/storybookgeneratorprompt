@@ -201,6 +201,25 @@ export default function ManualFlow({
       });
   }, []);
 
+  // "Check story match" must never appear functional when no real vision
+  // provider can actually inspect the image — disabled (not just silently
+  // returning NOT_CHECKED) with a visible setup explanation instead.
+  const [visionAvailable, setVisionAvailable] = useState<boolean | null>(null);
+  const [visionSetupInstructions, setVisionSetupInstructions] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/semantic-check")
+      .then((r) => r.json())
+      .then((data) => {
+        setVisionAvailable(data.isAvailable === true);
+        setVisionSetupInstructions(data.isAvailable ? null : (data.setupInstructions ?? data.message ?? null));
+      })
+      .catch(() => {
+        setVisionAvailable(false);
+        setVisionSetupInstructions("Could not reach /api/semantic-check to check vision-provider availability.");
+      });
+  }, []);
+
   const clearServerErrors = useCallback(() => {
     setError(null);
     setPreflightIssues([]);
@@ -2570,9 +2589,15 @@ export default function ManualFlow({
                 className={styles.copyButton}
                 style={{ borderColor: "#0284c7", color: "#0369a1", fontWeight: 700 }}
                 onClick={() => void onBatchCheckSemantic()}
-                disabled={batchEnhancing || batchChecking}
+                disabled={batchEnhancing || batchChecking || visionAvailable === false}
+                title={visionAvailable === false ? (visionSetupInstructions ?? "No vision provider is available.") : undefined}
+                data-testid="batch-check-semantic-button"
               >
-                {batchChecking ? "🎯 Checking story matches…" : "🎯 Check all story matches"}
+                {batchChecking
+                  ? "🎯 Checking story matches…"
+                  : visionAvailable === false
+                    ? "🎯 Check all story matches (unavailable — no vision provider)"
+                    : "🎯 Check all story matches"}
               </button>
               {pendingApprovalCount > 0 && (
                 <button
@@ -2580,8 +2605,9 @@ export default function ManualFlow({
                   style={{ borderColor: "#10b981", color: "#047857", fontWeight: 700 }}
                   onClick={() => void handleApproveAllEnhancements()}
                   data-testid="batch-approve-all-button"
+                  title="Approves every pending enhancement without individually opening each before/after comparison first. Use the per-image Approve button below each card to review one at a time."
                 >
-                  ✓ Approve all reviewed enhancements ({pendingApprovalCount})
+                  ✓ Approve all pending enhancements without individual review ({pendingApprovalCount})
                 </button>
               )}
             </div>
@@ -2600,6 +2626,24 @@ export default function ManualFlow({
                   <li><strong>Configured External AI:</strong> Set <code>ENHANCEMENT_API_URL</code> and <code>ENHANCEMENT_API_KEY</code> in <code>.env.local</code>.</li>
                 </ul>
                 Bicubic/Lanczos resizing and mock providers are strictly prohibited in production.
+              </div>
+            </div>
+          )}
+
+          {/* Vision-Provider Setup Instructions when Story-Match Checking Is Unavailable */}
+          {visionAvailable === false && (
+            <div className={styles.instructions} style={{ borderLeft: "4px solid #0284c7", margin: "10px 0" }} data-testid="vision-provider-setup-instructions">
+              <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: "4px" }}>
+                ⚠️ Story-Match Checking Is Unavailable — No Vision Provider Configured
+              </div>
+              <div style={{ fontSize: "13px", color: "#0c4a6e" }}>
+                "Check story match" cannot inspect the image content right now — no AI vision provider is
+                configured or reachable.
+                <ul style={{ margin: "4px 0 0 16px" }}>
+                  <li><strong>Local Ollama (Recommended, free/private):</strong> Install Ollama, run <code>ollama serve</code>, then pull a vision model (NOT automatic — this is a multi-gigabyte download), e.g. <code>ollama pull llava</code>.</li>
+                  <li><strong>Configured External API:</strong> Set <code>VISION_API_URL</code> and <code>VISION_API_KEY</code> in <code>.env.local</code>.</li>
+                </ul>
+                {visionSetupInstructions && <div style={{ marginTop: "4px" }}>{visionSetupInstructions}</div>}
               </div>
             </div>
           )}
@@ -2698,6 +2742,7 @@ export default function ManualFlow({
                 isEnhancing={enhancingIndices.has(p.index)}
                 isCheckingSemantic={checkingSemanticIndices.has(p.index)}
                 enhancerAvailable={enhancerAvailable === true}
+                visionAvailable={visionAvailable === true}
               />
             ))}
           </div>

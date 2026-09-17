@@ -35,7 +35,10 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
     const files = await Promise.all(
       plan.assets.map(async (slot, idx) => ({
         filename: slot.legacyAliases[0] ?? `${String(idx + 1).padStart(2, "0")}.png`,
-        buffer: await makeImage(3375, 2475),
+        // Distinct per-slot content — real artwork is never byte-identical
+        // across slots, and the duplicate-artwork-across-slots gate now
+        // correctly flags it if it is.
+        buffer: await makeImage(3375, 2475, { r: 100, g: (150 + idx * 7) % 255, b: (200 + idx * 11) % 255 }),
       })),
     );
 
@@ -116,9 +119,9 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       mode: "standard-single",
     });
     const files = await Promise.all(
-      plan26.assets.map(async (slot) => ({
+      plan26.assets.map(async (slot, idx) => ({
         filename: slot.expectedFilename,
-        buffer: await makeImage(1376, 768),
+        buffer: await makeImage(1376, 768, { r: 100, g: (150 + idx * 7) % 255, b: (200 + idx * 11) % 255 }),
       })),
     );
 
@@ -175,27 +178,32 @@ describe("Classic Landscape Preflight & Active Layout Contract Regression Suite"
       profileId: "classic-landscape-11x8",
       mode: "standard-single",
     });
-    const rawImage = await makeImage(2000, 1500);
-    const imageSha = crypto.createHash("sha256").update(rawImage).digest("hex");
+    // Distinct per-slot content (same dimensions/PPI, different pixel
+    // color) — real artwork is never byte-identical across slots, and the
+    // duplicate-artwork-across-slots gate now correctly flags it if it is.
+    // Each slot's own SHA is acknowledged individually below.
+    const rawImages = await Promise.all(
+      plan.assets.map((_, idx) => makeImage(2000, 1500, { r: 100, g: (150 + idx * 7) % 255, b: (200 + idx * 11) % 255 })),
+    );
 
     const files = plan.assets.map((slot, idx) => ({
       filename: slot.legacyAliases[0] ?? `${String(idx + 1).padStart(2, "0")}.png`,
-      buffer: rawImage,
+      buffer: rawImages[idx],
     }));
 
     const acks: Record<string, any> = {};
-    for (const slot of plan.assets) {
+    plan.assets.forEach((slot, idx) => {
       acks[slot.slotId] = {
         slotId: slot.slotId,
         bookId: "dream-big",
         profileId: "classic-landscape-11x8",
         layoutMode: "standard-single",
-        sourceSha256: imageSha,
+        sourceSha256: crypto.createHash("sha256").update(rawImages[idx]).digest("hex"),
         computedNativeEffectivePpi: 177.8,
         destinationDimensions: slot.destinationDimensions,
         timestamp: new Date().toISOString(),
       };
-    }
+    });
 
     const preflight = await runPreflight({
       child,

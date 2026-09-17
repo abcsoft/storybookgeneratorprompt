@@ -33,6 +33,7 @@ export default function IllustrationCard({
   isEnhancing,
   isCheckingSemantic,
   enhancerAvailable,
+  visionAvailable,
 }: {
   page: ManualPage;
   pageLabel: string;
@@ -60,6 +61,7 @@ export default function IllustrationCard({
   isEnhancing?: boolean;
   isCheckingSemantic?: boolean;
   enhancerAvailable?: boolean;
+  visionAvailable?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -411,15 +413,21 @@ export default function IllustrationCard({
             </>
           )}
 
-          {/* Check story match button */}
+          {/* Check story match button — disabled (not silently non-functional)
+              when no real vision provider can actually inspect the image. */}
           {hasImage && onCheckStoryMatch && (
             <button
               className={styles.copyButton}
               style={{ borderColor: "#0284c7", color: "#0369a1" }}
               onClick={onCheckStoryMatch}
-              disabled={isCheckingSemantic}
+              disabled={isCheckingSemantic || visionAvailable === false}
+              title={visionAvailable === false ? "No vision provider is available — see setup instructions above." : undefined}
             >
-              {isCheckingSemantic ? "🎯 Checking…" : "🎯 Check story match"}
+              {isCheckingSemantic
+                ? "🎯 Checking…"
+                : visionAvailable === false
+                  ? "🎯 Check story match (unavailable)"
+                  : "🎯 Check story match"}
             </button>
           )}
 

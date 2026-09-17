@@ -30,8 +30,11 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       const is213 = i < 7;
       const width = is213 ? 2400 : 1200;
       const height = is213 ? 1760 : 880;
+      // Distinct per-slot pixel content (not just distinct filenames) — real
+      // artwork is never byte-identical across slots, and the preflight's
+      // duplicate-artwork-across-slots gate now correctly flags it if it is.
       const buf = await sharp({
-        create: { width, height, channels: 3, background: { r: 50, g: 100, b: 200 } },
+        create: { width, height, channels: 3, background: { r: 50, g: (100 + i * 7) % 255, b: (200 + i * 11) % 255 } },
       }).png().toBuffer();
 
       const pfFile: PreflightFile = {
@@ -87,8 +90,11 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
       const is213 = i < 7;
       const width = is213 ? 2400 : 1200;
       const height = is213 ? 1760 : 880;
+      // Distinct per-slot pixel content (not just distinct filenames) — real
+      // artwork is never byte-identical across slots, and the preflight's
+      // duplicate-artwork-across-slots gate now correctly flags it if it is.
       const buf = await sharp({
-        create: { width, height, channels: 3, background: { r: 50, g: 100, b: 200 } },
+        create: { width, height, channels: 3, background: { r: 50, g: (100 + i * 7) % 255, b: (200 + i * 11) % 255 } },
       }).png().toBuffer();
 
       const pfFile: PreflightFile = {
@@ -169,9 +175,11 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
     const files: PreflightFile[] = [];
     const mapping = new Map<string, PreflightFile>();
 
-    for (const asset of plan.assets) {
+    for (let i = 0; i < plan.assets.length; i++) {
+      const asset = plan.assets[i];
+      // Distinct per-slot content — see the "classifies mixed 213/107 PPI" test above.
       const buf = await sharp({
-        create: { width: 1200, height: 880, channels: 3, background: { r: 30, g: 40, b: 50 } },
+        create: { width: 1200, height: 880, channels: 3, background: { r: 30, g: (40 + i * 7) % 255, b: (50 + i * 11) % 255 } },
       }).png().toBuffer();
 
       const pfFile: PreflightFile = {
@@ -231,9 +239,11 @@ describe("Actionable Resolution Gates & Truthfulness Verification Suite", () => 
     const files: PreflightFile[] = [];
     const mapping = new Map<string, PreflightFile>();
 
-    for (const asset of plan.assets) {
+    for (let i = 0; i < plan.assets.length; i++) {
+      const asset = plan.assets[i];
+      // Distinct per-slot content — see the "classifies mixed 213/107 PPI" test above.
       const buf = await sharp({
-        create: { width: 3375, height: 2475, channels: 3, background: { r: 100, g: 150, b: 200 } },
+        create: { width: 3375, height: 2475, channels: 3, background: { r: 100, g: (150 + i * 7) % 255, b: (200 + i * 11) % 255 } },
       }).png().toBuffer();
 
       const pfFile: PreflightFile = {

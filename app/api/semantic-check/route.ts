@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getActiveVisionProvider, validateStoryMatch } from "@/lib/semantic/semanticValidator";
+import { getActiveVisionProviderAsync, validateStoryMatch } from "@/lib/semantic/semanticValidator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,13 +7,23 @@ export const dynamic = "force-dynamic";
 const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_UPLOAD_BYTES = 35 * 1024 * 1024;
 
+/** Provider-capabilities / health endpoint — GET /api/semantic-check.
+ *  Reports whether "Check story match" can do a REAL visual check right
+ *  now, including a live (read-only, never-downloads) Ollama probe. */
 export async function GET(): Promise<Response> {
-  const provider = getActiveVisionProvider();
+  const { provider, ollamaProbe } = await getActiveVisionProviderAsync();
   if (!provider) {
     return NextResponse.json({
       provider: null,
       isAvailable: false,
-      message: "No vision provider configured. Only preliminary metadata diagnostic scanning available.",
+      message: "No vision provider configured. Story visual match cannot be checked — only preliminary metadata diagnostic scanning is available.",
+      ollama: ollamaProbe
+        ? { available: ollamaProbe.available, reason: ollamaProbe.reason, setupInstructions: ollamaProbe.setupInstructions }
+        : undefined,
+      setupInstructions:
+        ollamaProbe?.setupInstructions ??
+        "Configure a vision provider: run a local Ollama vision model (see OLLAMA_BASE_URL/OLLAMA_VISION_MODEL), " +
+          "or set VISION_API_URL + VISION_API_KEY for an OpenAI-compatible cloud endpoint.",
     });
   }
 
@@ -27,6 +37,7 @@ export async function GET(): Promise<Response> {
     },
     isAvailable: true,
     costEstimate: provider.estimateCost(1),
+    ollama: ollamaProbe ? { available: ollamaProbe.available, model: ollamaProbe.model } : undefined,
   });
 }
 
@@ -66,8 +77,28 @@ export async function POST(request: Request): Promise<Response> {
     const prompt = (formData.get("prompt") as string) || "";
     const userConfirmedPaid = formData.get("userConfirmedPaid") === "true";
 
-    const visionProvider = getActiveVisionProvider();
-    if (visionProvider && visionProvider.isPaid && !userConfirmedPaid) {
+    const { provider: visionProvider, ollamaProbe } = await getActiveVisionProviderAsync();
+    if (!visionProvider) {
+      // Never a misleading 200 "NOT_CHECKED" — a real story-match check was
+      // requested and none is possible right now. Fail closed with the
+      // exact setup instructions instead of silently degrading.
+      return NextResponse.json(
+        {
+          code: "VISION_PROVIDER_UNAVAILABLE",
+          status: "CHECK_FAILED",
+          error: "No AI vision provider is available. Story visual match cannot be checked.",
+          ollama: ollamaProbe
+            ? { available: ollamaProbe.available, reason: ollamaProbe.reason, setupInstructions: ollamaProbe.setupInstructions }
+            : undefined,
+          setupInstructions:
+            ollamaProbe?.setupInstructions ??
+            "Configure a vision provider: run a local Ollama vision model (see OLLAMA_BASE_URL/OLLAMA_VISION_MODEL), " +
+              "or set VISION_API_URL + VISION_API_KEY for an OpenAI-compatible cloud endpoint.",
+        },
+        { status: 503 },
+      );
+    }
+    if (visionProvider.isPaid && !userConfirmedPaid) {
       return NextResponse.json(
         {
           error: "Explicit user confirmation required before making paid vision API calls.",
@@ -91,6 +122,17 @@ export async function POST(request: Request): Promise<Response> {
 
     const imageBuffer = Buffer.from(await file.arrayBuffer());
 
+    const parseJsonArrayField = (name: string): string[] | undefined => {
+      const raw = formData.get(name) as string | null;
+      if (!raw) return undefined;
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.map(String) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+
     const result = await validateStoryMatch({
       slotId,
       filename: file.name,
@@ -102,6 +144,15 @@ export async function POST(request: Request): Promise<Response> {
       mimeType,
       otherSlots,
       userConfirmedPaid,
+      visionProvider, // already resolved above — avoid a second Ollama probe
+      requiredCharacters: parseJsonArrayField("requiredCharacters"),
+      requiredAction: (formData.get("requiredAction") as string) || undefined,
+      requiredLocation: (formData.get("requiredLocation") as string) || undefined,
+      requiredProps: parseJsonArrayField("requiredProps"),
+      continuityContract: parseJsonArrayField("continuityContract"),
+      forbiddenSubstitutions: parseJsonArrayField("forbiddenSubstitutions"),
+      identityStyleFingerprint: (formData.get("identityStyleFingerprint") as string) || undefined,
+      secretMarkerFingerprint: (formData.get("secretMarkerFingerprint") as string) || undefined,
     });
 
     return NextResponse.json(result);

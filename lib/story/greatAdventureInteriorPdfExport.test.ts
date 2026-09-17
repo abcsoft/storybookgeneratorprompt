@@ -10,8 +10,11 @@ import sharp from "sharp";
 import { POST as assemblePost } from "../../app/api/assemble/route";
 import { resolveLayoutPlan } from "./layoutPlan";
 
-async function makeFixture(width = 3375, height = 2475): Promise<Buffer> {
-  return sharp({ create: { width, height, channels: 3, background: { r: 120, g: 140, b: 200 } } }).png().toBuffer();
+/** Distinct per-slot content when `seed` varies — real artwork is never
+ *  byte-identical across slots, and the duplicate-artwork-across-slots gate
+ *  now correctly flags it if it is. */
+async function makeFixture(width = 3375, height = 2475, seed = 0): Promise<Buffer> {
+  return sharp({ create: { width, height, channels: 3, background: { r: 120, g: (140 + seed * 7) % 255, b: (200 + seed * 11) % 255 } } }).png().toBuffer();
 }
 
 describe("Great Adventure / Classic Landscape — separate production interior PDF", () => {
@@ -34,8 +37,9 @@ describe("Great Adventure / Classic Landscape — separate production interior P
     formData.append("videoUrl", "https://example.com/watch/ihan-great-adventure");
     formData.append("part", "interior");
 
-    for (const slot of plan.assets) {
-      const buf = await makeFixture();
+    for (let i = 0; i < plan.assets.length; i++) {
+      const slot = plan.assets[i];
+      const buf = await makeFixture(3375, 2475, i);
       formData.append("images", new File([new Uint8Array(buf)], slot.legacyAliases[0] ?? slot.filename, { type: "image/png" }));
     }
 
@@ -71,8 +75,9 @@ describe("Great Adventure / Classic Landscape — separate production interior P
     formData.append("videoUrl", "https://example.com/watch/ihan-great-adventure");
     // no `part` field — default combined proof
 
-    for (const slot of plan.assets) {
-      const buf = await makeFixture();
+    for (let i = 0; i < plan.assets.length; i++) {
+      const slot = plan.assets[i];
+      const buf = await makeFixture(3375, 2475, i);
       formData.append("images", new File([new Uint8Array(buf)], slot.legacyAliases[0] ?? slot.filename, { type: "image/png" }));
     }
 
