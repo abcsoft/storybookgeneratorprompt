@@ -82,6 +82,94 @@ export async function generateBook(
   let failed = 0;
   let cursor = 0;
 
+  // The cinematic hero book needs stronger continuity than ordinary
+  // independent storybook pages. Generate it sequentially so the previous
+  // approved-looking frame can be supplied as a visual reference, and keep
+  // the completed transformation frame as a permanent suit reference for all
+  // later hero pages. Real child photos + character anchor always stay first,
+  // so facial identity has higher priority than generated frames.
+  if (bookId === "hero-adventure") {
+    const canonicalIndex = 10; // cover=0; story page 10 is the final transformation
+
+    const asReference = (img: { data: Buffer; mimeType: string }): ReferencePhoto => ({
+      mimeType: img.mimeType,
+      base64: img.data.toString("base64"),
+    });
+
+    const generateAt = async (
+      i: number,
+      extraRefs: ReferencePhoto[] = [],
+    ): Promise<{ data: Buffer; mimeType: string } | null> => {
+      const page = pages[i];
+      const aspect = page.spread ? ASPECT_SPREAD : ASPECT_SINGLE;
+      try {
+        const pageRefs = [...refs, ...extraRefs].slice(0, MAX_REFERENCE_PHOTOS);
+        const image = await generate(page.prompt, pageRefs, aspect);
+        results[i] = {
+          index: page.index,
+          kind: page.kind,
+          role: page.role,
+          text: page.text,
+          image: image.data,
+          imageMimeType: image.mimeType,
+          failed: false,
+          spread: page.spread,
+          verseInk: page.ink,
+        };
+        return image;
+      } catch (err) {
+        failed++;
+        results[i] = {
+          index: page.index,
+          kind: page.kind,
+          role: page.role,
+          text: page.text,
+          image: null,
+          imageMimeType: "image/png",
+          failed: true,
+          spread: page.spread,
+          error: err instanceof Error ? err.message : String(err),
+        };
+        return null;
+      } finally {
+        completed++;
+        onProgress?.(completed, pages.length, failed);
+      }
+    };
+
+    let previousRef: ReferencePhoto | null = null;
+
+    // Story pages 1-9: civilian -> awakening -> partial transformation.
+    for (let i = 1; i < canonicalIndex; i++) {
+      const image = await generateAt(i, previousRef ? [previousRef] : []);
+      if (image) previousRef = asReference(image);
+    }
+
+    // Page 10 establishes the permanent hero design.
+    const canonicalImage = await generateAt(
+      canonicalIndex,
+      previousRef ? [previousRef] : [],
+    );
+    const canonicalRef = canonicalImage ? asReference(canonicalImage) : null;
+    if (canonicalRef) previousRef = canonicalRef;
+
+    // Cover is intentionally generated AFTER the canonical reveal, so it uses
+    // the exact same suit rather than inventing a separate cover costume.
+    await generateAt(0, canonicalRef ? [canonicalRef] : []);
+
+    // Remaining story + back cover keep both the canonical suit and previous
+    // frame. Canonical comes before previous-frame continuity.
+    for (let i = canonicalIndex + 1; i < pages.length; i++) {
+      const extra: ReferencePhoto[] = [];
+      if (canonicalRef) extra.push(canonicalRef);
+      if (previousRef) extra.push(previousRef);
+      const image = await generateAt(i, extra);
+      if (image) previousRef = asReference(image);
+    }
+
+    return results;
+  }
+
   async function worker(): Promise<void> {
     while (true) {
       const i = cursor++;
