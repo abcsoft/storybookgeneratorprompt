@@ -28,7 +28,6 @@ export default function AutoFlow({
   const [age, setAge] = useState("4");
   const [gender, setGender] = useState<Gender>("boy");
   const [heroId, setHeroId] = useState("sky-spark");
-  const [language, setLanguage] = useState("English");
   const [progress, setProgress] = useState<Progress>({
     completed: 0,
     total: pageCount,
@@ -113,7 +112,6 @@ export default function AutoFlow({
     form.append("bookId", bookId);
     if (bookId === "hero-adventure") {
       form.append("heroId", heroId);
-      form.append("language", language);
     }
 
     setPhase("generating");
@@ -192,12 +190,7 @@ export default function AutoFlow({
           />
 
           {bookId === "hero-adventure" && (
-            <HeroFields
-              heroId={heroId}
-              setHeroId={setHeroId}
-              language={language}
-              setLanguage={setLanguage}
-            />
+            <HeroFields heroId={heroId} setHeroId={setHeroId} />
           )}
 
           <button className={styles.button} type="submit">
