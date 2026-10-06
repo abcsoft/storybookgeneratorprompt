@@ -34,6 +34,10 @@ const BOOK_ART: Record<string, { cover: string; motif: string }> = {
     cover: "linear-gradient(150deg, #4a2c13 0%, #8a5426 60%, #d99a4e 130%)",
     motif: "🔍",
   },
+  "hero-adventure": {
+    cover: "linear-gradient(150deg, #081b3a 0%, #0c5f8f 58%, #47d9ff 125%)",
+    motif: "⚡",
+  },
   "kindness-garden": {
     cover: "linear-gradient(150deg, #234d2c 0%, #4c8f5b 60%, #a9dd8e 130%)",
     motif: "🌱",

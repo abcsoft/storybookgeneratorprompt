@@ -7,6 +7,10 @@ export interface ChildProfile {
   name: string;
   age: number;
   gender: Gender;
+  /** Optional original-hero choice used by dynamic hero stories. */
+  heroId?: string;
+  /** Optional output language hint for dynamic story generators. */
+  language?: string;
 }
 
 /** A reference photo, already downscaled and base64-encoded for Gemini. */
