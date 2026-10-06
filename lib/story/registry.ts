@@ -10,6 +10,7 @@ import { bedtimeDreamBook } from "./bedtimeDreamTemplate";
 import { dinosaurDiscoveryBook } from "./dinosaurDiscoveryTemplate";
 import { dreamBigBook } from "./dreamBigTemplate";
 import { greatAdventureBook } from "./greatAdventureTemplate";
+import { heroAdventureBook } from "./heroAdventureTemplate";
 import { kindnessGardenBook } from "./kindnessGardenTemplate";
 import { rainbowKingdomBook } from "./rainbowKingdomTemplate";
 import { safariFriendshipBook } from "./safariFriendshipTemplate";
@@ -23,6 +24,7 @@ export const DEFAULT_BOOK_ID = "dream-big";
 export const STORY_BOOKS: StoryTemplate[] = [
   dreamBigBook,
   greatAdventureBook,
+  heroAdventureBook,
   theGreatDetectiveBook,
   kindnessGardenBook,
   dinosaurDiscoveryBook,
