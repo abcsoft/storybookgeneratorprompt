@@ -82,7 +82,6 @@ export default function ManualFlow({
   const [age, setAge] = useState("4");
   const [gender, setGender] = useState<Gender>("boy");
   const [heroId, setHeroId] = useState("sky-spark");
-  const [language, setLanguage] = useState("English");
 
   const [pages, setPages] = useState<ManualPage[]>([]);
   const [markdown, setMarkdown] = useState("");
@@ -158,7 +157,6 @@ export default function ManualFlow({
           bookId: targetBookId,
           profileId: targetProfileId,
           heroId: targetBookId === "hero-adventure" ? heroId : undefined,
-          language: targetBookId === "hero-adventure" ? language : undefined,
         }),
       });
       const data = await res.json();
@@ -236,7 +234,6 @@ export default function ManualFlow({
           bookId,
           profileId,
           heroId: bookId === "hero-adventure" ? heroId : undefined,
-          language: bookId === "hero-adventure" ? language : undefined,
         }),
       });
       const data = await res.json();
@@ -738,12 +735,7 @@ export default function ManualFlow({
           />
 
           {bookId === "hero-adventure" && (
-            <HeroFields
-              heroId={heroId}
-              setHeroId={setHeroId}
-              language={language}
-              setLanguage={setLanguage}
-            />
+            <HeroFields heroId={heroId} setHeroId={setHeroId} />
           )}
           <button className={styles.button} onClick={getPrompts} disabled={busy}>
             {busy ? "Building prompts…" : "Get my prompts →"}
