@@ -22,6 +22,8 @@ const profileSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(40),
   age: z.coerce.number().int().min(0).max(18),
   gender: z.enum(["boy", "girl", "neutral"]),
+  heroId: z.string().trim().optional(),
+  language: z.string().trim().optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -50,6 +52,8 @@ export async function POST(request: Request): Promise<Response> {
     name: form.get("name"),
     age: form.get("age"),
     gender: form.get("gender"),
+    heroId: form.get("heroId") || undefined,
+    language: form.get("language") || undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
