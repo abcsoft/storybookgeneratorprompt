@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import ProfileFields, { type Gender } from "./ProfileFields";
+import HeroFields from "./HeroFields";
 import IllustrationCard from "./IllustrationCard";
 import CorrectionPanel from "./CorrectionPanel";
 import BookReview from "./BookReview";
@@ -80,6 +81,8 @@ export default function ManualFlow({
   const [name, setName] = useState("");
   const [age, setAge] = useState("4");
   const [gender, setGender] = useState<Gender>("boy");
+  const [heroId, setHeroId] = useState("sky-spark");
+  const [language, setLanguage] = useState("English");
 
   const [pages, setPages] = useState<ManualPage[]>([]);
   const [markdown, setMarkdown] = useState("");
@@ -154,6 +157,8 @@ export default function ManualFlow({
           gender,
           bookId: targetBookId,
           profileId: targetProfileId,
+          heroId: targetBookId === "hero-adventure" ? heroId : undefined,
+          language: targetBookId === "hero-adventure" ? language : undefined,
         }),
       });
       const data = await res.json();
@@ -224,7 +229,15 @@ export default function ManualFlow({
       const res = await fetch("/api/prompts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), age, gender, bookId, profileId }),
+        body: JSON.stringify({
+          name: name.trim(),
+          age,
+          gender,
+          bookId,
+          profileId,
+          heroId: bookId === "hero-adventure" ? heroId : undefined,
+          language: bookId === "hero-adventure" ? language : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -723,6 +736,15 @@ export default function ManualFlow({
             gender={gender}
             setGender={setGender}
           />
+
+          {bookId === "hero-adventure" && (
+            <HeroFields
+              heroId={heroId}
+              setHeroId={setHeroId}
+              language={language}
+              setLanguage={setLanguage}
+            />
+          )}
           <button className={styles.button} onClick={getPrompts} disabled={busy}>
             {busy ? "Building prompts…" : "Get my prompts →"}
           </button>
