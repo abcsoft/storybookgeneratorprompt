@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import ProfileFields, { type Gender } from "./ProfileFields";
+import HeroFields from "./HeroFields";
 import styles from "./page.module.css";
 
 type Phase = "idle" | "generating" | "done" | "error";
@@ -26,6 +27,8 @@ export default function AutoFlow({
   const [name, setName] = useState("");
   const [age, setAge] = useState("4");
   const [gender, setGender] = useState<Gender>("boy");
+  const [heroId, setHeroId] = useState("sky-spark");
+  const [language, setLanguage] = useState("English");
   const [progress, setProgress] = useState<Progress>({
     completed: 0,
     total: pageCount,
@@ -108,6 +111,10 @@ export default function AutoFlow({
     form.append("age", age);
     form.append("gender", gender);
     form.append("bookId", bookId);
+    if (bookId === "hero-adventure") {
+      form.append("heroId", heroId);
+      form.append("language", language);
+    }
 
     setPhase("generating");
     setProgress({ completed: 0, total: pageCount });
@@ -183,6 +190,15 @@ export default function AutoFlow({
             gender={gender}
             setGender={setGender}
           />
+
+          {bookId === "hero-adventure" && (
+            <HeroFields
+              heroId={heroId}
+              setHeroId={setHeroId}
+              language={language}
+              setLanguage={setLanguage}
+            />
+          )}
 
           <button className={styles.button} type="submit">
             Create my storybook ✨
